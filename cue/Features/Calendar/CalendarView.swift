@@ -51,8 +51,10 @@ struct CalendarView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) { newEventButton }
-        .safeAreaInset(edge: .bottom) {
-            CalendarChrome(onToday: goToToday)
+        .overlay(alignment: .bottomLeading) {
+            JumpToTodayButton(isVisible: !isOnToday, action: goToToday)
+                .padding(.leading, 20)
+                .padding(.bottom, 24)
         }
         .alert(
             "Couldn't load events",
@@ -137,6 +139,12 @@ struct CalendarView: View {
                 }
             }
         )
+    }
+
+    /// True when the day pager is showing today, so the "jump to today" pill
+    /// can hide — mirroring the month and year scopes.
+    private var isOnToday: Bool {
+        CalendarMath.isToday(store.selectedDate)
     }
 
     private func goToToday() {
