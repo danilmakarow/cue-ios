@@ -35,7 +35,7 @@ struct LoadingView: View {
                     .padding(.top, 8)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Loading Cue")
+            .accessibilityLabel("loading.accessibility")
         }
     }
 }

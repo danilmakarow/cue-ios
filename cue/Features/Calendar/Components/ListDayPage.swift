@@ -52,19 +52,21 @@ struct ListDayPage: View {
         }
     }
 
-    /// "Today's Tasks" on today, otherwise "Tasks on <date>".
+    /// "Today's Tasks" on today, otherwise "Tasks on <date>". Localized; the
+    /// date itself is formatted locale-aware by `FormatStyle`.
     private var heading: String {
         if Calendar.current.isDateInToday(date) {
-            return "Today's Tasks"
+            return String(localized: "calendar.list.heading.today")
         }
-        return "Tasks on \(date.formatted(.dateTime.weekday().day().month(.abbreviated)))"
+        let formattedDate = date.formatted(.dateTime.weekday().day().month(.abbreviated))
+        return String(format: String(localized: "calendar.list.heading.other"), formattedDate)
     }
 
     private var emptyState: some View {
         ContentUnavailableView(
-            "No tasks",
+            "calendar.list.empty.title",
             systemImage: "checkmark.circle",
-            description: Text("Nothing scheduled for this day.")
+            description: Text("calendar.list.empty.description")
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -128,6 +130,11 @@ private struct EventListCard: View {
             .frame(maxHeight: .infinity)
     }
 
+    /// Localized accessibility label for the completion checkbox.
+    private var toggleAccessibilityLabel: LocalizedStringKey {
+        event.isCompleted ? "task.toggle.markNotDone" : "task.toggle.markDone"
+    }
+
     private var completionToggle: some View {
         Button {
             onToggle(event)
@@ -140,7 +147,7 @@ private struct EventListCard: View {
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(event.isCompleted ? "Mark as not done" : "Mark as done")
+        .accessibilityLabel(toggleAccessibilityLabel)
     }
 
     /// Formatted time range (e.g. "9:00 – 10:30"), localized.

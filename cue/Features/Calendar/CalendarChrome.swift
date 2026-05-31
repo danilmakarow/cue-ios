@@ -18,7 +18,7 @@ struct CalendarChrome: View {
     var body: some View {
         HStack {
             Button(action: onToday) {
-                Text("Today")
+                Text("calendar.chrome.today")
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 18)
                     .padding(.vertical, 12)
@@ -36,7 +36,7 @@ struct CalendarChrome: View {
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Go to today")
+                .accessibilityLabel("calendar.chrome.today.accessibility")
 
                 Button {
                     // Inbox — not implemented yet.
@@ -46,7 +46,7 @@ struct CalendarChrome: View {
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Inbox")
+                .accessibilityLabel("calendar.chrome.inbox")
             }
             .font(.title3)
             .glassEffect(.regular.interactive(), in: .capsule)

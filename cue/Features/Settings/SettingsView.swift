@@ -21,15 +21,15 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Appearance") {
-                Picker("Theme", selection: $theme.appearance) {
+            Section("settings.appearance.title") {
+                Picker("settings.theme", selection: $theme.appearance) {
                     ForEach(AppearanceMode.allCases) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Accent Color")
+                    Text("settings.appearance.accentColor")
                     AccentColorPicker(selection: $theme.accentColor)
                 }
                 .padding(.vertical, 4)
@@ -42,7 +42,7 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             Spacer()
-                            Text("Log Out")
+                            Text("settings.signOut")
                                 .fontWeight(.semibold)
                             Spacer()
                         }
@@ -50,7 +50,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .navigationTitle("Settings")
+        .navigationTitle("settings.title")
         .safeAreaInset(edge: .bottom) {
             AppTabBar()
         }
@@ -90,7 +90,7 @@ private struct UserProfileRow: View {
         if let trimmed, !trimmed.isEmpty {
             return trimmed
         }
-        return "Signed in"
+        return String(localized: "settings.profile.signedIn")
     }
 
     @ViewBuilder
@@ -103,7 +103,7 @@ private struct UserProfileRow: View {
                 .overlay {
                     Circle().strokeBorder(.tint, lineWidth: 1.5)
                 }
-                .accessibilityLabel("Your profile photo")
+                .accessibilityLabel("settings.profile.avatar.accessibility")
         } else {
             Circle()
                 .fill(.secondary.opacity(0.15))
@@ -115,7 +115,7 @@ private struct UserProfileRow: View {
                 .overlay {
                     Circle().strokeBorder(.tint, lineWidth: 1.5)
                 }
-                .accessibilityLabel("Default profile avatar")
+                .accessibilityLabel("settings.profile.avatarDefault.accessibility")
         }
     }
 

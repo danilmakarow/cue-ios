@@ -15,12 +15,12 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
 
     var id: String { rawValue }
 
-    /// User-facing label.
+    /// User-facing label. Localized via the app's String Catalog.
     var title: String {
         switch self {
-        case .calendar: return "Calendar"
-        case .dashboard: return "Dashboard"
-        case .settings: return "Settings"
+        case .calendar: return String(localized: "tab.calendar")
+        case .dashboard: return String(localized: "tab.dashboard")
+        case .settings: return String(localized: "tab.settings")
         }
     }
 

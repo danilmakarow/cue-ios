@@ -42,7 +42,7 @@ struct AuthView: View {
                 if authStore.isAuthenticating {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text("Signing you in…")
+                        Text("auth.signingIn")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -52,7 +52,7 @@ struct AuthView: View {
             .padding(.bottom, 48)
         }
         .alert(
-            "Couldn't sign in",
+            "auth.alert.signInFailed.title",
             isPresented: Binding(
                 get: { authStore.errorMessage != nil },
                 set: { isPresented in
@@ -60,7 +60,7 @@ struct AuthView: View {
                 }
             )
         ) {
-            Button("OK", role: .cancel) {}
+            Button("common.ok", role: .cancel) {}
         } message: {
             Text(authStore.errorMessage ?? "")
         }
@@ -91,7 +91,7 @@ struct AuthView: View {
             Text("Cue")
                 .font(.system(size: 44, weight: .bold, design: .rounded))
 
-            Text("Your day, cued just right.")
+            Text("auth.tagline")
                 .font(.title3)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -111,7 +111,7 @@ struct AuthView: View {
     }
 
     private var disclaimer: some View {
-        Text("We use your Apple ID to create your Cue account. No password required.")
+        Text("auth.disclaimer")
             .font(.footnote)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
@@ -123,7 +123,7 @@ struct AuthView: View {
         Button {
             isDevLoginPresented = true
         } label: {
-            Label("Dev login", systemImage: "hammer.fill")
+            Label("dev.login.title", systemImage: "hammer.fill")
                 .font(.footnote.weight(.semibold))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
@@ -131,7 +131,7 @@ struct AuthView: View {
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
         .glassEffect(.regular.interactive(), in: .capsule)
-        .accessibilityLabel("Developer login with a pasted access token")
+        .accessibilityLabel("dev.login.trigger.accessibility")
     }
     #endif
 
@@ -188,11 +188,11 @@ private struct DevLoginSheet: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("Dev login")
+                .navigationTitle("dev.login.title")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
+                        Button("common.cancel") { dismiss() }
                     }
                     ToolbarItem(placement: .primaryAction) {
                         Button {
@@ -211,14 +211,14 @@ private struct DevLoginSheet: View {
     private var content: some View {
         switch phase {
         case .loading:
-            ProgressView("Loading users…")
+            ProgressView("dev.login.loading")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .loaded(let users) where users.isEmpty:
             ContentUnavailableView(
-                "No users",
+                "dev.login.empty.title",
                 systemImage: "person.crop.circle.badge.questionmark",
-                description: Text("Create one with `pnpm dev-cli create-user --appleUserId <id>`.")
+                description: Text("dev.login.empty.description")
             )
 
         case .loaded(let users):
@@ -234,7 +234,7 @@ private struct DevLoginSheet: View {
                         .buttonStyle(.plain)
                     }
                 } footer: {
-                    Text("Debug builds only. Tap a user to sign in without going through Apple.")
+                    Text("dev.login.footer")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -242,11 +242,11 @@ private struct DevLoginSheet: View {
 
         case .failed(let message):
             ContentUnavailableView {
-                Label("Couldn't load users", systemImage: "exclamationmark.triangle")
+                Label("dev.login.failed.title", systemImage: "exclamationmark.triangle")
             } description: {
                 Text(message)
             } actions: {
-                Button("Retry") {
+                Button("common.retry") {
                     Task { await loadUsers() }
                 }
             }
@@ -266,7 +266,7 @@ private struct DevLoginSheet: View {
             let users = try await authStore.fetchDevUsers()
             phase = .loaded(users)
         } catch let error as APIError {
-            phase = .failed(error.errorDescription ?? "Unknown error.")
+            phase = .failed(error.errorDescription ?? String(localized: "error.unknown"))
         } catch {
             phase = .failed(error.localizedDescription)
         }

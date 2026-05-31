@@ -9,11 +9,11 @@ import SwiftUI
 struct DashboardView: View {
     var body: some View {
         ContentUnavailableView(
-            "Dashboard",
+            "dashboard.title",
             systemImage: "chart.bar.fill",
-            description: Text("Reports on what you've completed will live here.")
+            description: Text("dashboard.empty.description")
         )
-        .navigationTitle("Dashboard")
+        .navigationTitle("dashboard.title")
         .safeAreaInset(edge: .bottom) {
             AppTabBar()
         }

@@ -24,11 +24,11 @@ enum CalendarViewMode: String, CaseIterable, Identifiable, Hashable, Sendable {
         }
     }
 
-    /// Accessibility label.
+    /// Accessibility label. Localized via the String Catalog.
     var displayName: String {
         switch self {
-        case .timeline: return "Timeline"
-        case .list: return "List"
+        case .timeline: return String(localized: "calendar.viewMode.timeline")
+        case .list: return String(localized: "calendar.viewMode.list")
         }
     }
 }

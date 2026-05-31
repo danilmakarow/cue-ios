@@ -15,14 +15,14 @@ enum APIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .transport(let message):
-            return "Network error: \(message)"
+            return String(format: String(localized: "api.error.transport"), message)
         case .http(let status, let body):
             if body.isEmpty {
-                return "Server returned status \(status)."
+                return String(format: String(localized: "api.error.httpStatus"), status)
             }
-            return "Server error (\(status)): \(body)"
+            return String(format: String(localized: "api.error.httpStatusWithBody"), status, body)
         case .decoding(let message):
-            return "Couldn't parse server response. \(message)"
+            return String(format: String(localized: "api.error.decoding"), message)
         }
     }
 

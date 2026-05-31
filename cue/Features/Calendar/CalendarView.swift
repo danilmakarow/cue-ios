@@ -55,7 +55,7 @@ struct CalendarView: View {
             CalendarChrome(onToday: goToToday)
         }
         .alert(
-            "Couldn't load events",
+            "calendar.alert.loadFailed.title",
             isPresented: Binding(
                 get: { store.errorMessage != nil },
                 set: { isPresented in
@@ -63,7 +63,7 @@ struct CalendarView: View {
                 }
             )
         ) {
-            Button("OK", role: .cancel) {}
+            Button("common.ok", role: .cancel) {}
         } message: {
             Text(store.errorMessage ?? "")
         }
@@ -81,7 +81,7 @@ struct CalendarView: View {
     private var loadingRow: some View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)
-            Text("Loading…")
+            Text("calendar.loading")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
@@ -101,7 +101,7 @@ struct CalendarView: View {
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: .circle)
         .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
-        .accessibilityLabel("New Event")
+        .accessibilityLabel("newEvent.title")
         .padding(.trailing, 20)
         .padding(.bottom, 76)
     }
