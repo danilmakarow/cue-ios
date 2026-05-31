@@ -33,6 +33,7 @@ struct CalendarRootView: View {
     @Environment(AuthStore.self) private var authStore
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
+    @Environment(NotificationStore.self) private var notifications
 
     @State private var store: CalendarStore
     @State private var path = NavigationPath()
@@ -57,7 +58,10 @@ struct CalendarRootView: View {
                 }
         }
         .environment(store)
-        .task { seedInitialScopeIfNeeded() }
+        .task {
+            store.bind(notifications: notifications)
+            seedInitialScopeIfNeeded()
+        }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             handleScenePhaseChange(from: oldPhase, to: newPhase)
         }

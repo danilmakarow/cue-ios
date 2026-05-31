@@ -15,6 +15,10 @@ struct SettingsView: View {
         @Bindable var theme = theme
 
         Form {
+            #if DEBUG
+            NotificationDebugSection()
+            #endif
+
             if case .authenticated(let user) = authStore.state {
                 Section {
                     UserProfileRow(user: user)
@@ -180,6 +184,46 @@ private struct AccentColorPicker: View {
     }
 }
 
+// MARK: - Notification debug section (DEBUG only)
+
+#if DEBUG
+/// Developer-only controls for firing each notification variant, so the global
+/// notification system can be exercised on-device without triggering a real API
+/// failure. Compiled out of release builds.
+private struct NotificationDebugSection: View {
+    @Environment(NotificationStore.self) private var notifications
+
+    var body: some View {
+        Section("Developer · Notifications") {
+            Button("Post info (auto-dismiss)") {
+                notifications.post(.info("Synced", message: "Your calendar is up to date."))
+            }
+            Button("Post success (auto-dismiss)") {
+                notifications.post(.success("Saved", message: "Your changes were saved."))
+            }
+            Button("Post warning (permanent)") {
+                notifications.post(.warning(
+                    "Working offline",
+                    message: "Changes will sync when you reconnect."
+                ))
+            }
+            Button("Post error (expandable)") {
+                notifications.post(.from(
+                    .http(
+                        status: 422,
+                        body: #"{"statusCode":422,"message":["title should not be empty"],"error":"Unprocessable Entity"}"#
+                    ),
+                    title: "Couldn't save event"
+                ))
+            }
+            Button("Clear all", role: .destructive) {
+                notifications.dismissAll()
+            }
+        }
+    }
+}
+#endif
+
 #Preview {
     NavigationStack {
         SettingsView()
@@ -187,4 +231,5 @@ private struct AccentColorPicker: View {
     .environment(ThemeSettings())
     .environment(AppNavigation())
     .environment(AuthStore())
+    .environment(NotificationStore())
 }

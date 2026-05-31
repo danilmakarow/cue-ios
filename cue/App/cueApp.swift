@@ -13,6 +13,7 @@ struct cueApp: App {
     @State private var themeSettings = ThemeSettings()
     @State private var navigation = AppNavigation()
     @State private var authStore = AuthStore()
+    @State private var notifications = NotificationStore()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -34,6 +35,7 @@ struct cueApp: App {
                 .environment(themeSettings)
                 .environment(navigation)
                 .environment(authStore)
+                .environment(notifications)
                 // Brand canvas as the window's base layer. Auth/Loading paint
                 // their own gradients on top; scroll-backed tabs paint system
                 // surfaces — this shows through during transitions and behind

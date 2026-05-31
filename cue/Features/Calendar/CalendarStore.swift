@@ -22,7 +22,6 @@ final class CalendarStore {
     var selectedDate: Date
     var viewMode: CalendarViewMode
     private(set) var isLoading: Bool = false
-    var errorMessage: String?
 
     /// How long data may sit untouched before a foreground return is allowed to
     /// refetch it. A short inactive→active blip (notification banner, Control
@@ -36,6 +35,10 @@ final class CalendarStore {
     private(set) var lastSyncedAt: Date?
 
     private let user: UserDTO
+    /// Global notification queue used to surface request failures as banners.
+    /// Optional + wired post-init via `bind(notifications:)` because the owning
+    /// view can only read it from `@Environment` in `body`, not in `init`.
+    private var notifications: NotificationStore?
     /// Memoized default-calendar id, resolved on first sync.
     private var calendarId: String?
     /// `startOfMonth` keys already synced this session — guards re-fetch.
@@ -50,10 +53,23 @@ final class CalendarStore {
         return formatter
     }()
 
-    init(user: UserDTO, today: Date = Calendar.current.startOfDay(for: .now)) {
+    init(
+        user: UserDTO,
+        notifications: NotificationStore? = nil,
+        today: Date = Calendar.current.startOfDay(for: .now)
+    ) {
         self.user = user
+        self.notifications = notifications
         self.selectedDate = today
         self.viewMode = .timeline
+    }
+
+    /// Wires the global notification queue read from the owning view's
+    /// environment. Idempotent — only binds the first time, so re-renders of
+    /// the host view don't replace an already-attached store.
+    func bind(notifications: NotificationStore) {
+        guard self.notifications == nil else { return }
+        self.notifications = notifications
     }
 
     // MARK: - Sync
@@ -92,7 +108,7 @@ final class CalendarStore {
             syncedMonths.insert(anchor)
             lastSyncedAt = .now
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            notifications?.postError(error, title: "Couldn't load your tasks")
         }
     }
 
@@ -165,7 +181,7 @@ final class CalendarStore {
         } catch {
             task.completedAt = previous
             try? context.save()
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            notifications?.postError(error, title: "Couldn't update task")
         }
     }
 

@@ -72,6 +72,20 @@ graph TD
 - **Concurrency**: `async`/`await` + structured concurrency (`Task`, `async let`, `TaskGroup`). Views run on `@MainActor` by default in Swift 6. Hop to background actors only when you actually need parallelism.
 - **Sendability**: respect `Sendable`. No `@unchecked Sendable` to work around it.
 
+## Notifications & loading / error / empty states
+
+An app-wide in-app banner system plus reusable state affordances live in
+`DesignSystem/Notifications/` and `DesignSystem/Components/`. `NotificationStore`
+(`@Observable`, injected at the root) is the integration point; `NotificationHost`
+(mounted in `RootView` via `.notificationHost()`) renders the stack above all
+content. Failed requests post error banners via `NotificationStore.postError(_:)`
+— collapsed shows a friendly line, expanded reveals the full HTTP diagnostic
+(`APIError.userMessage` / `.diagnosticDetail`), with the network→UI bridge kept
+one-way in `Networking/AppNotification+APIError.swift`.
+
+When to use a full-page state vs. inline spinner vs. notification vs. alert — see
+the decision matrix in [specs/notifications-and-states.md](specs/notifications-and-states.md).
+
 ## Networking
 
 URLSession + `async`/`await`. JSON via `Codable`. No third-party HTTP library.
