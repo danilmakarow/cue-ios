@@ -5,31 +5,6 @@
 
 import SwiftUI
 
-// MARK: - Brand palette
-
-/// The Cue brand palette — pale yellow, peach, light blue, medium blue.
-///
-/// > Merge note: this is a **local** copy of the brand colours so this view is
-/// > self-contained. Another agent is introducing the same palette app-wide as
-/// > shared `Theme` colour tokens. At merge time, delete `BrandPalette` and
-/// > point `BrandMark` at those shared tokens instead (e.g. `Theme.peach`,
-/// > `Theme.mediumBlue`, …) so there is a single source of truth.
-enum BrandPalette {
-    /// `#FFF9D2` — pale yellow. The lightest tone; used for highlights.
-    static let paleYellow = Color(red: 1.0, green: 0.976, blue: 0.824)
-    /// `#FFEBCC` — peach. Warm mid-light tone for the icon backdrop.
-    static let peach = Color(red: 1.0, green: 0.922, blue: 0.800)
-    /// `#BFDDF0` — light blue. Soft accent and gradient start.
-    static let lightBlue = Color(red: 0.749, green: 0.867, blue: 0.941)
-    /// `#8CC0EB` — medium blue. The primary brand colour for the mark.
-    static let mediumBlue = Color(red: 0.549, green: 0.753, blue: 0.922)
-
-    /// Ink tone for strokes and the clock face on light backdrops.
-    /// Not part of the four-colour palette — a desaturated deep blue chosen to
-    /// read as "almost black" while staying on-brand.
-    static let ink = Color(red: 0.149, green: 0.255, blue: 0.353)
-}
-
 // MARK: - BrandMark
 
 /// The reusable Cue brand mark: a rounded calendar sheet with a clock badge,
@@ -79,6 +54,12 @@ struct BrandMark: View {
 /// proportions can be mirrored by the headless Core Graphics icon generator
 /// (`Scripts/GenerateAppIcon.swift`) without sharing a live SwiftUI hierarchy.
 enum BrandMarkRenderer {
+    /// Ink tone for the mark's strokes and clock face on light backdrops.
+    /// Not one of the four brand colours — a desaturated deep blue that reads
+    /// as "almost black" while staying on-brand. Kept local to the mark since
+    /// it isn't a shared `BrandPalette` token.
+    private static let ink = Color(red: 0.149, green: 0.255, blue: 0.353)
+
     /// Draws the calendar-and-clock mark, filling the whole `size` square.
     ///
     /// The mark is *transparent* outside its shapes — callers that need an
@@ -97,11 +78,11 @@ enum BrandMarkRenderer {
 
         switch style {
         case .tinted:
-            calendarTop = BrandPalette.lightBlue
-            calendarBottom = BrandPalette.mediumBlue
-            bindingColor = BrandPalette.ink
-            clockFace = BrandPalette.paleYellow
-            clockInk = BrandPalette.ink
+            calendarTop = BrandPalette.skyBlue
+            calendarBottom = BrandPalette.blue
+            bindingColor = Self.ink
+            clockFace = BrandPalette.warmYellow
+            clockInk = Self.ink
         case .monochrome(let color):
             calendarTop = color
             calendarBottom = color
@@ -235,7 +216,7 @@ enum BrandMarkRenderer {
 
 #Preview("Monochrome") {
     HStack(spacing: 24) {
-        BrandMark(size: 80, style: .monochrome(BrandPalette.mediumBlue))
+        BrandMark(size: 80, style: .monochrome(BrandPalette.blue))
         BrandMark(size: 80, style: .monochrome(.primary))
     }
     .padding()
