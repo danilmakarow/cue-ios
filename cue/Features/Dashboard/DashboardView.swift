@@ -14,9 +14,6 @@ struct DashboardView: View {
             description: Text("Reports on what you've completed will live here.")
         )
         .navigationTitle("Dashboard")
-        .safeAreaInset(edge: .bottom) {
-            AppTabBar()
-        }
     }
 }
 

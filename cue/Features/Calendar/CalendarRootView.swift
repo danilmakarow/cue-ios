@@ -43,7 +43,6 @@ struct CalendarRootView: View {
                 }
         }
         .environment(store)
-        .toolbar(.hidden, for: .tabBar)
     }
 
     @ViewBuilder

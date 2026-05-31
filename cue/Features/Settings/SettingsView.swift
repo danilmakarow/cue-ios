@@ -51,9 +51,6 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
-        .safeAreaInset(edge: .bottom) {
-            AppTabBar()
-        }
     }
 }
 
