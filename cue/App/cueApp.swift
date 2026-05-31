@@ -13,6 +13,7 @@ struct cueApp: App {
     @State private var themeSettings = ThemeSettings()
     @State private var navigation = AppNavigation()
     @State private var authStore = AuthStore()
+    @State private var notifications = NotificationStore()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -34,6 +35,7 @@ struct cueApp: App {
                 .environment(themeSettings)
                 .environment(navigation)
                 .environment(authStore)
+                .environment(notifications)
                 .preferredColorScheme(themeSettings.appearance.colorScheme)
                 .tint(themeSettings.accentColor.color)
         }

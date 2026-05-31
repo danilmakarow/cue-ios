@@ -16,6 +16,7 @@ import SwiftUI
 struct CalendarRootView: View {
     let user: UserDTO
 
+    @Environment(NotificationStore.self) private var notifications
     @State private var store: CalendarStore
     @State private var path: NavigationPath
     @Namespace private var zoom
@@ -44,6 +45,7 @@ struct CalendarRootView: View {
         }
         .environment(store)
         .toolbar(.hidden, for: .tabBar)
+        .task { store.bind(notifications: notifications) }
     }
 
     @ViewBuilder

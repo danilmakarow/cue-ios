@@ -35,6 +35,10 @@ struct RootView: View {
                 await authStore.bootstrap()
             }
         }
+        // Global notification overlay — rendered above every screen (loading,
+        // auth, and the tabbed app) so banners are visible regardless of auth
+        // state. The host reads `NotificationStore` from the environment.
+        .notificationHost()
     }
 }
 
@@ -73,4 +77,5 @@ private struct MainTabs: View {
         .environment(AuthStore())
         .environment(AppNavigation())
         .environment(ThemeSettings())
+        .environment(NotificationStore())
 }

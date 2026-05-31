@@ -37,7 +37,9 @@ struct CalendarView: View {
             WeekStripPicker(selectedDate: $store.selectedDate)
 
             if store.isLoading {
-                loadingRow
+                InlineLoadingRow()
+                    .padding(.horizontal, 16)
+                    .transition(.opacity)
             }
 
             paginatedContent
@@ -54,19 +56,8 @@ struct CalendarView: View {
         .safeAreaInset(edge: .bottom) {
             CalendarChrome(onToday: goToToday)
         }
-        .alert(
-            "Couldn't load events",
-            isPresented: Binding(
-                get: { store.errorMessage != nil },
-                set: { isPresented in
-                    if !isPresented { store.errorMessage = nil }
-                }
-            )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(store.errorMessage ?? "")
-        }
+        // Request failures surface through the global notification host
+        // (wired in `CalendarStore`), so no per-screen error alert here.
         .task(id: store.selectedDate) {
             await store.ensureDaySynced(store.selectedDate, context: modelContext)
         }
@@ -76,18 +67,6 @@ struct CalendarView: View {
 
     private var dayTitle: String {
         store.selectedDate.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
-    }
-
-    private var loadingRow: some View {
-        HStack(spacing: 8) {
-            ProgressView().controlSize(.small)
-            Text("Loading…")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .transition(.opacity)
     }
 
     private var newEventButton: some View {
