@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Xcode build output
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Per-user Xcode state (window layout, breakpoints, schemes, etc.)
+# Keep shared data (xcshareddata) tracked; ignore only the per-user parts.
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# CocoaPods / Carthage (not used today, ignored defensively)
+Pods/
+Carthage/Build/
