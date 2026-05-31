@@ -24,11 +24,25 @@ final class CalendarStore {
     private(set) var isLoading: Bool = false
     var errorMessage: String?
 
+    /// How long data may sit untouched before a foreground return is allowed to
+    /// refetch it. A short inactive→active blip (notification banner, Control
+    /// Center) within this window is ignored so it doesn't spam the API; a real
+    /// background trip refetches regardless (see `refreshIfStale(context:wasBackgrounded:)`).
+    static let staleThreshold: TimeInterval = 30
+
+    /// Wall-clock time of the most recent *successful* month fetch, used to
+    /// decide whether foreground-return data is stale. `nil` until the first
+    /// successful sync.
+    private(set) var lastSyncedAt: Date?
+
     private let user: UserDTO
     /// Memoized default-calendar id, resolved on first sync.
     private var calendarId: String?
     /// `startOfMonth` keys already synced this session — guards re-fetch.
     private var syncedMonths: Set<Date> = []
+    /// In-flight foreground refresh, retained so a second trigger can skip
+    /// rather than fire an overlapping refetch.
+    private var refreshTask: Task<Void, Never>?
 
     private static let iso8601: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -76,8 +90,58 @@ final class CalendarStore {
             }
             try? context.save()
             syncedMonths.insert(anchor)
+            lastSyncedAt = .now
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    // MARK: - Foreground refresh
+
+    /// Refetches visible data when the app returns to the foreground.
+    ///
+    /// Debounce policy:
+    /// - `wasBackgrounded == true` (came back from `.background`) always refetches —
+    ///   the data is presumed stale after a real trip away.
+    /// - `wasBackgrounded == false` (a brief `.inactive → .active` blip such as a
+    ///   notification banner or Control Center) only refetches if at least
+    ///   ``staleThreshold`` seconds have elapsed since the last successful fetch,
+    ///   so transient interruptions don't spam the API.
+    ///
+    /// Overlap is guarded: if a refresh is already running, this skips rather than
+    /// stacking a second refetch.
+    func refreshIfStale(context: ModelContext, wasBackgrounded: Bool) {
+        guard refreshTask == nil else { return }
+        guard wasBackgrounded || isStale else { return }
+
+        refreshTask = Task { [weak self] in
+            await self?.refresh(context: context)
+            self?.refreshTask = nil
+        }
+    }
+
+    /// True when more than ``staleThreshold`` has passed since the last successful
+    /// fetch, or when nothing has ever been fetched.
+    private var isStale: Bool {
+        guard let lastSyncedAt else { return true }
+        return Date.now.timeIntervalSince(lastSyncedAt) >= Self.staleThreshold
+    }
+
+    /// Drops the sync cache for the currently-visible month and its neighbors,
+    /// then re-syncs them so the open scope reflects server-side changes made
+    /// while the app was away. Other months stay cached and refetch lazily when
+    /// next scrolled into view.
+    private func refresh(context: ModelContext) async {
+        let calendar = Calendar.current
+        let center = CalendarMath.startOfMonth(selectedDate)
+        let anchors = (-1...1).compactMap { offset in
+            calendar.date(byAdding: .month, value: offset, to: center)
+        }
+        for anchor in anchors {
+            syncedMonths.remove(CalendarMath.startOfMonth(anchor))
+        }
+        for anchor in anchors {
+            await ensureMonthSynced(anchor, context: context)
         }
     }
 
