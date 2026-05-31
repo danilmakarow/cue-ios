@@ -13,14 +13,10 @@ import SwiftUI
 /// `[month(thisMonth), day(today)]` so the app opens on the day scope while
 /// back-swipe zooms out Day → Month → Year.
 ///
-/// Seeding happens *after first appear* (with animations disabled), not in
-/// `init`. Pushing the scopes through the live `path` binding — the same code
-/// path a user tap takes — registers each `.zoom` transition's source and wires
-/// the interactive back-swipe. Pre-seeding a `NavigationPath` in `init` left the
-/// gesture dead on cold launch (the destinations existed but their matched
-/// sources never had, so the edge-swipe pop wouldn't attach until the user
-/// popped via the back button and drilled in again). Disabling animations keeps
-/// the deep open instantaneous, so there's no visible Year → Month → Day push.
+/// Seeding happens *after first appear* (with animations disabled) and is
+/// staged one level at a time — see ``seedInitialScopeIfNeeded()`` for why the
+/// month scope must mount before the day is pushed, otherwise the interactive
+/// zoom-out is dead on cold launch.
 ///
 /// It also owns the foreground-refresh trigger: this view observes
 /// `@Environment(\.scenePhase)` and, on a return to `.active`, asks the store to
@@ -51,16 +47,11 @@ struct CalendarRootView: View {
                 .navigationDestination(for: CalendarScopeRoute.self) { route in
                     scopeDestination(route)
                 }
-                .navigationDestination(for: CalendarRoute.self) { route in
-                    switch route {
-                    case .newEvent: NewEventScreen()
-                    }
-                }
         }
         .environment(store)
         .task {
             store.bind(notifications: notifications)
-            seedInitialScopeIfNeeded()
+            await seedInitialScopeIfNeeded()
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             handleScenePhaseChange(from: oldPhase, to: newPhase)
@@ -88,23 +79,63 @@ struct CalendarRootView: View {
             MonthScopeView(monthAnchor: anchor, namespace: zoom, onSelectDay: selectDay)
                 .navigationTransition(.zoom(sourceID: anchor, in: zoom))
         case .day(let day):
-            CalendarView(user: user)
+            CalendarView(user: user, onOpenToday: openTodayInDayScope)
                 .navigationTransition(.zoom(sourceID: day, in: zoom))
         }
     }
 
-    /// Opens the app on the day scope by pushing month → day through the live
-    /// path binding once, with animation suppressed so the deep open is
-    /// instantaneous. Driving it through `path` (rather than seeding in `init`)
-    /// is what makes the back-swipe zoom-out work on cold launch.
-    private func seedInitialScopeIfNeeded() {
+    /// Opens *today* in the day scope by re-anchoring the top `.day` route to
+    /// today (and selecting it). Distinct from the in-scope "Today" pill, which
+    /// only recenters the pager: this re-targets the navigation entry itself, so
+    /// it reaches today even when the current day is outside the pager's ±90-day
+    /// window and gives the day scope a today-anchored zoom source. Swaps the
+    /// top entry in place (rather than pushing) so the stack stays
+    /// Year → Month → Day rather than deepening.
+    ///
+    /// Only reachable from the day scope's "open today" button, which shows
+    /// solely when the current day isn't today — so the top route is always a
+    /// non-today `.day` and the remove-then-append is a clean re-anchor.
+    private func openTodayInDayScope() {
+        let today = CalendarMath.startOfDay(.now)
+        store.selectedDate = today
+        path.removeLast()
+        path.append(CalendarScopeRoute.day(today))
+    }
+
+    /// Opens the app on the day scope, then deep-links into the month and day
+    /// scopes *one level at a time across run-loop ticks* so the interactive
+    /// zoom-out gesture works on the very first cold launch.
+    ///
+    /// Why staged rather than a single `path = [month, day]` append: the `.zoom`
+    /// pop is interactive only when the *destination's parent* has rendered a
+    /// `.matchedTransitionSource` for the same id. Those sources live in lazy
+    /// grids (`YearMonthCell` in the year root, `MonthDayCell` in the month
+    /// scope) and are realized only when their page is actually laid out on
+    /// screen. Appending both routes in one transaction jumps straight to the
+    /// day scope, so the month scope never lays out its grid and the
+    /// today-cell source for the day-zoom is never registered — leaving the
+    /// back-swipe dead until the user manually pops to the month (which finally
+    /// renders it) and drills back in. That was the real cold-launch bug.
+    ///
+    /// Pushing month, yielding a tick for `MonthScopeView` to mount and lay out
+    /// its grid (registering the day source), then pushing day, makes every
+    /// level's matched source live before we rest on the day scope. Animations
+    /// stay disabled so the staged open is still visually instantaneous.
+    private func seedInitialScopeIfNeeded() async {
         guard !hasSeededPath else { return }
         hasSeededPath = true
 
         var transaction = Transaction()
         transaction.disablesAnimations = true
+
         withTransaction(transaction) {
             path.append(CalendarScopeRoute.month(CalendarMath.startOfMonth(.now)))
+        }
+        // Let the month scope mount and lay out its grid so today's
+        // `MonthDayCell` registers as the zoom source before we push the day.
+        await Task.yield()
+
+        withTransaction(transaction) {
             path.append(CalendarScopeRoute.day(CalendarMath.startOfDay(.now)))
         }
     }

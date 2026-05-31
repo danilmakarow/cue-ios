@@ -122,18 +122,34 @@ struct MonthScopeView: View {
 
     // MARK: - Actions
 
+    /// Jumps back to the current month, reliably even while the list is still
+    /// flinging. Mirrors `YearScopeView.scrollToCurrentYear` — see its doc for
+    /// the full rationale:
+    /// - **item 3:** extend the window to include today (add only missing
+    ///   months) instead of rebuilding the whole `monthAnchors` array, so the
+    ///   lazy column keeps its page identities and stays cheap.
+    /// - **item 2:** clear the scroll-position binding to release an in-flight
+    ///   fling, then assign the target next tick so the jump isn't dropped.
     private func scrollToCurrentMonth() {
         let currentMonth = CalendarMath.startOfMonth(.now)
-        // The target month must exist in the window for `.scrollPosition(id:)`
-        // to move to it. When the scope was entered far from today (e.g. zoomed
-        // in from a distant year) the current month can fall outside the seeded
-        // window, which made the Today button silently no-op. Re-anchor around
-        // today first so the id is always present.
         if !monthAnchors.contains(currentMonth) {
-            monthAnchors = CalendarMath.monthAnchors(around: .now, radius: Self.seedRadius)
+            monthAnchors = CalendarMath.monthAnchorsExtended(monthAnchors, toInclude: currentMonth, margin: 6)
         }
-        withAnimation(.snappy) { centered = currentMonth }
+        jumpCentered(to: currentMonth)
         Task { await syncAround(currentMonth) }
+    }
+
+    /// Forces the lazy column to the given anchor, overriding any in-flight
+    /// user fling. Detaches scroll-position tracking (`nil`) so the decelerating
+    /// scroll lets go, waits one frame for the scroll view to apply the detach,
+    /// then drives the real target — which now lands as a fresh programmatic
+    /// scroll the in-flight gesture can't override.
+    private func jumpCentered(to anchor: Date) {
+        centered = nil
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(16))
+            withAnimation(.snappy) { centered = anchor }
+        }
     }
 
     /// Caches the average height of a single month page so the fling clamp can

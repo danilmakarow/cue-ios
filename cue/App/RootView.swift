@@ -52,7 +52,7 @@ private struct MainTabs: View {
     var body: some View {
         @Bindable var navigation = navigation
 
-        TabView(selection: $navigation.selectedTab) {
+        TabView(selection: tabSelection) {
             Tab(AppTab.calendar.title, systemImage: AppTab.calendar.systemImage, value: AppTab.calendar) {
                 CalendarRootView(user: user)
             }
@@ -66,10 +66,40 @@ private struct MainTabs: View {
                     SettingsView()
                 }
             }
+            // "New Event" lives in the native tab bar as its own round item next
+            // to the real tabs, so it inherits Liquid Glass for free (no
+            // hand-rolled bar). It's an *action* item, not a destination: the
+            // `tabSelection` setter below intercepts a tap, opens the New Event
+            // sheet, and keeps the previously-selected tab — so it never
+            // "selects" and its empty content never shows.
+            Tab(AppTab.newEvent.title, systemImage: AppTab.newEvent.systemImage, value: AppTab.newEvent) {
+                EmptyView()
+            }
         }
         // iOS 26 polish: the Liquid Glass tab bar shrinks while the user scrolls
         // down a tab's content, then re-expands on scroll-up.
         .tabBarMinimizeBehavior(.onScrollDown)
+        .sheet(isPresented: $navigation.isPresentingNewEvent) {
+            NavigationStack {
+                NewEventScreen()
+            }
+        }
+    }
+
+    /// Tab-selection binding that treats `.newEvent` as a one-shot action: when
+    /// the user taps it, present the New Event sheet and *keep* the current tab
+    /// rather than switching. All real tabs pass through unchanged.
+    private var tabSelection: Binding<AppTab> {
+        Binding(
+            get: { navigation.selectedTab },
+            set: { tapped in
+                guard tapped == .newEvent else {
+                    navigation.selectedTab = tapped
+                    return
+                }
+                navigation.isPresentingNewEvent = true
+            }
+        )
     }
 }
 

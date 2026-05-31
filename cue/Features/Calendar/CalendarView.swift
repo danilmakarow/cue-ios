@@ -6,18 +6,16 @@
 import SwiftData
 import SwiftUI
 
-/// Routes pushed onto the Calendar stack as plain (non-zoom) slide pushes.
-/// The zoom-based scope routes live in `CalendarScopeRoute`.
-enum CalendarRoute: Hashable {
-    case newEvent
-}
-
 /// Day scope of the Calendar tab. Renders the week strip plus a horizontally
 /// paged set of day pages; `DayEventsProvider` picks timeline vs. list per the
 /// store's `viewMode`. Selection and events come from the shared
 /// `CalendarStore` + SwiftData, so this view holds no data of its own.
 struct CalendarView: View {
     let user: UserDTO
+    /// Navigates the day scope to today (re-anchoring the navigation entry),
+    /// as opposed to the pill which only recenters the pager. Supplied by
+    /// `CalendarRootView`; defaults to a no-op for previews.
+    var onOpenToday: () -> Void = {}
 
     @Environment(CalendarStore.self) private var store
     @Environment(\.modelContext) private var modelContext
@@ -48,11 +46,15 @@ struct CalendarView: View {
         .navigationTitle(dayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if !isOnToday {
+                ToolbarItem(placement: .topBarTrailing) {
+                    openTodayButton
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 ViewModeSwitcher(mode: $store.viewMode)
             }
         }
-        .overlay(alignment: .bottomTrailing) { newEventButton }
         .overlay(alignment: .bottomLeading) {
             JumpToTodayButton(isVisible: !isOnToday, action: goToToday)
                 .padding(.leading, 20)
@@ -71,20 +73,16 @@ struct CalendarView: View {
         store.selectedDate.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
     }
 
-    private var newEventButton: some View {
-        NavigationLink(value: CalendarRoute.newEvent) {
-            Image(systemName: "plus")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.tint)
-                .frame(width: 56, height: 56)
-                .contentShape(.circle)
+    /// Toolbar button that *navigates* to today's day page (re-anchoring the
+    /// day route via `onOpenToday`). Distinct from the floating "Today" pill,
+    /// which only recenters the pager within the current scope. Lives in the
+    /// nav bar so it never overlaps the pill (bottom-leading) or other chrome.
+    /// Reuses the existing "Go to today" accessibility string.
+    private var openTodayButton: some View {
+        Button(action: onOpenToday) {
+            Image(systemName: "calendar.circle")
         }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .circle)
-        .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
-        .accessibilityLabel("newEvent.title")
-        .padding(.trailing, 20)
-        .padding(.bottom, 76)
+        .accessibilityLabel("calendar.chrome.today.accessibility")
     }
 
     // MARK: - Horizontally paged content

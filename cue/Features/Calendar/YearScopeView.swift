@@ -94,15 +94,41 @@ struct YearScopeView: View {
 
     // MARK: - Actions
 
+    /// Jumps the column back to the current year. Snappy even mid-fling and
+    /// even after scrolling centuries away.
+    ///
+    /// Two things made the old version slow and unreliable:
+    /// 1. **Lag (item 3):** it reassigned the entire `yearAnchors` array
+    ///    (`yearAnchors(around:)`), changing the identity of every page so the
+    ///    `LazyVStack` tore down and rebuilt all ~25 `YearPage`s — each ~500
+    ///    text views — on the main actor, a multi-second hang after a long
+    ///    scroll. We now *extend* the window to include today (adding only the
+    ///    missing years), preserving existing page identities so almost nothing
+    ///    re-realizes.
+    /// 2. **Ignored mid-scroll (item 2):** writing `centered = target` while a
+    ///    fling is decelerating loses the race with the scroll view's own
+    ///    offset write-backs. Clearing the binding first abandons the in-flight
+    ///    target, then assigning the destination on the next tick lands as a
+    ///    fresh programmatic scroll the view can't override.
     private func scrollToCurrentYear() {
         let currentYear = CalendarMath.startOfYear(.now)
-        // The target year must exist in the window for `.scrollPosition(id:)` to
-        // move to it. After scrolling far away the current year can fall outside
-        // the grown window, so re-anchor around today first.
         if !yearAnchors.contains(currentYear) {
-            yearAnchors = CalendarMath.yearAnchors(around: .now, radius: 12)
+            yearAnchors = CalendarMath.yearAnchorsExtended(yearAnchors, toInclude: currentYear, margin: 4)
         }
-        withAnimation(.snappy) { centered = currentYear }
+        jumpCentered(to: currentYear)
+    }
+
+    /// Forces the lazy column to the given anchor, overriding any in-flight
+    /// user fling. Detaches scroll-position tracking (`nil`) so the decelerating
+    /// scroll lets go, waits one frame for the scroll view to apply the detach,
+    /// then drives the real target — which now lands as a fresh programmatic
+    /// scroll the in-flight gesture can't override.
+    private func jumpCentered(to anchor: Date) {
+        centered = nil
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(16))
+            withAnimation(.snappy) { centered = anchor }
+        }
     }
 
     /// Caches the average height of a single year page so the fling clamp can

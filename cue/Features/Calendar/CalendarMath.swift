@@ -85,6 +85,62 @@ enum CalendarMath {
         return (1...count).reversed().compactMap { calendar.date(byAdding: .year, value: -$0, to: anchor) }
     }
 
+    /// Extends `anchors` (ascending month-starts) just enough to contain
+    /// `target`'s month with `margin` extra months on the leading side, reusing
+    /// every existing element so the caller's `LazyVStack` keeps page identities
+    /// stable. Returns the original array unchanged when `target` is already
+    /// covered. Prefer this over rebuilding the whole window when jumping to a
+    /// far-away month: only the genuinely-new pages get realized.
+    static func monthAnchorsExtended(_ anchors: [Date], toInclude target: Date, margin: Int) -> [Date] {
+        extendedAnchors(anchors, toInclude: startOfMonth(target), margin: margin, component: .month)
+    }
+
+    /// Year-scope counterpart of ``monthAnchorsExtended(_:toInclude:margin:)``.
+    /// Extends `anchors` (ascending year-starts) to contain `target`'s year
+    /// without discarding existing pages, so jumping to a distant year doesn't
+    /// rebuild the entire lazy column.
+    static func yearAnchorsExtended(_ anchors: [Date], toInclude target: Date, margin: Int) -> [Date] {
+        extendedAnchors(anchors, toInclude: startOfYear(target), margin: margin, component: .year)
+    }
+
+    /// Shared engine for the year/month "extend a window to include a target"
+    /// helpers. Prepends/appends only the missing anchors (plus `margin`),
+    /// keeping every existing element so lazy-stack identities survive.
+    private static func extendedAnchors(
+        _ anchors: [Date],
+        toInclude target: Date,
+        margin: Int,
+        component: Calendar.Component
+    ) -> [Date] {
+        guard let first = anchors.first, let last = anchors.last else {
+            // Empty window: seed a small window centered on the target.
+            let span = max(margin, 1)
+            return (-span...span).compactMap { calendar.date(byAdding: component, value: $0, to: target) }
+        }
+        guard target < first || target > last else { return anchors }
+
+        var result = anchors
+        if target < first,
+           let prependFrom = calendar.date(byAdding: component, value: -margin, to: target) {
+            var cursor = calendar.date(byAdding: component, value: -1, to: first)
+            var prefix: [Date] = []
+            while let value = cursor, value >= prependFrom {
+                prefix.insert(value, at: 0)
+                cursor = calendar.date(byAdding: component, value: -1, to: value)
+            }
+            result.insert(contentsOf: prefix, at: 0)
+        }
+        if target > last,
+           let appendTo = calendar.date(byAdding: component, value: margin, to: target) {
+            var cursor = calendar.date(byAdding: component, value: 1, to: last)
+            while let value = cursor, value <= appendTo {
+                result.append(value)
+                cursor = calendar.date(byAdding: component, value: 1, to: value)
+            }
+        }
+        return result
+    }
+
     // MARK: - Grid building
 
     /// The 12 month-start anchors of `yearAnchor`'s year, ascending.
