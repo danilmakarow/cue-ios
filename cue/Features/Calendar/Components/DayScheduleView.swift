@@ -179,7 +179,7 @@ struct DayScheduleView: View {
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(event.isCompleted ? "Mark as not done" : "Mark as done")
+        .accessibilityLabel(event.isCompleted ? LocalizedStringKey("task.toggle.markNotDone") : LocalizedStringKey("task.toggle.markDone"))
     }
 
     private func currentTimeIndicator(now: Date) -> some View {

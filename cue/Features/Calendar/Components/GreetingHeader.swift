@@ -14,19 +14,27 @@ struct GreetingHeader: View {
         self.name = name
     }
 
+    /// Time-of-day greeting phrase, localized via the String Catalog.
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<12: return "Good Morning"
-        case 12..<17: return "Good Afternoon"
-        case 17..<22: return "Good Evening"
-        default: return "Hello"
+        case 5..<12: return String(localized: "greeting.morning")
+        case 12..<17: return String(localized: "greeting.afternoon")
+        case 17..<22: return String(localized: "greeting.evening")
+        default: return String(localized: "greeting.hello")
         }
+    }
+
+    /// Full greeting line ("Good Morning, Danil") composed from the localized
+    /// time-of-day phrase and the user's name. Built in code so the format
+    /// key stays stable across languages.
+    private var greetingLine: String {
+        String(format: String(localized: "greeting.withName"), greeting, name)
     }
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text("\(greeting), \(name)")
+            Text(greetingLine)
                 .font(.title.weight(.bold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -41,7 +49,7 @@ struct GreetingHeader: View {
                     .frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Switch appearance mode")
+            .accessibilityLabel("header.switchAppearance.accessibility")
 
             Button {
                 // Settings placeholder — no-op for now.
@@ -51,7 +59,7 @@ struct GreetingHeader: View {
                     .frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Settings")
+            .accessibilityLabel("header.settings.accessibility")
         }
     }
 }

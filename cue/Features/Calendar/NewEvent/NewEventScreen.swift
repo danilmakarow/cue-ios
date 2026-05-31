@@ -16,35 +16,35 @@ struct NewEventScreen: View {
         @Bindable var viewModel = viewModel
 
         Form {
-            Section("Details") {
-                TextField("Title", text: $viewModel.title)
+            Section("newEvent.details") {
+                TextField("newEvent.titleField", text: $viewModel.title)
                     .textInputAutocapitalization(.sentences)
-                TextField("Notes", text: $viewModel.notes, axis: .vertical)
+                TextField("newEvent.notesField", text: $viewModel.notes, axis: .vertical)
                     .lineLimit(3...6)
             }
 
-            Section("Time") {
-                Toggle("All-day", isOn: $viewModel.isAllDay.animation(.default))
+            Section("newEvent.time") {
+                Toggle("newEvent.allDay", isOn: $viewModel.isAllDay.animation(.default))
 
                 if viewModel.isAllDay {
                     DatePicker(
-                        "Date",
+                        "newEvent.date",
                         selection: $viewModel.startAt,
                         displayedComponents: .date
                     )
                 } else if viewModel.useClassicPicker {
                     DatePicker(
-                        "Start",
+                        "newEvent.start",
                         selection: $viewModel.startAt,
                         displayedComponents: [.date, .hourAndMinute]
                     )
                     DatePicker(
-                        "End",
+                        "newEvent.end",
                         selection: $viewModel.endAt,
                         in: viewModel.startAt...,
                         displayedComponents: [.date, .hourAndMinute]
                     )
-                    Button("Use quick picker") {
+                    Button("newEvent.useQuickPicker") {
                         withAnimation { viewModel.useClassicPicker = false }
                     }
                     .font(.footnote)
@@ -52,11 +52,11 @@ struct NewEventScreen: View {
                 } else {
                     durationChipStrip(viewModel: viewModel)
                     DatePicker(
-                        "Starts",
+                        "newEvent.starts",
                         selection: $viewModel.startAt,
                         displayedComponents: [.date, .hourAndMinute]
                     )
-                    Button("Switch to classic picker") {
+                    Button("newEvent.switchToClassicPicker") {
                         withAnimation { viewModel.useClassicPicker = true }
                     }
                     .font(.footnote)
@@ -65,12 +65,12 @@ struct NewEventScreen: View {
             }
 
             Section {
-                Toggle("Requires completion", isOn: $viewModel.requiresCompletion)
+                Toggle("newEvent.requiresCompletion", isOn: $viewModel.requiresCompletion)
             } footer: {
-                Text("If off, the event is informational — no done/not-done state.")
+                Text("newEvent.requiresCompletion.footer")
             }
         }
-        .navigationTitle("New Event")
+        .navigationTitle("newEvent.title")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
             saveButton(viewModel: viewModel)
@@ -81,7 +81,7 @@ struct NewEventScreen: View {
             }
         }
         .alert(
-            "Couldn't save event",
+            "newEvent.alert.saveFailed.title",
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { isPresented in
@@ -91,7 +91,7 @@ struct NewEventScreen: View {
                 }
             )
         ) {
-            Button("OK", role: .cancel) {}
+            Button("common.ok", role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
@@ -144,7 +144,7 @@ struct NewEventScreen: View {
                 dismiss()
             }
         } label: {
-            Text("Save")
+            Text("newEvent.save")
                 .font(.headline)
                 .foregroundStyle(.tint)
                 .frame(maxWidth: .infinity)
@@ -166,7 +166,7 @@ struct NewEventScreen: View {
             VStack(spacing: 12) {
                 ProgressView()
                     .controlSize(.large)
-                Text("Saving…")
+                Text("newEvent.saving")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }

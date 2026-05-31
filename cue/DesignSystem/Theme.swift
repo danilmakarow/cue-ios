@@ -36,12 +36,12 @@ enum AppearanceMode: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    /// Human-readable label for pickers.
+    /// Human-readable label for pickers. Localized via the String Catalog.
     var displayName: String {
         switch self {
-        case .system: return "System"
-        case .light: return "Light"
-        case .dark: return "Dark"
+        case .system: return String(localized: "theme.appearance.system")
+        case .light: return String(localized: "theme.appearance.light")
+        case .dark: return String(localized: "theme.appearance.dark")
         }
     }
 
@@ -234,11 +234,20 @@ enum AppAccentColor: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Human-readable label for accessibility and pickers.
+    /// Human-readable label for accessibility and pickers. Localized via the
+    /// String Catalog so color names translate (e.g. "Blue" → "Синій").
     var displayName: String {
         switch self {
-        case .brand: return "Cue Blue"
-        default: return rawValue.capitalized
+        case .brand: return String(localized: "theme.accent.brand", defaultValue: "Cue Blue")
+        case .blue: return String(localized: "theme.accent.blue")
+        case .indigo: return String(localized: "theme.accent.indigo")
+        case .purple: return String(localized: "theme.accent.purple")
+        case .pink: return String(localized: "theme.accent.pink")
+        case .red: return String(localized: "theme.accent.red")
+        case .orange: return String(localized: "theme.accent.orange")
+        case .yellow: return String(localized: "theme.accent.yellow")
+        case .green: return String(localized: "theme.accent.green")
+        case .teal: return String(localized: "theme.accent.teal")
         }
     }
 }

@@ -82,7 +82,7 @@ struct CalendarView: View {
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: .circle)
         .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
-        .accessibilityLabel("New Event")
+        .accessibilityLabel("newEvent.title")
         .padding(.trailing, 20)
         .padding(.bottom, 76)
     }

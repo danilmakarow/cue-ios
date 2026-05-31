@@ -35,9 +35,9 @@ enum AuthError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .appleCredentialMissing:
-            return "Apple didn't return the expected credentials."
+            return String(localized: "auth.error.appleCredentialMissing")
         case .appleFailed(let message):
-            return "Sign in with Apple failed: \(message)"
+            return String(format: String(localized: "auth.error.appleFailed"), message)
         case .api(let error):
             return error.errorDescription
         case .unknown(let message):

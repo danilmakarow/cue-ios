@@ -47,13 +47,14 @@ enum APIError: LocalizedError {
     var diagnosticDetail: String {
         switch self {
         case .transport(let message):
-            return "Transport error\n\n\(message)"
+            return String(format: String(localized: "api.error.transport"), message)
         case .http(let status, let body):
-            let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-            let bodyText = trimmed.isEmpty ? "(empty response body)" : trimmed
-            return "HTTP \(status)\n\n\(bodyText)"
+            if body.isEmpty {
+                return String(format: String(localized: "api.error.httpStatus"), status)
+            }
+            return String(format: String(localized: "api.error.httpStatusWithBody"), status, body)
         case .decoding(let message):
-            return "Decoding error\n\n\(message)"
+            return String(format: String(localized: "api.error.decoding"), message)
         }
     }
 

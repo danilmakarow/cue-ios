@@ -55,12 +55,14 @@ struct TimelineDayPage: View {
         }
     }
 
-    /// "Schedule Today" on today, otherwise "Schedule on <date>".
+    /// "Schedule Today" on today, otherwise "Schedule on <date>". Localized;
+    /// the date itself is formatted locale-aware by `FormatStyle`.
     private var scheduleHeading: String {
         if Calendar.current.isDateInToday(date) {
-            return "Schedule Today"
+            return String(localized: "calendar.timeline.heading.today")
         }
-        return "Schedule on \(date.formatted(.dateTime.weekday().day().month(.abbreviated)))"
+        let formattedDate = date.formatted(.dateTime.weekday().day().month(.abbreviated))
+        return String(format: String(localized: "calendar.timeline.heading.other"), formattedDate)
     }
 
     /// Centers the current hour on today, or anchors 08:00 near the top
