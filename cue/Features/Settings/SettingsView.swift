@@ -161,13 +161,25 @@ private struct AccentColorPicker: View {
                     if isSelected {
                         Image(systemName: "checkmark")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(checkmarkColor(for: accent))
                     }
                 }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accent.displayName)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// Picks a checkmark color with enough contrast against the swatch fill.
+    /// Light swatches (the brand blue and yellow) get the dark on-accent ink;
+    /// saturated swatches keep a white check.
+    private func checkmarkColor(for accent: AppAccentColor) -> Color {
+        switch accent {
+        case .brand, .yellow:
+            return .appOnAccent
+        default:
+            return .white
+        }
     }
 }
 
