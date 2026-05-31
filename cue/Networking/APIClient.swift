@@ -30,14 +30,14 @@ enum APIError: LocalizedError {
     var userMessage: String {
         switch self {
         case .transport:
-            return "We couldn't reach the server. Check your connection and try again."
+            return String(localized: "error.network.unreachable")
         case .http(let status, let body):
             if let parsed = ServerErrorBody(rawBody: body)?.displayMessage {
                 return parsed
             }
             return Self.genericMessage(for: status)
         case .decoding:
-            return "We received an unexpected response from the server."
+            return String(localized: "api.userError.decoding")
         }
     }
 
@@ -76,14 +76,14 @@ enum APIError: LocalizedError {
     /// response body has no parseable message.
     private static func genericMessage(for status: Int) -> String {
         switch status {
-        case 401: return "Your session has expired. Please sign in again."
-        case 403: return "You don't have permission to do that."
-        case 404: return "We couldn't find what you were looking for."
-        case 408, 504: return "The request timed out. Please try again."
-        case 429: return "You're doing that too fast. Please wait a moment."
-        case 400..<500: return "The request couldn't be completed."
-        case 500..<600: return "The server ran into a problem. Please try again."
-        default: return "Something went wrong (status \(status))."
+        case 401: return String(localized: "api.userError.sessionExpired")
+        case 403: return String(localized: "api.userError.forbidden")
+        case 404: return String(localized: "api.userError.notFound")
+        case 408, 504: return String(localized: "api.userError.timeout")
+        case 429: return String(localized: "api.userError.rateLimited")
+        case 400..<500: return String(localized: "api.userError.clientError")
+        case 500..<600: return String(localized: "api.userError.serverError")
+        default: return String(format: String(localized: "api.userError.unknown"), status)
         }
     }
 }

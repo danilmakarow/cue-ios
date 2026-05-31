@@ -101,8 +101,9 @@ struct NotificationBanner: View {
 
     /// Small "Show more / Show less" cue shown on expandable banners.
     private var expandAffordance: some View {
-        HStack(spacing: 3) {
-            Text(isExpanded ? "Show less" : "Show details")
+        let disclosureLabel: LocalizedStringKey = isExpanded ? "notification.showLess" : "notification.showDetails"
+        return HStack(spacing: 3) {
+            Text(disclosureLabel)
             Image(systemName: "chevron.down")
                 .rotationEffect(.degrees(isExpanded ? 180 : 0))
         }
@@ -122,7 +123,7 @@ struct NotificationBanner: View {
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Dismiss notification")
+        .accessibilityLabel("notification.dismiss")
     }
 
     // MARK: - Interaction
@@ -150,7 +151,9 @@ struct NotificationBanner: View {
     /// Spoken hint guiding the expand/collapse interaction.
     private var accessibilityHint: String {
         guard notification.isExpandable else { return "" }
-        return isExpanded ? "Double tap to collapse details." : "Double tap to show details."
+        return isExpanded
+            ? String(localized: "notification.a11y.collapseHint")
+            : String(localized: "notification.a11y.expandHint")
     }
 }
 

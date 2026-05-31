@@ -42,10 +42,10 @@ enum NotificationSeverity: Sendable, Hashable, CaseIterable {
     /// Spoken prefix so VoiceOver users hear the severity before the message.
     var accessibilityPrefix: String {
         switch self {
-        case .info: return "Information"
-        case .success: return "Success"
-        case .warning: return "Warning"
-        case .error: return "Error"
+        case .info: return String(localized: "notification.severity.info")
+        case .success: return String(localized: "notification.severity.success")
+        case .warning: return String(localized: "notification.severity.warning")
+        case .error: return String(localized: "notification.severity.error")
         }
     }
 }

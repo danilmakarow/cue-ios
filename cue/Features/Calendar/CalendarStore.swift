@@ -108,7 +108,7 @@ final class CalendarStore {
             syncedMonths.insert(anchor)
             lastSyncedAt = .now
         } catch {
-            notifications?.postError(error, title: "Couldn't load your tasks")
+            notifications?.postError(error, title: String(localized: "calendar.error.loadTasks"))
         }
     }
 
@@ -181,7 +181,7 @@ final class CalendarStore {
         } catch {
             task.completedAt = previous
             try? context.save()
-            notifications?.postError(error, title: "Couldn't update task")
+            notifications?.postError(error, title: String(localized: "calendar.error.updateTask"))
         }
     }
 

@@ -50,7 +50,7 @@ struct ErrorStateView: View {
             Text(message)
         } actions: {
             if let retry {
-                Button("Try Again", action: retry)
+                Button("common.retry", action: retry)
                     .buttonStyle(.borderedProminent)
             }
         }
@@ -64,8 +64,8 @@ extension ErrorStateView {
     /// the most common case so call sites don't restate boilerplate copy.
     static func networkFailure(retry: @escaping () -> Void) -> ErrorStateView {
         ErrorStateView(
-            title: "Something went wrong",
-            message: "We couldn't reach the server. Check your connection and try again.",
+            title: String(localized: "error.somethingWrong"),
+            message: String(localized: "error.network.unreachable"),
             systemImage: "wifi.exclamationmark",
             retry: retry
         )

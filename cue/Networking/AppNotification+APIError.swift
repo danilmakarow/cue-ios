@@ -25,7 +25,7 @@ extension AppNotification {
     ///   - dismissal: override the default permanent behavior if desired.
     static func from(
         _ error: APIError,
-        title: String = "Something went wrong",
+        title: String = String(localized: "error.somethingWrong"),
         dismissal: NotificationDismissal = .permanent
     ) -> AppNotification {
         AppNotification(
@@ -48,7 +48,7 @@ extension NotificationStore {
     ///   - title: headline describing the failed operation.
     /// - Returns: the posted notification's id.
     @discardableResult
-    func postError(_ error: Error, title: String = "Something went wrong") -> UUID {
+    func postError(_ error: Error, title: String = String(localized: "error.somethingWrong")) -> UUID {
         if let apiError = error as? APIError {
             return post(.from(apiError, title: title))
         }

@@ -43,7 +43,7 @@ struct LoadingStateView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(label ?? "Loading")
+        .accessibilityLabel(label ?? String(localized: "common.loading"))
     }
 }
 
@@ -56,7 +56,7 @@ struct InlineLoadingRow: View {
     let label: String
 
     /// - Parameter label: caption text (default "Loading…").
-    init(label: String = "Loading…") {
+    init(label: String = String(localized: "common.loading")) {
         self.label = label
     }
 
