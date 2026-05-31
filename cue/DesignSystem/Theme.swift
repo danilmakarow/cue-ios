@@ -45,6 +45,16 @@ enum AppearanceMode: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Picker label as a `LocalizedStringKey`, resolved by SwiftUI against the
+    /// current `\.locale` so the picker re-localizes live on a language change.
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .system: return "theme.appearance.system"
+        case .light: return "theme.appearance.light"
+        case .dark: return "theme.appearance.dark"
+        }
+    }
+
     /// Value to pass to `.preferredColorScheme(_)`. `nil` defers to the OS.
     var colorScheme: ColorScheme? {
         switch self {
@@ -248,6 +258,23 @@ enum AppAccentColor: String, CaseIterable, Identifiable, Sendable {
         case .yellow: return String(localized: "theme.accent.yellow")
         case .green: return String(localized: "theme.accent.green")
         case .teal: return String(localized: "theme.accent.teal")
+        }
+    }
+
+    /// Accessibility label as a `LocalizedStringKey`, resolved by SwiftUI against
+    /// the current `\.locale` so the color names re-localize live.
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .brand: return "theme.accent.brand"
+        case .blue: return "theme.accent.blue"
+        case .indigo: return "theme.accent.indigo"
+        case .purple: return "theme.accent.purple"
+        case .pink: return "theme.accent.pink"
+        case .red: return "theme.accent.red"
+        case .orange: return "theme.accent.orange"
+        case .yellow: return "theme.accent.yellow"
+        case .green: return "theme.accent.green"
+        case .teal: return "theme.accent.teal"
         }
     }
 }

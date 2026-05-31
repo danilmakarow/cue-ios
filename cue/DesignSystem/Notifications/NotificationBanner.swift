@@ -44,6 +44,12 @@ struct NotificationBanner: View {
         .padding(.vertical, 12)
         .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        // Hug the content vertically. Without this the severity rail's
+        // `maxHeight: .infinity` makes the banner greedy, so the host's
+        // full-height overlay stretches every banner to fill the screen. The
+        // rail still spans the content height (like a Divider); expanding an
+        // error simply grows the banner to fit its detail.
+        .fixedSize(horizontal: false, vertical: true)
         .glassEffect(.regular, in: .rect(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)

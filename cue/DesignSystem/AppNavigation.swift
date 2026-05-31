@@ -25,13 +25,25 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
 
     var id: String { rawValue }
 
-    /// User-facing label. Localized via the app's String Catalog.
+    /// User-facing label as a plain `String`. For SwiftUI tab labels prefer
+    /// ``titleKey`` so the text re-localizes live with the `\.locale` environment.
     var title: String {
         switch self {
         case .calendar: return String(localized: "tab.calendar")
         case .dashboard: return String(localized: "tab.dashboard")
         case .settings: return String(localized: "tab.settings")
         case .newEvent: return String(localized: "newEvent.title")
+        }
+    }
+
+    /// User-facing label as a `LocalizedStringKey`, resolved by SwiftUI against
+    /// the current `\.locale` — so the tab bar switches language live.
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .calendar: return "tab.calendar"
+        case .dashboard: return "tab.dashboard"
+        case .settings: return "tab.settings"
+        case .newEvent: return "newEvent.title"
         }
     }
 

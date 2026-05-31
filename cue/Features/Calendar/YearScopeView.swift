@@ -16,6 +16,9 @@ import SwiftUI
 struct YearScopeView: View {
     let namespace: Namespace.ID
     var onSelectMonth: (Date) -> Void
+    /// Resets the whole calendar to today's day page. Supplied by
+    /// `CalendarRootView`; defaults to a no-op for previews.
+    var onOpenToday: () -> Void = {}
 
     @State private var yearAnchors: [Date]
     @State private var centered: Date?
@@ -35,9 +38,14 @@ struct YearScopeView: View {
     /// Most years a single fling may cross before settling.
     private static let maxYearsPerFling: CGFloat = 10
 
-    init(namespace: Namespace.ID, onSelectMonth: @escaping (Date) -> Void) {
+    init(
+        namespace: Namespace.ID,
+        onSelectMonth: @escaping (Date) -> Void,
+        onOpenToday: @escaping () -> Void = {}
+    ) {
         self.namespace = namespace
         self.onSelectMonth = onSelectMonth
+        self.onOpenToday = onOpenToday
         _yearAnchors = State(initialValue: CalendarMath.yearAnchors(around: .now, radius: 12))
         _centered = State(initialValue: CalendarMath.startOfYear(.now))
     }
@@ -77,9 +85,13 @@ struct YearScopeView: View {
         }
         .navigationTitle(yearTitle)
         .navigationBarTitleDisplayMode(.large)
-        .overlay(alignment: .bottom) {
-            JumpToTodayButton(isVisible: !isOnCurrentYear, action: scrollToCurrentYear)
-                .padding(.bottom, 24)
+        .overlay(alignment: .bottomTrailing) {
+            HStack(spacing: 10) {
+                JumpToTodayButton(isVisible: !isOnCurrentYear, action: scrollToCurrentYear)
+                OpenTodayButton(action: onOpenToday)
+            }
+            .padding(.trailing, 20)
+            .padding(.bottom, 24)
         }
     }
 

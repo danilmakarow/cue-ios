@@ -43,7 +43,7 @@ struct CalendarRootView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            YearScopeView(namespace: zoom, onSelectMonth: selectMonth)
+            YearScopeView(namespace: zoom, onSelectMonth: selectMonth, onOpenToday: openTodayDay)
                 .navigationDestination(for: CalendarScopeRoute.self) { route in
                     scopeDestination(route)
                 }
@@ -76,7 +76,7 @@ struct CalendarRootView: View {
     private func scopeDestination(_ route: CalendarScopeRoute) -> some View {
         switch route {
         case .month(let anchor):
-            MonthScopeView(monthAnchor: anchor, namespace: zoom, onSelectDay: selectDay)
+            MonthScopeView(monthAnchor: anchor, namespace: zoom, onSelectDay: selectDay, onOpenToday: openTodayDay)
                 .navigationTransition(.zoom(sourceID: anchor, in: zoom))
         case .day(let day):
             CalendarView(user: user, onOpenToday: openTodayInDayScope)
@@ -100,6 +100,37 @@ struct CalendarRootView: View {
         store.selectedDate = today
         path.removeLast()
         path.append(CalendarScopeRoute.day(today))
+    }
+
+    /// Resets the calendar back to *today's day page* from the year or month
+    /// overview — the "back to right now" action behind the nav-bar button in
+    /// those scopes. Distinct from each scope's in-place "Today" pill, which only
+    /// recenters that scope (year stays on year, month on month): this drills all
+    /// the way down to today's day, regardless of where the user has scrolled to.
+    private func openTodayDay() {
+        store.selectedDate = CalendarMath.startOfDay(.now)
+        Task { await stageTodayDayPath() }
+    }
+
+    /// Rebuilds the navigation path to `[month(thisMonth), day(today)]`, pushing
+    /// one level at a time with a yielded tick between pushes so the month scope
+    /// mounts and registers today's zoom source before the day is pushed — the
+    /// same staging ``seedInitialScopeIfNeeded()`` relies on to keep the
+    /// interactive zoom-out alive (here, after the jump). Animations are disabled
+    /// so the reset lands instantly rather than zooming through two levels.
+    private func stageTodayDayPath() async {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+
+        withTransaction(transaction) {
+            path = NavigationPath()
+            path.append(CalendarScopeRoute.month(CalendarMath.startOfMonth(.now)))
+        }
+        await Task.yield()
+
+        withTransaction(transaction) {
+            path.append(CalendarScopeRoute.day(CalendarMath.startOfDay(.now)))
+        }
     }
 
     /// Opens the app on the day scope, then deep-links into the month and day

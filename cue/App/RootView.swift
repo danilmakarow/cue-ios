@@ -14,8 +14,8 @@ import SwiftUI
 ///
 /// The tabbed app uses a native `TabView`, so on iOS 26 the bottom bar renders
 /// with Liquid Glass automatically — no custom chrome. The bar persists across
-/// pushes within each tab's `NavigationStack` (standard iOS behavior) and
-/// minimizes on scroll-down.
+/// pushes within each tab's `NavigationStack` (standard iOS behavior) and stays
+/// fully expanded at all times — it never minimizes/collapses on scroll.
 struct RootView: View {
     @Environment(AuthStore.self) private var authStore
 
@@ -53,32 +53,34 @@ private struct MainTabs: View {
         @Bindable var navigation = navigation
 
         TabView(selection: tabSelection) {
-            Tab(AppTab.calendar.title, systemImage: AppTab.calendar.systemImage, value: AppTab.calendar) {
+            Tab(AppTab.calendar.titleKey, systemImage: AppTab.calendar.systemImage, value: AppTab.calendar) {
                 CalendarRootView(user: user)
             }
-            Tab(AppTab.dashboard.title, systemImage: AppTab.dashboard.systemImage, value: AppTab.dashboard) {
+            Tab(AppTab.dashboard.titleKey, systemImage: AppTab.dashboard.systemImage, value: AppTab.dashboard) {
                 NavigationStack {
                     DashboardView()
                 }
             }
-            Tab(AppTab.settings.title, systemImage: AppTab.settings.systemImage, value: AppTab.settings) {
+            Tab(AppTab.settings.titleKey, systemImage: AppTab.settings.systemImage, value: AppTab.settings) {
                 NavigationStack {
                     SettingsView()
                 }
             }
-            // "New Event" lives in the native tab bar as its own round item next
-            // to the real tabs, so it inherits Liquid Glass for free (no
-            // hand-rolled bar). It's an *action* item, not a destination: the
-            // `tabSelection` setter below intercepts a tap, opens the New Event
+            // "New Event" sits in the tab bar as a *standalone* trailing item,
+            // detached from the three destination tabs (which stay merged in the
+            // main group). The `.search` role is the only API that renders a tab
+            // in its own separated capsule, so we repurpose it purely for that
+            // placement. It's an *action* item, not a destination: the
+            // `tabSelection` setter below intercepts the tap, opens the New Event
             // sheet, and keeps the previously-selected tab — so it never
             // "selects" and its empty content never shows.
-            Tab(AppTab.newEvent.title, systemImage: AppTab.newEvent.systemImage, value: AppTab.newEvent) {
+            Tab(AppTab.newEvent.titleKey, systemImage: AppTab.newEvent.systemImage, value: AppTab.newEvent, role: .search) {
                 EmptyView()
             }
         }
-        // iOS 26 polish: the Liquid Glass tab bar shrinks while the user scrolls
-        // down a tab's content, then re-expands on scroll-up.
-        .tabBarMinimizeBehavior(.onScrollDown)
+        // Keep the Liquid Glass tab bar fully expanded at all times — it must
+        // never minimize/collapse while a tab's content scrolls.
+        .tabBarMinimizeBehavior(.never)
         .sheet(isPresented: $navigation.isPresentingNewEvent) {
             NavigationStack {
                 NewEventScreen()
@@ -109,4 +111,5 @@ private struct MainTabs: View {
         .environment(AppNavigation())
         .environment(ThemeSettings())
         .environment(NotificationStore())
+        .environment(LanguageSettings())
 }

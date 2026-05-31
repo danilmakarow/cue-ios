@@ -9,10 +9,12 @@ import UIKit
 /// Settings tab — profile summary, appearance, and sign-out.
 struct SettingsView: View {
     @Environment(ThemeSettings.self) private var theme
+    @Environment(LanguageSettings.self) private var language
     @Environment(AuthStore.self) private var authStore
 
     var body: some View {
         @Bindable var theme = theme
+        @Bindable var language = language
 
         Form {
             #if DEBUG
@@ -28,7 +30,7 @@ struct SettingsView: View {
             Section("settings.appearance.title") {
                 Picker("settings.theme", selection: $theme.appearance) {
                     ForEach(AppearanceMode.allCases) { mode in
-                        Text(mode.displayName).tag(mode)
+                        Text(mode.titleKey).tag(mode)
                     }
                 }
 
@@ -37,6 +39,16 @@ struct SettingsView: View {
                     AccentColorPicker(selection: $theme.accentColor)
                 }
                 .padding(.vertical, 4)
+            }
+
+            Section {
+                Picker("settings.language", selection: $language.selected) {
+                    ForEach(AppLanguage.allCases) { option in
+                        option.label.tag(option)
+                    }
+                }
+            } footer: {
+                Text("settings.language.footer")
             }
 
             if case .authenticated = authStore.state {
@@ -167,7 +179,7 @@ private struct AccentColorPicker: View {
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(accent.displayName)
+        .accessibilityLabel(accent.titleKey)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -229,6 +241,7 @@ private struct NotificationDebugSection: View {
         SettingsView()
     }
     .environment(ThemeSettings())
+    .environment(LanguageSettings())
     .environment(AppNavigation())
     .environment(AuthStore())
     .environment(NotificationStore())

@@ -14,6 +14,7 @@ struct cueApp: App {
     @State private var navigation = AppNavigation()
     @State private var authStore = AuthStore()
     @State private var notifications = NotificationStore()
+    @State private var languageSettings = LanguageSettings()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -36,6 +37,11 @@ struct cueApp: App {
                 .environment(navigation)
                 .environment(authStore)
                 .environment(notifications)
+                .environment(languageSettings)
+                // Drive SwiftUI's localization (and date/number formatting) from
+                // the user's language choice, so most of the UI switches language
+                // live without a relaunch.
+                .environment(\.locale, languageSettings.locale)
                 // Brand canvas as the window's base layer. Auth/Loading paint
                 // their own gradients on top; scroll-backed tabs paint system
                 // surfaces — this shows through during transitions and behind
@@ -45,6 +51,10 @@ struct cueApp: App {
                 // asset-catalog appearance resolution from the user's choice.
                 .preferredColorScheme(themeSettings.appearance.colorScheme)
                 .tint(themeSettings.accentColor.color)
+                // Rebuild the whole UI when the language changes — a clean in-app
+                // "reload" so every screen re-renders in the new language at once
+                // rather than leaving stale text behind.
+                .id(languageSettings.selected)
         }
         .modelContainer(sharedModelContainer)
     }

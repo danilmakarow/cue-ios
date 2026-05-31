@@ -1,403 +1,6 @@
 {
   "sourceLanguage" : "en",
-  "version" : "1.0",
   "strings" : {
-    "api.userError.clientError" : {
-      "comment" : "Friendly fallback for 4xx client errors with no parseable body",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "The request couldn't be completed." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Не вдалося виконати запит." }
-        }
-      }
-    },
-    "api.userError.decoding" : {
-      "comment" : "Friendly message when the server response can't be parsed",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "We received an unexpected response from the server." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Сервер надіслав неочікувану відповідь." }
-        }
-      }
-    },
-    "api.userError.forbidden" : {
-      "comment" : "Friendly message for HTTP 403",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "You don't have permission to do that." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "У вас немає дозволу на цю дію." }
-        }
-      }
-    },
-    "api.userError.notFound" : {
-      "comment" : "Friendly message for HTTP 404",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "We couldn't find what you were looking for." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Не вдалося знайти те, що ви шукали." }
-        }
-      }
-    },
-    "api.userError.rateLimited" : {
-      "comment" : "Friendly message for HTTP 429",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "You're doing that too fast. Please wait a moment." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Забагато спроб поспіль. Зачекайте трохи." }
-        }
-      }
-    },
-    "api.userError.serverError" : {
-      "comment" : "Friendly fallback for 5xx server errors",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "The server ran into a problem. Please try again." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "На сервері сталася помилка. Спробуйте ще раз." }
-        }
-      }
-    },
-    "api.userError.sessionExpired" : {
-      "comment" : "Friendly message for HTTP 401",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Your session has expired. Please sign in again." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Ваш сеанс завершився. Будь ласка, увійдіть знову." }
-        }
-      }
-    },
-    "api.userError.timeout" : {
-      "comment" : "Friendly message for request timeouts (408, 504)",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "The request timed out. Please try again." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Час очікування запиту вичерпано. Спробуйте ще раз." }
-        }
-      }
-    },
-    "api.userError.unknown" : {
-      "comment" : "Friendly fallback for an unrecognized status. Parameter is the HTTP status code.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Something went wrong (status %lld)." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Щось пішло не так (код %lld)." }
-        }
-      }
-    },
-    "calendar.error.loadTasks" : {
-      "comment" : "Error notification title when loading the month's tasks fails",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Couldn't load your tasks" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Не вдалося завантажити завдання" }
-        }
-      }
-    },
-    "calendar.error.updateTask" : {
-      "comment" : "Error notification title when toggling/updating a task fails",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Couldn't update task" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Не вдалося оновити завдання" }
-        }
-      }
-    },
-    "common.loading" : {
-      "comment" : "Generic loading caption shown beside an inline spinner",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Loading…" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Завантаження…" }
-        }
-      }
-    },
-    "error.network.unreachable" : {
-      "comment" : "Shown when the server can't be reached (transport failure / network error page)",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "We couldn't reach the server. Check your connection and try again." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Не вдалося з'єднатися із сервером. Перевірте підключення та повторіть спробу." }
-        }
-      }
-    },
-    "error.somethingWrong" : {
-      "comment" : "Generic error headline used as a default notification/error-page title",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Something went wrong" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Щось пішло не так" }
-        }
-      }
-    },
-    "notification.a11y.collapseHint" : {
-      "comment" : "VoiceOver hint for collapsing an expandable notification",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Double tap to collapse details." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Двічі торкніться, щоб згорнути деталі." }
-        }
-      }
-    },
-    "notification.a11y.expandHint" : {
-      "comment" : "VoiceOver hint for expanding an expandable notification",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Double tap to show details." }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Двічі торкніться, щоб показати деталі." }
-        }
-      }
-    },
-    "notification.dismiss" : {
-      "comment" : "Accessibility label for a notification's close button",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Dismiss notification" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Закрити сповіщення" }
-        }
-      }
-    },
-    "notification.severity.error" : {
-      "comment" : "VoiceOver severity prefix for error notifications",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Error" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Помилка" }
-        }
-      }
-    },
-    "notification.severity.info" : {
-      "comment" : "VoiceOver severity prefix for informational notifications",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Information" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Інформація" }
-        }
-      }
-    },
-    "notification.severity.success" : {
-      "comment" : "VoiceOver severity prefix for success notifications",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Success" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Успіх" }
-        }
-      }
-    },
-    "notification.severity.warning" : {
-      "comment" : "VoiceOver severity prefix for warning notifications",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Warning" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Попередження" }
-        }
-      }
-    },
-    "notification.showDetails" : {
-      "comment" : "Disclosure cue to expand an error notification's detail",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Show details" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Показати деталі" }
-        }
-      }
-    },
-    "notification.showLess" : {
-      "comment" : "Disclosure cue to collapse an expanded notification",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Show less" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Згорнути" }
-        }
-      }
-    },
-    "theme.accent.brand" : {
-      "comment" : "Display name for the default brand accent color",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "Cue Blue" }
-        },
-        "uk" : {
-          "stringUnit" : { "state" : "translated", "value" : "Синій Cue" }
-        }
-      }
-    },
-    "auth.alert.signInFailed.title" : {
-      "comment" : "Title of the alert shown when Sign in with Apple fails",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn't sign in"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Не вдалося ввійти"
-          }
-        }
-      }
-    },
-    "auth.error.appleCredentialMissing" : {
-      "comment" : "Error shown when Apple did not return the expected sign-in credentials",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple didn't return the expected credentials."
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple не повернув очікувані облікові дані."
-          }
-        }
-      }
-    },
-    "auth.error.appleFailed" : {
-      "comment" : "Error shown when Sign in with Apple fails. Parameter is the underlying system error message.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sign in with Apple failed: %@"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Не вдалося ввійти через Apple: %@"
-          }
-        }
-      }
-    },
-    "auth.disclaimer" : {
-      "comment" : "Small print under the Sign in with Apple button",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "We use your Apple ID to create your Cue account. No password required."
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ми використовуємо ваш Apple ID для створення облікового запису Cue. Пароль не потрібен."
-          }
-        }
-      }
-    },
-    "auth.signingIn" : {
-      "comment" : "Progress text shown while a sign-in request is in flight",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signing you in…"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Виконуємо вхід…"
-          }
-        }
-      }
-    },
-    "auth.tagline" : {
-      "comment" : "App tagline on the sign-in and loading screens",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your day, cued just right."
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ваш день — точно за сигналом."
-          }
-        }
-      }
-    },
     "api.error.decoding" : {
       "comment" : "Error shown when the server response could not be parsed. Parameter is the underlying decoding error.",
       "extractionState" : "manual",
@@ -470,6 +73,276 @@
         }
       }
     },
+    "api.userError.clientError" : {
+      "comment" : "Friendly fallback for 4xx client errors with no parseable body",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The request couldn't be completed."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося виконати запит."
+          }
+        }
+      }
+    },
+    "api.userError.decoding" : {
+      "comment" : "Friendly message when the server response can't be parsed",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We received an unexpected response from the server."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер надіслав неочікувану відповідь."
+          }
+        }
+      }
+    },
+    "api.userError.forbidden" : {
+      "comment" : "Friendly message for HTTP 403",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You don't have permission to do that."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У вас немає дозволу на цю дію."
+          }
+        }
+      }
+    },
+    "api.userError.notFound" : {
+      "comment" : "Friendly message for HTTP 404",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We couldn't find what you were looking for."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося знайти те, що ви шукали."
+          }
+        }
+      }
+    },
+    "api.userError.rateLimited" : {
+      "comment" : "Friendly message for HTTP 429",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're doing that too fast. Please wait a moment."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Забагато спроб поспіль. Зачекайте трохи."
+          }
+        }
+      }
+    },
+    "api.userError.serverError" : {
+      "comment" : "Friendly fallback for 5xx server errors",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server ran into a problem. Please try again."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На сервері сталася помилка. Спробуйте ще раз."
+          }
+        }
+      }
+    },
+    "api.userError.sessionExpired" : {
+      "comment" : "Friendly message for HTTP 401",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your session has expired. Please sign in again."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ваш сеанс завершився. Будь ласка, увійдіть знову."
+          }
+        }
+      }
+    },
+    "api.userError.timeout" : {
+      "comment" : "Friendly message for request timeouts (408, 504)",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The request timed out. Please try again."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Час очікування запиту вичерпано. Спробуйте ще раз."
+          }
+        }
+      }
+    },
+    "api.userError.unknown" : {
+      "comment" : "Friendly fallback for an unrecognized status. Parameter is the HTTP status code.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something went wrong (status %lld)."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Щось пішло не так (код %lld)."
+          }
+        }
+      }
+    },
+    "auth.alert.signInFailed.title" : {
+      "comment" : "Title of the alert shown when Sign in with Apple fails",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't sign in"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося ввійти"
+          }
+        }
+      }
+    },
+    "auth.disclaimer" : {
+      "comment" : "Small print under the Sign in with Apple button",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We use your Apple ID to create your Cue account. No password required."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ми використовуємо ваш Apple ID для створення облікового запису Cue. Пароль не потрібен."
+          }
+        }
+      }
+    },
+    "auth.error.appleCredentialMissing" : {
+      "comment" : "Error shown when Apple did not return the expected sign-in credentials",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple didn't return the expected credentials."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple не повернув очікувані облікові дані."
+          }
+        }
+      }
+    },
+    "auth.error.appleFailed" : {
+      "comment" : "Error shown when Sign in with Apple fails. Parameter is the underlying system error message.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in with Apple failed: %@"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося ввійти через Apple: %@"
+          }
+        }
+      }
+    },
+    "auth.signingIn" : {
+      "comment" : "Progress text shown while a sign-in request is in flight",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signing you in…"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Виконуємо вхід…"
+          }
+        }
+      }
+    },
+    "auth.tagline" : {
+      "comment" : "App tagline on the sign-in and loading screens",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your day, cued just right."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ваш день — точно за сигналом."
+          }
+        }
+      }
+    },
     "calendar.alert.loadFailed.title" : {
       "comment" : "Title of the alert shown when loading the day's events fails",
       "extractionState" : "manual",
@@ -538,6 +411,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Перейти до сьогодні"
+          }
+        }
+      }
+    },
+    "calendar.error.loadTasks" : {
+      "comment" : "Error notification title when loading the month's tasks fails",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load your tasks"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося завантажити завдання"
+          }
+        }
+      }
+    },
+    "calendar.error.updateTask" : {
+      "comment" : "Error notification title when toggling/updating a task fails",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't update task"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося оновити завдання"
           }
         }
       }
@@ -722,6 +631,24 @@
         }
       }
     },
+    "common.loading" : {
+      "comment" : "Generic loading caption shown beside an inline spinner",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading…"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантаження…"
+          }
+        }
+      }
+    },
     "common.ok" : {
       "comment" : "Generic OK button, typically dismisses an alert",
       "extractionState" : "manual",
@@ -757,6 +684,10 @@
           }
         }
       }
+    },
+    "Cue" : {
+      "comment" : "The name of the app.",
+      "isCommentAutoGenerated" : true
     },
     "dashboard.empty.description" : {
       "comment" : "Description of the placeholder dashboard screen",
@@ -920,6 +851,42 @@
         }
       }
     },
+    "error.network.unreachable" : {
+      "comment" : "Shown when the server can't be reached (transport failure / network error page)",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We couldn't reach the server. Check your connection and try again."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося з'єднатися із сервером. Перевірте підключення та повторіть спробу."
+          }
+        }
+      }
+    },
+    "error.somethingWrong" : {
+      "comment" : "Generic error headline used as a default notification/error-page title",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something went wrong"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Щось пішло не так"
+          }
+        }
+      }
+    },
     "error.unknown" : {
       "comment" : "Generic fallback error message",
       "extractionState" : "manual",
@@ -1064,6 +1031,10 @@
         }
       }
     },
+    "Jump to today" : {
+      "comment" : "A label for the \"Today\" button.",
+      "isCommentAutoGenerated" : true
+    },
     "loading.accessibility" : {
       "comment" : "Accessibility label for the initial loading splash screen",
       "extractionState" : "manual",
@@ -1168,6 +1139,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Кінець"
+          }
+        }
+      }
+    },
+    "newEvent.notesField" : {
+      "comment" : "Placeholder for the event notes text field",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нотатки"
           }
         }
       }
@@ -1352,24 +1341,6 @@
         }
       }
     },
-    "newEvent.notesField" : {
-      "comment" : "Placeholder for the event notes text field",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notes"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нотатки"
-          }
-        }
-      }
-    },
     "newEvent.useQuickPicker" : {
       "comment" : "Button switching from the classic start/end pickers to the quick duration picker",
       "extractionState" : "manual",
@@ -1384,6 +1355,168 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Швидкий вибір"
+          }
+        }
+      }
+    },
+    "notification.a11y.collapseHint" : {
+      "comment" : "VoiceOver hint for collapsing an expandable notification",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Double tap to collapse details."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Двічі торкніться, щоб згорнути деталі."
+          }
+        }
+      }
+    },
+    "notification.a11y.expandHint" : {
+      "comment" : "VoiceOver hint for expanding an expandable notification",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Double tap to show details."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Двічі торкніться, щоб показати деталі."
+          }
+        }
+      }
+    },
+    "notification.dismiss" : {
+      "comment" : "Accessibility label for a notification's close button",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dismiss notification"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрити сповіщення"
+          }
+        }
+      }
+    },
+    "notification.severity.error" : {
+      "comment" : "VoiceOver severity prefix for error notifications",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Помилка"
+          }
+        }
+      }
+    },
+    "notification.severity.info" : {
+      "comment" : "VoiceOver severity prefix for informational notifications",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Information"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Інформація"
+          }
+        }
+      }
+    },
+    "notification.severity.success" : {
+      "comment" : "VoiceOver severity prefix for success notifications",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Success"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Успіх"
+          }
+        }
+      }
+    },
+    "notification.severity.warning" : {
+      "comment" : "VoiceOver severity prefix for warning notifications",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warning"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Попередження"
+          }
+        }
+      }
+    },
+    "notification.showDetails" : {
+      "comment" : "Disclosure cue to expand an error notification's detail",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show details"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показати деталі"
+          }
+        }
+      }
+    },
+    "notification.showLess" : {
+      "comment" : "Disclosure cue to collapse an expanded notification",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show less"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Згорнути"
           }
         }
       }
@@ -1424,24 +1557,6 @@
         }
       }
     },
-    "settings.profile.signedIn" : {
-      "comment" : "Fallback profile name shown when the signed-in user has no display name",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signed in"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ви ввійшли"
-          }
-        }
-      }
-    },
     "settings.profile.avatar.accessibility" : {
       "comment" : "Accessibility label for the user's profile photo in Settings",
       "extractionState" : "manual",
@@ -1478,6 +1593,24 @@
         }
       }
     },
+    "settings.profile.signedIn" : {
+      "comment" : "Fallback profile name shown when the signed-in user has no display name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signed in"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ви ввійшли"
+          }
+        }
+      }
+    },
     "settings.signOut" : {
       "comment" : "Button that signs the user out of the app",
       "extractionState" : "manual",
@@ -1492,6 +1625,60 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Вийти"
+          }
+        }
+      }
+    },
+    "settings.language" : {
+      "comment" : "Label for the app-language picker row in Settings",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мова"
+          }
+        }
+      }
+    },
+    "settings.language.footer" : {
+      "comment" : "Footer under the language picker noting some text finishes updating after the app is reopened",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some text updates fully the next time you open the app."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Деякі написи повністю оновляться після наступного відкриття застосунку."
+          }
+        }
+      }
+    },
+    "settings.language.system" : {
+      "comment" : "Language picker option that follows the device language",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Системна"
           }
         }
       }
@@ -1636,6 +1823,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Синій"
+          }
+        }
+      }
+    },
+    "theme.accent.brand" : {
+      "comment" : "Display name for the default brand accent color",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue Blue"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Синій Cue"
           }
         }
       }
@@ -1837,6 +2042,11 @@
           }
         }
       }
+    },
+    "Today" : {
+      "comment" : "A label for the \"Today\" button.",
+      "isCommentAutoGenerated" : true
     }
-  }
+  },
+  "version" : "1.1"
 }

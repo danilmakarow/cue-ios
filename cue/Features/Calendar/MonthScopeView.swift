@@ -18,6 +18,9 @@ struct MonthScopeView: View {
     let monthAnchor: Date
     let namespace: Namespace.ID
     var onSelectDay: (Date) -> Void
+    /// Resets the whole calendar to today's day page. Supplied by
+    /// `CalendarRootView`; defaults to a no-op for previews.
+    var onOpenToday: () -> Void = {}
 
     @Environment(CalendarStore.self) private var store
     @Environment(\.modelContext) private var modelContext
@@ -40,10 +43,16 @@ struct MonthScopeView: View {
     private static let maxMonthsPerFling: CGFloat = 10
     private static let seedRadius = 18
 
-    init(monthAnchor: Date, namespace: Namespace.ID, onSelectDay: @escaping (Date) -> Void) {
+    init(
+        monthAnchor: Date,
+        namespace: Namespace.ID,
+        onSelectDay: @escaping (Date) -> Void,
+        onOpenToday: @escaping () -> Void = {}
+    ) {
         self.monthAnchor = monthAnchor
         self.namespace = namespace
         self.onSelectDay = onSelectDay
+        self.onOpenToday = onOpenToday
         _monthAnchors = State(initialValue: CalendarMath.monthAnchors(around: monthAnchor, radius: Self.seedRadius))
         _centered = State(initialValue: CalendarMath.startOfMonth(monthAnchor))
     }
@@ -86,9 +95,13 @@ struct MonthScopeView: View {
             }
         }
         .safeAreaInset(edge: .top) { weekdayHeader }
-        .overlay(alignment: .bottom) {
-            JumpToTodayButton(isVisible: !isOnCurrentMonth, action: scrollToCurrentMonth)
-                .padding(.bottom, 24)
+        .overlay(alignment: .bottomTrailing) {
+            HStack(spacing: 10) {
+                JumpToTodayButton(isVisible: !isOnCurrentMonth, action: scrollToCurrentMonth)
+                OpenTodayButton(action: onOpenToday)
+            }
+            .padding(.trailing, 20)
+            .padding(.bottom, 24)
         }
         .navigationTitle(monthTitle)
         .navigationBarTitleDisplayMode(.inline)
