@@ -1,0 +1,30 @@
+{
+  "/Users/danil/personal-projects/cue-ios/cue/Features/Calendar/MonthDayCell.swift" : {
+    "const-values" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthDayCell.swiftconstvalues",
+    "dependencies" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthDayCell.d",
+    "diagnostics" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthDayCell.dia",
+    "object" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthDayCell.o",
+    "swift-dependencies" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthDayCell.swiftdeps"
+  },
+  "/Users/danil/personal-projects/cue-ios/cue/Features/Calendar/MonthGrid.swift" : {
+    "const-values" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthGrid.swiftconstvalues",
+    "dependencies" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthGrid.d",
+    "diagnostics" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthGrid.dia",
+    "object" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthGrid.o",
+    "swift-dependencies" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthGrid.swiftdeps"
+  },
+  "/Users/danil/personal-projects/cue-ios/cue/Features/Calendar/MonthPage.swift" : {
+    "const-values" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthPage.swiftconstvalues",
+    "dependencies" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthPage.d",
+    "diagnostics" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthPage.dia",
+    "object" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthPage.o",
+    "swift-dependencies" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthPage.swiftdeps"
+  },
+  "/Users/danil/personal-projects/cue-ios/cue/Features/Calendar/MonthScopeView.swift" : {
+    "const-values" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthScopeView.swiftconstvalues",
+    "dependencies" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthScopeView.d",
+    "diagnostics" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthScopeView.dia",
+    "object" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthScopeView.o",
+    "swift-dependencies" : "/Users/danil/personal-projects/cue-ios/build/Build/Intermediates.noindex/cue.build/Debug-iphonesimulator/cue.build/Objects-normal/arm64/MonthScopeView.swiftdeps"
+  }
+}

@@ -1,0 +1,13 @@
+// Debug.xcconfig
+//
+// Local development. Override API_BASE_URL here when running against a
+// different backend (e.g. a Mac LAN IP for physical-device testing).
+//
+// xcconfig treats `//` as the start of a line comment, so a literal URL like
+// `https://host` resolves to just `https:`. The `/$()/` escape splits the two
+// slashes with an empty variable expansion — the parser never sees `//`, but
+// the resulting value is `https://host`.
+
+#include "Shared.xcconfig"
+
+API_BASE_URL = https:/$()/cue.ngrok.app

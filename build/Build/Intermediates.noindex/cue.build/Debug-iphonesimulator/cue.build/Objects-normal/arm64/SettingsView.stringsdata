@@ -1,0 +1,64 @@
+{
+  "source": "/Users/danil/personal-projects/cue-ios/cue/Features/Settings/SettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Settings",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 53
+        }
+      },
+      {
+        "comment": "",
+        "key": "Appearance",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 24
+        }
+      },
+      {
+        "comment": "",
+        "key": "Theme",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 25
+        }
+      },
+      {
+        "comment": "",
+        "key": "Accent Color",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 32
+        }
+      },
+      {
+        "comment": "",
+        "key": "Log Out",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 45
+        }
+      },
+      {
+        "comment": "",
+        "key": "Your profile photo",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 106
+        }
+      },
+      {
+        "comment": "",
+        "key": "Default profile avatar",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 118
+        }
+      }
+    ]
+  },
+  "version": 1
+}

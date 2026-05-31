@@ -1,0 +1,24 @@
+{
+  "source": "/Users/danil/personal-projects/cue-ios/cue/Features/Calendar/Components/DayScheduleView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Mark as not done",
+        "location": {
+          "startingColumn": 49,
+          "startingLine": 182
+        }
+      },
+      {
+        "comment": "",
+        "key": "Mark as done",
+        "location": {
+          "startingColumn": 70,
+          "startingLine": 182
+        }
+      }
+    ]
+  },
+  "version": 1
+}

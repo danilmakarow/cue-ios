@@ -1,0 +1,120 @@
+{
+  "source": "/Users/danil/personal-projects/cue-ios/cue/Features/Auth/AuthView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Couldn't sign in",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 54
+        }
+      },
+      {
+        "comment": "",
+        "key": "We use your Apple ID to create your Cue account. No password required.",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 113
+        }
+      },
+      {
+        "comment": "",
+        "key": "Signing you in…",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 44
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 62
+        }
+      },
+      {
+        "comment": "",
+        "key": "Developer login with a pasted access token",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 133
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cue",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 90
+        }
+      },
+      {
+        "comment": "",
+        "key": "Your day, cued just right.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 93
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dev login",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 125
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dev login",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 220
+        }
+      },
+      {
+        "comment": "",
+        "key": "Access token",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 181
+        }
+      },
+      {
+        "comment": "",
+        "key": "Paste JWT from `pnpm dev-cli issue-token`",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 183
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sign in with token",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 206
+        }
+      },
+      {
+        "comment": "",
+        "key": "Debug builds only. Generate a token on the server with:\n`pnpm dev-cli issue-token --appleUserId <id>`",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 215
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 224
+        }
+      }
+    ]
+  },
+  "version": 1
+}

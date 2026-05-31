@@ -1,0 +1,8 @@
+// Release.xcconfig
+//
+// Production builds. The `/$()/` escape is required because xcconfig treats
+// `//` as a comment marker — see Debug.xcconfig for the explanation.
+
+#include "Shared.xcconfig"
+
+API_BASE_URL = https:/$()/cue.ngrok.app

@@ -1,0 +1,12 @@
+// Shared.xcconfig
+//
+// Values shared across every build configuration. Per-configuration overrides
+// (API endpoints, etc.) live in Debug.xcconfig / Release.xcconfig and include
+// this file.
+//
+// Custom Info.plist keys (`APIBaseURL` and friends) live in `Config/Info.plist`
+// and are substituted at build time via `$(VAR)` references. Xcode only honors
+// `INFOPLIST_KEY_<Key>` for keys it documents, so a real plist is required.
+
+INFOPLIST_FILE = Config/Info.plist
+GENERATE_INFOPLIST_FILE = NO
