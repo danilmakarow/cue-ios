@@ -18,12 +18,7 @@ struct LoadingView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 20) {
-                Image(systemName: "calendar.badge.clock")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 72, height: 72)
-                    .foregroundStyle(.tint)
-                    .accessibilityHidden(true)
+                BrandMark(size: 72)
 
                 Text("Cue")
                     .font(.system(size: 40, weight: .bold, design: .rounded))
