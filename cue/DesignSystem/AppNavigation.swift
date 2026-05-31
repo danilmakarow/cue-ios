@@ -24,7 +24,7 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
         }
     }
 
-    /// SF Symbol used by the custom tab bar.
+    /// SF Symbol shown in the native `TabView` bar for this tab.
     var systemImage: String {
         switch self {
         case .calendar: return "calendar"
@@ -36,9 +36,8 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
 
 // MARK: - AppNavigation
 
-/// Shared navigation state — currently just the selected top-level tab.
-/// Root screens render `AppTabBar` themselves via `.safeAreaInset(.bottom)`;
-/// pushed destinations don't, so the bar is naturally absent on detail pages.
+/// Shared navigation state — currently just the selected top-level tab,
+/// bound to the native `TabView(selection:)` in `RootView`.
 @Observable
 @MainActor
 final class AppNavigation {

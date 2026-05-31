@@ -12,10 +12,10 @@ import SwiftUI
 /// - `.unauthenticated` — shows `AuthView` with Sign in with Apple.
 /// - `.authenticated` — shows the tabbed main app.
 ///
-/// The tabbed app hides the system tab bar on every root screen; each screen
-/// renders our own `AppTabBar` via `.safeAreaInset(edge: .bottom)`. Pushed
-/// destinations don't include the inset, so the bar is simply absent on detail
-/// pages — no hide/show animation, no flicker.
+/// The tabbed app uses a native `TabView`, so on iOS 26 the bottom bar renders
+/// with Liquid Glass automatically — no custom chrome. The bar persists across
+/// pushes within each tab's `NavigationStack` (standard iOS behavior) and
+/// minimizes on scroll-down.
 struct RootView: View {
     @Environment(AuthStore.self) private var authStore
 
@@ -55,16 +55,17 @@ private struct MainTabs: View {
             Tab(AppTab.dashboard.title, systemImage: AppTab.dashboard.systemImage, value: AppTab.dashboard) {
                 NavigationStack {
                     DashboardView()
-                        .toolbar(.hidden, for: .tabBar)
                 }
             }
             Tab(AppTab.settings.title, systemImage: AppTab.settings.systemImage, value: AppTab.settings) {
                 NavigationStack {
                     SettingsView()
-                        .toolbar(.hidden, for: .tabBar)
                 }
             }
         }
+        // iOS 26 polish: the Liquid Glass tab bar shrinks while the user scrolls
+        // down a tab's content, then re-expands on scroll-up.
+        .tabBarMinimizeBehavior(.onScrollDown)
     }
 }
 

@@ -7,7 +7,7 @@ import SwiftUI
 
 /// Year scope — the root of the calendar stack. An infinitely-scrolling column
 /// of `YearPage`s; tapping a month zooms into the month scope. This is the
-/// calendar "home", so it hosts the global `AppTabBar` for tab switching.
+/// calendar "home"; tab switching is handled by the native `TabView` bar.
 struct YearScopeView: View {
     let namespace: Namespace.ID
     var onSelectMonth: (Date) -> Void
@@ -40,7 +40,6 @@ struct YearScopeView: View {
         .scrollPosition(id: $centered, anchor: .top)
         .navigationTitle(yearTitle)
         .navigationBarTitleDisplayMode(.large)
-        .safeAreaInset(edge: .bottom) { AppTabBar() }
         .onChange(of: centered) { _, _ in extendIfNeeded() }
     }
 
