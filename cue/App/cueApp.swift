@@ -34,6 +34,13 @@ struct cueApp: App {
                 .environment(themeSettings)
                 .environment(navigation)
                 .environment(authStore)
+                // Brand canvas as the window's base layer. Auth/Loading paint
+                // their own gradients on top; scroll-backed tabs paint system
+                // surfaces — this shows through during transitions and behind
+                // any non-opaque content.
+                .background(Color.appBackground.ignoresSafeArea())
+                // Drive both the SwiftUI environment color scheme AND the
+                // asset-catalog appearance resolution from the user's choice.
                 .preferredColorScheme(themeSettings.appearance.colorScheme)
                 .tint(themeSettings.accentColor.color)
         }

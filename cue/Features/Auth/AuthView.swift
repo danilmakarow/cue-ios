@@ -22,7 +22,7 @@ struct AuthView: View {
 
         ZStack {
             LinearGradient(
-                colors: [Color.accentColor.opacity(0.25), Color(.systemBackground)],
+                colors: [Color.appPrimary.opacity(0.25), Color.appBackground],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
