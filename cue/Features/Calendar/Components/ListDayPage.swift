@@ -16,6 +16,8 @@ struct ListDayPage: View {
     let date: Date
     let events: [ScheduleEvent]
     let onToggleCompletion: (ScheduleEvent) -> Void
+    /// Called when the user taps an event card body (not the completion checkbox).
+    var onSelect: (ScheduleEvent) -> Void = { _ in }
 
     /// Events sorted by start time. Incomplete tasks stay in chronological
     /// order; completed ones sink to the bottom so the TODO feels like a
@@ -41,7 +43,7 @@ struct ListDayPage: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 10) {
                         ForEach(sortedEvents) { event in
-                            EventListCard(event: event, onToggle: onToggleCompletion)
+                            EventListCard(event: event, onToggle: onToggleCompletion, onSelect: onSelect)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -79,6 +81,7 @@ struct ListDayPage: View {
 private struct EventListCard: View {
     let event: ScheduleEvent
     let onToggle: (ScheduleEvent) -> Void
+    var onSelect: (ScheduleEvent) -> Void = { _ in }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -104,6 +107,9 @@ private struct EventListCard: View {
                         .padding(.top, 2)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture { onSelect(event) }
 
             Spacer(minLength: 0)
 
@@ -163,7 +169,7 @@ private struct EventListCard: View {
     let cal = Calendar.current
     let events: [ScheduleEvent] = [
         ScheduleEvent(
-            id: UUID().uuidString,
+            id: "key1", seriesId: UUID().uuidString,
             title: "Team sync",
             notes: "Discuss Q2 roadmap priorities and unblock data-layer work.",
             startAt: cal.date(bySettingHour: 9, minute: 0, second: 0, of: today) ?? today,
@@ -171,7 +177,7 @@ private struct EventListCard: View {
             requiresCompletion: true
         ),
         ScheduleEvent(
-            id: UUID().uuidString,
+            id: "key2", seriesId: UUID().uuidString,
             title: "1:1 with manager",
             notes: nil,
             startAt: cal.date(bySettingHour: 14, minute: 0, second: 0, of: today) ?? today,
@@ -180,11 +186,11 @@ private struct EventListCard: View {
             completedAt: Date()
         ),
         ScheduleEvent(
-            id: UUID().uuidString,
+            id: "key3", seriesId: UUID().uuidString,
             title: "Gym",
             startAt: cal.date(bySettingHour: 18, minute: 0, second: 0, of: today) ?? today,
             endAt: cal.date(bySettingHour: 19, minute: 0, second: 0, of: today) ?? today
         ),
     ]
-    return ListDayPage(date: today, events: events, onToggleCompletion: { _ in })
+    ListDayPage(date: today, events: events, onToggleCompletion: { _ in }, onSelect: { _ in })
 }

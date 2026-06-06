@@ -18,6 +18,7 @@ import SwiftUI
 /// fully expanded at all times — it never minimizes/collapses on scroll.
 struct RootView: View {
     @Environment(AuthStore.self) private var authStore
+    @Environment(AppNavigation.self) private var navigation
 
     var body: some View {
         Group {
@@ -33,6 +34,15 @@ struct RootView: View {
         .task {
             if case .loading = authStore.state {
                 await authStore.bootstrap()
+            }
+        }
+        // Capture Telegram linking deep links from any auth state. The code is
+        // parked on `AppNavigation`; the "Connect Telegram?" sheet (in
+        // `MainTabs`) only presents once authenticated, so a link tapped while
+        // signed out surfaces automatically after Apple sign-in.
+        .onOpenURL { url in
+            if case .telegramLink(let code) = DeepLink(url: url) {
+                navigation.pendingTelegramCode = code
             }
         }
         // Global notification overlay — rendered above every screen (loading,
@@ -86,6 +96,28 @@ private struct MainTabs: View {
                 NewEventScreen()
             }
         }
+        // "Connect Telegram?" confirmation, driven by a deep-linked code parked
+        // on `AppNavigation`. Presented as a sheet (mirrors the New Event sheet)
+        // only while authenticated — this view only mounts in that state — so a
+        // code captured during sign-out surfaces here once sign-in completes.
+        .sheet(isPresented: telegramLinkPresented) {
+            NavigationStack {
+                ConnectTelegramView(prefilledCode: navigation.pendingTelegramCode ?? "")
+            }
+        }
+    }
+
+    /// Bool binding mirroring `pendingTelegramCode != nil`; clearing the code on
+    /// dismiss so the sheet doesn't immediately re-present.
+    private var telegramLinkPresented: Binding<Bool> {
+        Binding(
+            get: { navigation.pendingTelegramCode != nil },
+            set: { isPresented in
+                if !isPresented {
+                    navigation.pendingTelegramCode = nil
+                }
+            }
+        )
     }
 
     /// Tab-selection binding that treats `.newEvent` as a one-shot action: when
@@ -112,4 +144,5 @@ private struct MainTabs: View {
         .environment(ThemeSettings())
         .environment(NotificationStore())
         .environment(LanguageSettings())
+        .environment(TelegramLinkStore())
 }

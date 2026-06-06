@@ -25,17 +25,22 @@ struct MonthPage: View {
         self.onSelectDay = onSelectDay
 
         let (from, to) = CalendarMath.monthBounds(monthAnchor)
-        let sentinel = Date.distantPast
+        // Note: #Predicate cannot close over Date.distantPast as a KeyPath expression.
+        // We store all tasks and filter in body — month scope queries are small.
         _tasks = Query(
             filter: #Predicate<TaskItem> { task in
-                (task.startAt ?? sentinel) >= from && (task.startAt ?? sentinel) < to
+                task.occurrenceStart != nil
             }
         )
+        _ = from
+        _ = to
     }
 
     var body: some View {
-        let daysWithEvents = Set(tasks.compactMap { task in
-            task.startAt.map { CalendarMath.startOfDay($0) }
+        let (from, to) = CalendarMath.monthBounds(monthAnchor)
+        let daysWithEvents = Set(tasks.compactMap { task -> Date? in
+            guard let start = task.occurrenceStart, start >= from && start < to else { return nil }
+            return CalendarMath.startOfDay(start)
         })
 
         VStack(alignment: .leading, spacing: 12) {

@@ -50,6 +50,10 @@ final class NewEventViewModel {
     var endAt: Date = Date.nextFullHour().addingTimeInterval(3600)
     var isAllDay: Bool = false
     var requiresCompletion: Bool = false
+    /// Optional recurrence rule to attach to the new task.
+    var recurrenceInput: RecurrenceRuleInput?
+    /// Optional group to assign the new task to.
+    var selectedGroupId: String?
 
     /// Selected preset duration. Nil when user is in classic mode and freely edits `endAt`.
     var duration: EventDuration? = .oneHour {
@@ -101,13 +105,15 @@ final class NewEventViewModel {
             let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
             let request = CreateTaskRequest(
                 calendarId: calendarId,
+                groupId: selectedGroupId,
                 title: title.trimmingCharacters(in: .whitespaces),
                 notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
                 startAt: startAt,
                 endAt: isAllDay ? nil : endAt,
                 isAllDay: isAllDay,
                 timezone: TimeZone.current.identifier,
-                requiresCompletion: requiresCompletion
+                requiresCompletion: requiresCompletion,
+                recurrence: recurrenceInput
             )
             let created: TaskDTO = try await api.post("/tasks", body: request)
             return created

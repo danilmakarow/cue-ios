@@ -340,6 +340,18 @@ extension Color {
         self.init(.sRGB, red: red, green: green, blue: blue, opacity: 1.0)
     }
 
+    /// Builds a `Color` from a CSS hex string (`#RRGGBB` or `RRGGBB`). Returns
+    /// `nil` for malformed input. Used to render group colors persisted as hex
+    /// strings by the backend.
+    init?(hex string: String) {
+        var cleaned = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned.hasPrefix("#") { cleaned = String(cleaned.dropFirst()) }
+        guard cleaned.count == 6, let value = UInt32(cleaned, radix: 16) else {
+            return nil
+        }
+        self.init(hex: value)
+    }
+
     /// Builds a dynamic color that resolves to `light` in light mode and `dark`
     /// in dark mode, mirroring how an asset-catalog color with "Any/Dark"
     /// appearances behaves — but expressed in code so every role is reviewable

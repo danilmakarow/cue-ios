@@ -20,6 +20,8 @@ struct DayScheduleView: View {
     /// Callback invoked when the user taps the completion checkbox on an
     /// event. Only fired for events whose `requiresCompletion` is true.
     var onToggleCompletion: (ScheduleEvent) -> Void = { _ in }
+    /// Callback invoked when the user taps the event card body (not the checkbox).
+    var onSelect: (ScheduleEvent) -> Void = { _ in }
 
     /// Vertical points per hour. Exposed so callers can compute scroll
     /// targets in the same coordinate space as this view.
@@ -149,11 +151,15 @@ struct DayScheduleView: View {
             .fill(.tint)
             .overlay(alignment: .topLeading) {
                 HStack(alignment: .top, spacing: 8) {
+                    // Tappable area for opening detail — excludes the checkbox.
                     Text(event.title)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                         .lineLimit(2)
                         .strikethrough(event.isCompleted, color: .white)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .onTapGesture { onSelect(event) }
                     Spacer(minLength: 0)
                     if event.requiresCompletion {
                         completionToggle(for: event)
@@ -275,14 +281,14 @@ struct DayScheduleView: View {
     let cal = Calendar.current
     let events: [ScheduleEvent] = [
         ScheduleEvent(
-            id: UUID().uuidString,
+            id: "key1", seriesId: UUID().uuidString,
             title: "Team sync",
             startAt: cal.date(bySettingHour: 9, minute: 0, second: 0, of: today) ?? today,
             endAt: cal.date(bySettingHour: 10, minute: 0, second: 0, of: today) ?? today,
             requiresCompletion: true
         ),
         ScheduleEvent(
-            id: UUID().uuidString,
+            id: "key2", seriesId: UUID().uuidString,
             title: "1:1 with manager",
             startAt: cal.date(bySettingHour: 9, minute: 30, second: 0, of: today) ?? today,
             endAt: cal.date(bySettingHour: 10, minute: 30, second: 0, of: today) ?? today,
@@ -290,13 +296,13 @@ struct DayScheduleView: View {
             completedAt: Date()
         ),
         ScheduleEvent(
-            id: UUID().uuidString,
+            id: "key3", seriesId: UUID().uuidString,
             title: "Deep work",
             startAt: cal.date(bySettingHour: 11, minute: 0, second: 0, of: today) ?? today,
             endAt: cal.date(bySettingHour: 13, minute: 0, second: 0, of: today) ?? today
         ),
     ]
-    return ScrollView {
+    ScrollView {
         DayScheduleView(date: today, events: events)
             .padding(.horizontal)
     }

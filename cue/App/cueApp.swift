@@ -15,20 +15,43 @@ struct cueApp: App {
     @State private var authStore = AuthStore()
     @State private var notifications = NotificationStore()
     @State private var languageSettings = LanguageSettings()
+    @State private var telegramLink = TelegramLinkStore()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             EventCalendar.self,
             TaskItem.self,
+            EventTaskGroup.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            // The on-device store is a cache that re-syncs from the backend, so when
+            // a schema change leaves the existing store unreadable (no migration plan
+            // for, e.g., the occurrence-key remodel), discard it and recreate rather
+            // than crashing the app. Safe while there is no local-only data to
+            // preserve; revisit with a `SchemaMigrationPlan` once there is.
+            Self.destroyStore(at: modelConfiguration.url)
+            do {
+                return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            } catch {
+                fatalError("Could not create ModelContainer after resetting the store: \(error)")
+            }
         }
     }()
+
+    /// Deletes the SwiftData store at `url` along with its SQLite WAL/SHM
+    /// sidecars, so a fresh store matching the current schema can replace an
+    /// unreadable one. Best-effort: missing files are ignored.
+    private static func destroyStore(at url: URL) {
+        let fileManager = FileManager.default
+        let storeFiles = [url.path, url.path + "-wal", url.path + "-shm"]
+        for path in storeFiles where fileManager.fileExists(atPath: path) {
+            try? fileManager.removeItem(atPath: path)
+        }
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -38,6 +61,7 @@ struct cueApp: App {
                 .environment(authStore)
                 .environment(notifications)
                 .environment(languageSettings)
+                .environment(telegramLink)
                 // Drive SwiftUI's localization (and date/number formatting) from
                 // the user's language choice, so most of the UI switches language
                 // live without a relaunch.

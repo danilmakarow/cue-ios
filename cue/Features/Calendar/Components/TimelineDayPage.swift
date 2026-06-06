@@ -17,6 +17,8 @@ struct TimelineDayPage: View {
     let date: Date
     let events: [ScheduleEvent]
     let onToggleCompletion: (ScheduleEvent) -> Void
+    /// Called when the user taps an event card body (not the completion checkbox).
+    var onSelect: (ScheduleEvent) -> Void = { _ in }
 
     /// Per-page vertical scroll offset. Each page maintains its own so
     /// swiping horizontally back and forth preserves position.
@@ -35,7 +37,8 @@ struct TimelineDayPage: View {
                 DayScheduleView(
                     date: date,
                     events: events,
-                    onToggleCompletion: onToggleCompletion
+                    onToggleCompletion: onToggleCompletion,
+                    onSelect: onSelect
                 )
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)

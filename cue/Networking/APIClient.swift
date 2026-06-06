@@ -217,6 +217,16 @@ struct APIClient: Sendable {
         return try await perform(request)
     }
 
+    /// DELETEs the given relative path and decodes the response. Carries no
+    /// request body; reuses the same bearer-token + `APIError` handling as the
+    /// other verbs.
+    nonisolated func delete<Response: Decodable>(_ path: String) async throws -> Response {
+        var request = URLRequest(url: baseURL.appending(path: path))
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        return try await perform(request)
+    }
+
     /// Runs the request, validates status, decodes the body.
     nonisolated private func perform<Response: Decodable>(_ request: URLRequest) async throws -> Response {
         var authenticatedRequest = request

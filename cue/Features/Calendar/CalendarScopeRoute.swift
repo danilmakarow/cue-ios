@@ -15,4 +15,6 @@ import Foundation
 enum CalendarScopeRoute: Hashable {
     case month(Date)
     case day(Date)
+    /// Push the task-detail screen for a specific occurrence.
+    case taskDetail(ScheduleEvent)
 }

@@ -16,6 +16,8 @@ struct CalendarView: View {
     /// as opposed to the pill which only recenters the pager. Supplied by
     /// `CalendarRootView`; defaults to a no-op for previews.
     var onOpenToday: () -> Void = {}
+    /// Called when the user taps an event card (not the completion checkbox).
+    var onSelect: (ScheduleEvent) -> Void = { _ in }
 
     @Environment(CalendarStore.self) private var store
     @Environment(\.modelContext) private var modelContext
@@ -94,7 +96,7 @@ struct CalendarView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 0) {
                 ForEach(pageDates, id: \.self) { date in
-                    DayEventsProvider(date: date)
+                    DayEventsProvider(date: date, onSelect: onSelect)
                         .containerRelativeFrame(.horizontal)
                         .id(date)
                 }

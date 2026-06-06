@@ -11,6 +11,8 @@ struct SettingsView: View {
     @Environment(ThemeSettings.self) private var theme
     @Environment(LanguageSettings.self) private var language
     @Environment(AuthStore.self) private var authStore
+    @Environment(TelegramLinkStore.self) private var telegramLink
+    @Environment(NotificationStore.self) private var notifications
 
     var body: some View {
         @Bindable var theme = theme
@@ -52,9 +54,34 @@ struct SettingsView: View {
             }
 
             if case .authenticated = authStore.state {
+                Section("settings.manage.title") {
+                    NavigationLink {
+                        GroupsScreen()
+                    } label: {
+                        Label("settings.groups", systemImage: "folder.fill")
+                    }
+                }
+            }
+
+            if case .authenticated = authStore.state {
+                Section("settings.integrations.title") {
+                    NavigationLink {
+                        ConnectTelegramView()
+                    } label: {
+                        LabeledContent {
+                            telegramStatusLabel
+                        } label: {
+                            Label("telegram.title", systemImage: "paperplane.fill")
+                        }
+                    }
+                }
+            }
+
+            if case .authenticated = authStore.state {
                 Section {
                     Button(role: .destructive) {
                         authStore.signOut()
+                        telegramLink.clear()
                     } label: {
                         HStack {
                             Spacer()
@@ -67,6 +94,36 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("settings.title")
+        .task {
+            telegramLink.bind(notifications: notifications)
+            await telegramLink.refreshStatus()
+        }
+    }
+
+    /// Trailing status indicator for the Telegram integration row: the linked
+    /// `@handle` (or a generic "connected" label), "Not connected", or a spinner
+    /// while the status is still resolving.
+    @ViewBuilder
+    private var telegramStatusLabel: some View {
+        switch telegramLink.status {
+        case .unknown, .loading:
+            ProgressView()
+        case .connected(let username, _):
+            Text(connectedLabel(for: username))
+                .foregroundStyle(.secondary)
+        case .notConnected, .failed:
+            Text("telegram.status.notConnected")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Formats the connected username as `@handle`, or a generic label when the
+    /// backend hasn't supplied one.
+    private func connectedLabel(for username: String?) -> String {
+        guard let username, !username.isEmpty else {
+            return String(localized: "telegram.status.connected")
+        }
+        return username.hasPrefix("@") ? username : "@\(username)"
     }
 }
 
@@ -245,4 +302,5 @@ private struct NotificationDebugSection: View {
     .environment(AppNavigation())
     .environment(AuthStore())
     .environment(NotificationStore())
+    .environment(TelegramLinkStore())
 }

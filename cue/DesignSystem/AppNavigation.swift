@@ -71,4 +71,10 @@ final class AppNavigation {
     /// action item — a tab-level create action belongs in a modal, not pushed
     /// onto a single tab's navigation stack — so it's reachable from any tab.
     var isPresentingNewEvent = false
+
+    /// Transient linking nonce parked by an incoming Telegram deep link. Non-nil
+    /// drives the global "Connect Telegram?" sheet in `RootView`. A code that
+    /// arrives while signed out stays parked here until sign-in flips
+    /// `AuthStore.state` to `.authenticated`, at which point the sheet surfaces.
+    var pendingTelegramCode: String?
 }

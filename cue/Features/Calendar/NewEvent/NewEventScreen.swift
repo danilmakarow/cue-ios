@@ -11,6 +11,8 @@ struct NewEventScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = NewEventViewModel()
+    @State private var showRecurrenceEditor = false
+    @State private var groups: [TaskGroupDTO] = []
 
     var body: some View {
         @Bindable var viewModel = viewModel
@@ -60,7 +62,7 @@ struct NewEventScreen: View {
                         withAnimation { viewModel.useClassicPicker = true }
                     }
                     .font(.footnote)
-//                    .foregroundStyle(.tint)
+                    .foregroundStyle(.tint)
                 }
             }
 
@@ -68,6 +70,19 @@ struct NewEventScreen: View {
                 Toggle("newEvent.requiresCompletion", isOn: $viewModel.requiresCompletion)
             } footer: {
                 Text("newEvent.requiresCompletion.footer")
+            }
+
+            RecurrenceSection(recurrence: $viewModel.recurrenceInput)
+
+            if !groups.isEmpty {
+                Section(String(localized: "newEvent.group.section")) {
+                    Picker("newEvent.group.label", selection: $viewModel.selectedGroupId) {
+                        Text("newEvent.group.none").tag(Optional<String>.none)
+                        ForEach(groups) { group in
+                            Text(group.name).tag(Optional(group.id))
+                        }
+                    }
+                }
             }
         }
         .navigationTitle("newEvent.title")
@@ -96,6 +111,18 @@ struct NewEventScreen: View {
             Text(viewModel.errorMessage ?? "")
         }
         .disabled(viewModel.isSubmitting)
+        .task { await loadGroups() }
+    }
+
+    private func loadGroups() async {
+        // Only fetch once; the `.task` can re-fire on re-appear.
+        guard groups.isEmpty else { return }
+        do {
+            let fetched: [TaskGroupDTO] = try await APIClient.shared.get("/task-groups")
+            groups = fetched
+        } catch {
+            // Non-fatal — group picker just won't appear.
+        }
     }
 
     /// Horizontal chip selector for preset event durations.
@@ -180,5 +207,5 @@ struct NewEventScreen: View {
     NavigationStack {
         NewEventScreen()
     }
-    .modelContainer(for: [EventCalendar.self, TaskItem.self], inMemory: true)
+    .modelContainer(for: [EventCalendar.self, TaskItem.self, EventTaskGroup.self], inMemory: true)
 }
