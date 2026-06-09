@@ -9,7 +9,6 @@ import SwiftUI
 /// of the year's twelve `YearMonthCell`s.
 struct YearPage: View {
     let yearAnchor: Date
-    let namespace: Namespace.ID
     var onSelectMonth: (Date) -> Void
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 3)
@@ -28,8 +27,7 @@ struct YearPage: View {
                 ForEach(CalendarMath.monthsOfYear(yearAnchor), id: \.self) { monthAnchor in
                     YearMonthCell(
                         model: MonthGridModel.model(for: monthAnchor),
-                        todayKey: monthAnchor == todayMonth ? todayKey : nil,
-                        namespace: namespace
+                        todayKey: monthAnchor == todayMonth ? todayKey : nil
                     )
                     .contentShape(.rect)
                     .onTapGesture { onSelectMonth(monthAnchor) }

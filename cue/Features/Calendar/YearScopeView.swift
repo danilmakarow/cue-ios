@@ -20,10 +20,9 @@ import SwiftUI
 /// change's context, and the per-year height estimate from content *size*
 /// changes (rare) — so scrolling never invalidates this view's body.
 struct YearScopeView: View {
-    let namespace: Namespace.ID
     var onSelectMonth: (Date) -> Void
     /// Resets the whole calendar to today's day page. Supplied by
-    /// `CalendarRootView`; defaults to a no-op for previews.
+    /// `CalendarZoomContainer`; defaults to a no-op for previews.
     var onOpenToday: () -> Void = {}
 
     @State private var yearAnchors: [Date]
@@ -45,23 +44,25 @@ struct YearScopeView: View {
     /// so a long session can't accumulate unbounded pages.
     private static let maxWindowSize = 33
 
+    /// `centeredOn` is the date whose *year* the scope mounts scrolled to —
+    /// the zoom container passes the month being zoomed out of, so the year
+    /// scope appears already showing the right year.
     init(
-        namespace: Namespace.ID,
+        centeredOn date: Date = .now,
         onSelectMonth: @escaping (Date) -> Void,
         onOpenToday: @escaping () -> Void = {}
     ) {
-        self.namespace = namespace
         self.onSelectMonth = onSelectMonth
         self.onOpenToday = onOpenToday
-        _yearAnchors = State(initialValue: CalendarMath.yearAnchors(around: .now, radius: 12))
-        _centered = State(initialValue: CalendarMath.startOfYear(.now))
+        _yearAnchors = State(initialValue: CalendarMath.yearAnchors(around: date, radius: 12))
+        _centered = State(initialValue: CalendarMath.startOfYear(date))
     }
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 36) {
                 ForEach(yearAnchors, id: \.self) { yearAnchor in
-                    YearPage(yearAnchor: yearAnchor, namespace: namespace, onSelectMonth: onSelectMonth)
+                    YearPage(yearAnchor: yearAnchor, onSelectMonth: onSelectMonth)
                         .id(yearAnchor)
                 }
             }
@@ -185,10 +186,10 @@ struct YearScopeView: View {
 }
 
 #Preview {
-    @Previewable @Namespace var namespace
     NavigationStack {
-        YearScopeView(namespace: namespace, onSelectMonth: { _ in })
+        YearScopeView(onSelectMonth: { _ in })
     }
     .environment(AppNavigation())
     .environment(ThemeSettings())
+    .environment(ScopeFrameRegistry())
 }

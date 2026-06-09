@@ -11,6 +11,11 @@ import SwiftUI
 /// Renders entirely from a precomputed `MonthGridModel` plus day-key flags —
 /// no `Calendar` math or formatting happens here, so realizing a month while
 /// the list scrolls stays cheap.
+///
+/// Each day cell reports its frame (in the zoom container's coordinate space)
+/// to the `ScopeFrameRegistry`, which is how a day ↔ month zoom finds its
+/// anchor cell and how a pinch-open picks the day under the fingers. The
+/// registry is a plain store — writes don't invalidate any view.
 struct MonthGrid: View {
     let model: MonthGridModel
     /// `startOfDay` key of the selected day (drives the selection ring).
@@ -18,10 +23,9 @@ struct MonthGrid: View {
     /// `startOfDay` key of today (drives the today highlight).
     let todayKey: Date
     let daysWithEvents: Set<Date>
-    let namespace: Namespace.ID
     var onSelectDay: (Date) -> Void
 
-    @Environment(ZoomSourceRegistry.self) private var zoomSources
+    @Environment(ScopeFrameRegistry.self) private var frames
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
@@ -30,21 +34,19 @@ struct MonthGrid: View {
             ForEach(Array(model.cells.enumerated()), id: \.offset) { _, cell in
                 if let cell {
                     MonthDayCell(
-                        day: cell.date,
                         number: cell.number,
                         isSelected: cell.date == selectedDayKey,
                         isToday: cell.date == todayKey,
-                        hasEvents: daysWithEvents.contains(cell.date),
-                        namespace: namespace
+                        hasEvents: daysWithEvents.contains(cell.date)
                     )
                     .contentShape(.rect)
                     .onTapGesture { onSelectDay(cell.date) }
-                    // Report this day's zoom source as on/off screen so a
-                    // programmatic deep-link can wait for it before pushing the
-                    // day scope, keeping the interactive zoom-out alive. The
-                    // date is the same value used as the cell's matched-source id.
-                    .onAppear { zoomSources.markPresent(cell.date) }
-                    .onDisappear { zoomSources.markAbsent(cell.date) }
+                    .onGeometryChange(for: CGRect.self) { proxy in
+                        proxy.frame(in: .named(ScopeFrameRegistry.coordinateSpaceName))
+                    } action: { frame in
+                        frames.setDayFrame(frame, for: cell.date)
+                    }
+                    .onDisappear { frames.clearDayFrame(for: cell.date) }
                 } else {
                     Color.clear.frame(height: 44)
                 }

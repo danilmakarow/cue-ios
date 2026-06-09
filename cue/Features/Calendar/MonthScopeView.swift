@@ -21,12 +21,16 @@ import SwiftUI
 /// change's context, and the per-month height estimate from content *size*
 /// changes (rare) — so scrolling never invalidates this view's body.
 struct MonthScopeView: View {
+    /// Month the scope mounts centered on.
     let monthAnchor: Date
-    let namespace: Namespace.ID
     var onSelectDay: (Date) -> Void
     /// Resets the whole calendar to today's day page. Supplied by
-    /// `CalendarRootView`; defaults to a no-op for previews.
+    /// `CalendarZoomContainer`; defaults to a no-op for previews.
     var onOpenToday: () -> Void = {}
+    /// Reports the month the list has settled on, so the zoom container can
+    /// anchor a month → year zoom-out (and seed the year scope) truthfully
+    /// after the user scrolls this list away from `monthAnchor`.
+    var onCenteredMonthChange: (Date) -> Void = { _ in }
 
     @Environment(CalendarStore.self) private var store
     @Environment(\.modelContext) private var modelContext
@@ -52,14 +56,14 @@ struct MonthScopeView: View {
 
     init(
         monthAnchor: Date,
-        namespace: Namespace.ID,
         onSelectDay: @escaping (Date) -> Void,
-        onOpenToday: @escaping () -> Void = {}
+        onOpenToday: @escaping () -> Void = {},
+        onCenteredMonthChange: @escaping (Date) -> Void = { _ in }
     ) {
         self.monthAnchor = monthAnchor
-        self.namespace = namespace
         self.onSelectDay = onSelectDay
         self.onOpenToday = onOpenToday
+        self.onCenteredMonthChange = onCenteredMonthChange
         _monthAnchors = State(initialValue: CalendarMath.monthAnchors(around: monthAnchor, radius: Self.seedRadius))
         _centered = State(initialValue: CalendarMath.startOfMonth(monthAnchor))
     }
@@ -71,7 +75,6 @@ struct MonthScopeView: View {
                     MonthPage(
                         monthAnchor: anchor,
                         selectedDate: store.selectedDate,
-                        namespace: namespace,
                         onSelectDay: onSelectDay
                     )
                     .id(anchor)
@@ -116,6 +119,11 @@ struct MonthScopeView: View {
         .navigationTitle(monthTitle)
         .navigationBarTitleDisplayMode(.inline)
         .task { await syncAround(centered) }
+        .onChange(of: centered) { _, newCentered in
+            if let newCentered {
+                onCenteredMonthChange(newCentered)
+            }
+        }
     }
 
     // MARK: - Header

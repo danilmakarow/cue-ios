@@ -13,15 +13,13 @@ import SwiftUI
 struct MonthPage: View {
     let monthAnchor: Date
     let selectedDate: Date
-    let namespace: Namespace.ID
     var onSelectDay: (Date) -> Void
 
     @Query private var tasks: [TaskItem]
 
-    init(monthAnchor: Date, selectedDate: Date, namespace: Namespace.ID, onSelectDay: @escaping (Date) -> Void) {
+    init(monthAnchor: Date, selectedDate: Date, onSelectDay: @escaping (Date) -> Void) {
         self.monthAnchor = monthAnchor
         self.selectedDate = selectedDate
-        self.namespace = namespace
         self.onSelectDay = onSelectDay
 
         // Bound the query to this month's window so each realized page fetches
@@ -55,7 +53,6 @@ struct MonthPage: View {
                 selectedDayKey: CalendarMath.startOfDay(selectedDate),
                 todayKey: todayKey,
                 daysWithEvents: daysWithEvents,
-                namespace: namespace,
                 onSelectDay: onSelectDay
             )
         }

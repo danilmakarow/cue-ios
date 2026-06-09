@@ -6,20 +6,24 @@
 import SwiftUI
 
 /// Miniature month inside the year grid: the month name above a tiny 7-column
-/// day-number grid. Dot-free by design (the year scope shows no events). Acts
-/// as the `matchedTransitionSource` for the zoom into the month scope.
+/// day-number grid. Dot-free by design (the year scope shows no events).
 ///
 /// The day numbers are drawn with a single `Canvas` instead of ~37 laid-out
 /// `Text` views: a year page realizes twelve of these at once mid-scroll, and
 /// the view-tree version (~450 views + ~450 format calls per page) was the
 /// main frame-drop source in the year scope. All strings come pre-formatted
 /// from `MonthGridModel`.
+///
+/// Reports its frame to the `ScopeFrameRegistry`, which is how a month ↔ year
+/// zoom finds its anchor cell and how a pinch-open picks the month under the
+/// fingers.
 struct YearMonthCell: View {
     let model: MonthGridModel
     /// Today's `startOfDay` when it falls inside this month, else nil. Doubles
     /// as the "this is the current month" flag for the title tint.
     let todayKey: Date?
-    let namespace: Namespace.ID
+
+    @Environment(ScopeFrameRegistry.self) private var frames
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -30,7 +34,12 @@ struct YearMonthCell: View {
             MiniMonthGrid(model: model, todayKey: todayKey)
         }
         .padding(8)
-        .matchedTransitionSource(id: model.monthAnchor, in: namespace)
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .named(ScopeFrameRegistry.coordinateSpaceName))
+        } action: { frame in
+            frames.setMonthFrame(frame, for: model.monthAnchor)
+        }
+        .onDisappear { frames.clearMonthFrame(for: model.monthAnchor) }
     }
 }
 
@@ -64,11 +73,10 @@ struct MiniMonthGrid: View {
 }
 
 #Preview {
-    @Previewable @Namespace var namespace
     YearMonthCell(
         model: MonthGridModel.model(for: .now),
-        todayKey: CalendarMath.startOfDay(.now),
-        namespace: namespace
+        todayKey: CalendarMath.startOfDay(.now)
     )
     .frame(width: 110)
+    .environment(ScopeFrameRegistry())
 }

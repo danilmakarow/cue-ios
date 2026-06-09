@@ -6,20 +6,18 @@
 import SwiftUI
 
 /// One day in the month grid: the day number with a today/selected background
-/// and an event-indicator dot. Acts as the `matchedTransitionSource` for the
-/// zoom into the day scope.
+/// and an event-indicator dot.
 ///
 /// Deliberately dumb: the day number arrives pre-formatted (from
 /// `MonthGridModel`) and today/selected arrive as flags, so the cell's `body`
 /// does no date math or formatting — it renders constantly while the month
-/// list scrolls.
+/// list scrolls. Zoom anchoring is handled by the parent grid's frame
+/// reporting, not by the cell.
 struct MonthDayCell: View {
-    let day: Date
     let number: String
     let isSelected: Bool
     let isToday: Bool
     let hasEvents: Bool
-    let namespace: Namespace.ID
 
     var body: some View {
         VStack(spacing: 3) {
@@ -37,7 +35,6 @@ struct MonthDayCell: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 44)
-        .matchedTransitionSource(id: day, in: namespace)
     }
 
     @ViewBuilder
@@ -56,11 +53,10 @@ struct MonthDayCell: View {
 }
 
 #Preview {
-    @Previewable @Namespace var namespace
     HStack(spacing: 8) {
-        MonthDayCell(day: .now, number: "17", isSelected: false, isToday: true, hasEvents: true, namespace: namespace)
-        MonthDayCell(day: .now, number: "18", isSelected: true, isToday: false, hasEvents: true, namespace: namespace)
-        MonthDayCell(day: .now, number: "19", isSelected: false, isToday: false, hasEvents: false, namespace: namespace)
+        MonthDayCell(number: "17", isSelected: false, isToday: true, hasEvents: true)
+        MonthDayCell(number: "18", isSelected: true, isToday: false, hasEvents: true)
+        MonthDayCell(number: "19", isSelected: false, isToday: false, hasEvents: false)
     }
     .padding()
 }
