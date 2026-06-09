@@ -15,6 +15,9 @@ struct YearPage: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 3)
 
     var body: some View {
+        let todayKey = CalendarMath.startOfDay(.now)
+        let todayMonth = CalendarMath.startOfMonth(todayKey)
+
         VStack(alignment: .leading, spacing: 16) {
             Text(yearAnchor.formatted(.dateTime.year()))
                 .font(.largeTitle.bold())
@@ -23,9 +26,13 @@ struct YearPage: View {
 
             LazyVGrid(columns: columns, spacing: 20) {
                 ForEach(CalendarMath.monthsOfYear(yearAnchor), id: \.self) { monthAnchor in
-                    YearMonthCell(monthAnchor: monthAnchor, namespace: namespace)
-                        .contentShape(.rect)
-                        .onTapGesture { onSelectMonth(monthAnchor) }
+                    YearMonthCell(
+                        model: MonthGridModel.model(for: monthAnchor),
+                        todayKey: monthAnchor == todayMonth ? todayKey : nil,
+                        namespace: namespace
+                    )
+                    .contentShape(.rect)
+                    .onTapGesture { onSelectMonth(monthAnchor) }
                 }
             }
             .padding(.horizontal, 16)

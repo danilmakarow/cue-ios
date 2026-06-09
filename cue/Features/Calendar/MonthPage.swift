@@ -24,33 +24,36 @@ struct MonthPage: View {
         self.namespace = namespace
         self.onSelectDay = onSelectDay
 
+        // Bound the query to this month's window so each realized page fetches
+        // (and re-fetches, on any context save) only its own handful of rows —
+        // never the whole table. #Predicate can't reference `Date.distantPast`
+        // as a key path, but coalescing through a captured local works.
         let (from, to) = CalendarMath.monthBounds(monthAnchor)
-        // Note: #Predicate cannot close over Date.distantPast as a KeyPath expression.
-        // We store all tasks and filter in body — month scope queries are small.
+        let sentinel = Date.distantPast
         _tasks = Query(
             filter: #Predicate<TaskItem> { task in
-                task.occurrenceStart != nil
+                (task.occurrenceStart ?? sentinel) >= from &&
+                (task.occurrenceStart ?? sentinel) < to
             }
         )
-        _ = from
-        _ = to
     }
 
     var body: some View {
-        let (from, to) = CalendarMath.monthBounds(monthAnchor)
-        let daysWithEvents = Set(tasks.compactMap { task -> Date? in
-            guard let start = task.occurrenceStart, start >= from && start < to else { return nil }
-            return CalendarMath.startOfDay(start)
+        let model = MonthGridModel.model(for: monthAnchor)
+        let todayKey = CalendarMath.startOfDay(.now)
+        let daysWithEvents = Set(tasks.compactMap { task in
+            task.occurrenceStart.map(CalendarMath.startOfDay)
         })
 
         VStack(alignment: .leading, spacing: 12) {
-            Text(monthHeading)
+            Text(heading(for: model, todayKey: todayKey))
                 .font(.title2.bold())
                 .padding(.horizontal, 16)
 
             MonthGrid(
-                monthAnchor: monthAnchor,
-                selectedDate: selectedDate,
+                model: model,
+                selectedDayKey: CalendarMath.startOfDay(selectedDate),
+                todayKey: todayKey,
                 daysWithEvents: daysWithEvents,
                 namespace: namespace,
                 onSelectDay: onSelectDay
@@ -60,12 +63,8 @@ struct MonthPage: View {
 
     /// "May" within the current year; "May 2027" elsewhere, so the year is
     /// clear while scrolling across year boundaries.
-    private var monthHeading: String {
-        let calendar = Calendar.current
-        let sameYear = calendar.component(.year, from: monthAnchor) == calendar.component(.year, from: .now)
-        if sameYear {
-            return monthAnchor.formatted(.dateTime.month(.wide))
-        }
-        return monthAnchor.formatted(.dateTime.month(.wide).year())
+    private func heading(for model: MonthGridModel, todayKey: Date) -> String {
+        let currentYear = Calendar.current.component(.year, from: todayKey)
+        return model.year == currentYear ? model.nameWide : model.nameWideWithYear
     }
 }

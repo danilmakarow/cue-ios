@@ -9,11 +9,17 @@ import SwiftUI
 /// Month scope — an infinitely-scrolling column of `MonthPage`s with a pinned
 /// weekday header. Tapping a day zooms into the day scope.
 ///
-/// Infinite scroll uses a growing window of month anchors plus
+/// Infinite scroll uses a sliding window of month anchors plus
 /// `.scrollPosition(id:)` bound to the *centered* anchor: because the centered
 /// id stays put, prepending older months above it doesn't jump the viewport.
-/// The window grows only after the scroll settles, and a `FlingClampBehavior`
-/// caps single-fling travel, so a fast flick can't coast through years at once.
+/// The window grows only after the scroll settles (and is trimmed at the far
+/// edge so it can't grow without bound), and a `FlingClampBehavior` caps
+/// single-fling travel, so a fast flick can't coast through years at once.
+///
+/// Scroll-performance invariant: nothing here observes per-frame scroll
+/// geometry. The fling clamp's gesture-start offset comes from the phase
+/// change's context, and the per-month height estimate from content *size*
+/// changes (rare) — so scrolling never invalidates this view's body.
 struct MonthScopeView: View {
     let monthAnchor: Date
     let namespace: Namespace.ID
@@ -31,8 +37,6 @@ struct MonthScopeView: View {
     /// Vertical content offset captured when the current drag began; feeds the
     /// fling clamp so travel is measured from the gesture's origin.
     @State private var flingStartOffsetY: CGFloat = 0
-    /// Live vertical content offset, updated as the user scrolls.
-    @State private var currentOffsetY: CGFloat = 0
     /// Approximate on-screen height of one `MonthPage`, derived from the
     /// laid-out content. Drives the per-fling travel cap (~10 months).
     @State private var pointsPerMonth: CGFloat = 0
@@ -42,6 +46,9 @@ struct MonthScopeView: View {
     /// Months a single fling may cross before settling.
     private static let maxMonthsPerFling: CGFloat = 10
     private static let seedRadius = 18
+    /// Hard cap on the window; the far edge is trimmed when growth exceeds it
+    /// so a long session can't accumulate unbounded pages.
+    private static let maxWindowSize = 60
 
     init(
         monthAnchor: Date,
@@ -81,13 +88,16 @@ struct MonthScopeView: View {
                 maxTravel: pointsPerMonth * Self.maxMonthsPerFling
             )
         )
-        .onScrollGeometryChange(for: ScrollGeometry.self, of: { $0 }) { _, geometry in
-            currentOffsetY = geometry.contentOffset.y
-            updatePointsPerMonth(contentHeight: geometry.contentSize.height)
+        // Observe content *size* only — it changes when the window grows, not
+        // while the user scrolls, so this never fires per frame.
+        .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentSize.height }) { _, newHeight in
+            updatePointsPerMonth(contentHeight: newHeight)
         }
-        .onScrollPhaseChange { oldPhase, newPhase in
+        .onScrollPhaseChange { oldPhase, newPhase, context in
+            // Snapshot the origin when a drag begins so the clamp measures from
+            // there; extend the window only once motion fully settles.
             if !oldPhase.isScrolling, newPhase.isScrolling {
-                flingStartOffsetY = currentOffsetY
+                flingStartOffsetY = context.geometry.contentOffset.y
             }
             if oldPhase.isScrolling, newPhase == .idle {
                 extendIfNeeded()
@@ -172,16 +182,30 @@ struct MonthScopeView: View {
         pointsPerMonth = contentHeight / CGFloat(monthAnchors.count)
     }
 
-    /// Grows the month window when the centered month nears an end. Called on
-    /// scroll-settle (not mid-fling) so the window can't run away during a fast
-    /// flick.
+    /// Grows the month window when the centered month nears an end, then trims
+    /// the opposite edge past `maxWindowSize`. Called on scroll-settle (not
+    /// mid-fling) so the window can't run away during a fast flick. Trimming
+    /// the far edge never touches the centered id, so the id-pinned viewport
+    /// doesn't move.
     private func extendIfNeeded() {
         guard let centered, let index = monthAnchors.firstIndex(of: centered) else { return }
         if index < Self.edgeThreshold, let first = monthAnchors.first {
             monthAnchors.insert(contentsOf: CalendarMath.months(before: first, count: Self.growBy), at: 0)
-        }
-        if index > monthAnchors.count - 1 - Self.edgeThreshold, let last = monthAnchors.last {
+            trimWindowExcess(fromFront: false)
+        } else if index > monthAnchors.count - 1 - Self.edgeThreshold, let last = monthAnchors.last {
             monthAnchors.append(contentsOf: CalendarMath.months(after: last, count: Self.growBy))
+            trimWindowExcess(fromFront: true)
+        }
+    }
+
+    /// Drops pages beyond `maxWindowSize` from the edge opposite the growth.
+    private func trimWindowExcess(fromFront: Bool) {
+        let excess = monthAnchors.count - Self.maxWindowSize
+        guard excess > 0 else { return }
+        if fromFront {
+            monthAnchors.removeFirst(excess)
+        } else {
+            monthAnchors.removeLast(excess)
         }
     }
 

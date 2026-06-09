@@ -8,8 +8,14 @@ import SwiftUI
 /// One day in the month grid: the day number with a today/selected background
 /// and an event-indicator dot. Acts as the `matchedTransitionSource` for the
 /// zoom into the day scope.
+///
+/// Deliberately dumb: the day number arrives pre-formatted (from
+/// `MonthGridModel`) and today/selected arrive as flags, so the cell's `body`
+/// does no date math or formatting — it renders constantly while the month
+/// list scrolls.
 struct MonthDayCell: View {
     let day: Date
+    let number: String
     let isSelected: Bool
     let isToday: Bool
     let hasEvents: Bool
@@ -17,7 +23,7 @@ struct MonthDayCell: View {
 
     var body: some View {
         VStack(spacing: 3) {
-            Text(day.formatted(.dateTime.day()))
+            Text(number)
                 .font(.callout)
                 .fontWeight(isToday ? .bold : .regular)
                 .monospacedDigit()
@@ -52,9 +58,9 @@ struct MonthDayCell: View {
 #Preview {
     @Previewable @Namespace var namespace
     HStack(spacing: 8) {
-        MonthDayCell(day: .now, isSelected: false, isToday: true, hasEvents: true, namespace: namespace)
-        MonthDayCell(day: .now, isSelected: true, isToday: false, hasEvents: true, namespace: namespace)
-        MonthDayCell(day: .now, isSelected: false, isToday: false, hasEvents: false, namespace: namespace)
+        MonthDayCell(day: .now, number: "17", isSelected: false, isToday: true, hasEvents: true, namespace: namespace)
+        MonthDayCell(day: .now, number: "18", isSelected: true, isToday: false, hasEvents: true, namespace: namespace)
+        MonthDayCell(day: .now, number: "19", isSelected: false, isToday: false, hasEvents: false, namespace: namespace)
     }
     .padding()
 }
