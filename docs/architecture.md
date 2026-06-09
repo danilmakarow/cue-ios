@@ -54,13 +54,16 @@ graph TD
   TV --> NS1[NavigationStack — Calendar]
   TV --> NS2[NavigationStack — Dashboard]
   TV --> NS3[NavigationStack — Settings]
-  NS1 --> CV[CalendarView]
-  CV --> NE[NewEventView]
-  NE --> NEVM[NewEventViewModel]
+  NS1 --> ZC[CalendarZoomContainer]
+  ZC -->|zoom levels| Y[YearScopeView]
+  ZC -->|zoom levels| M[MonthScopeView]
+  ZC -->|zoom levels| D[CalendarView — day]
+  NS1 -->|push| TD[TaskDetailScreen]
 ```
 
 - **Root navigation**: `TabView` using the iOS 18+ `Tab(_:systemImage:content:)` DSL.
 - **Per-tab navigation**: one `NavigationStack` per tab; value-based `navigationDestination(for:destination:)`.
+- **Calendar scopes are zoom levels, not navigation**: `CalendarZoomContainer` hosts year/month/day as one zoomable surface with a continuous, interactive pinch between adjacent scopes — see [ADR 0002](adr/0002-custom-calendar-zoom-container.md). The Calendar tab's `NavigationStack` carries leaf pushes only (task detail).
 - **Chrome (Liquid Glass) is automatic** on iOS 26+. **Do not** add `.background(.ultraThinMaterial)` to nav/tab bars; do not mutate `UITabBar.appearance()` / `UINavigationBar.appearance()`; do not hand-roll blur layers. Pre-iOS 26 workarounds now produce wrong visuals. Use `.glassEffect()` for custom elements that should look like glass.
 
 ## State patterns

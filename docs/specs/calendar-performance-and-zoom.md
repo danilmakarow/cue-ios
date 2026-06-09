@@ -1,10 +1,29 @@
 # Calendar performance refactor + continuous scope zoom
 
-- **Status**: Draft
+- **Status**: Implemented (Options A+B+C; Phase 2 launch items deferred — see Implementation notes)
 - **Last updated**: 2026-06-09
 - **Owner**: Danil
-- **Related ADRs**: [0001](../adr/0001-swiftui-not-uikit.md)
+- **Related ADRs**: [0001](../adr/0001-swiftui-not-uikit.md), [0002](../adr/0002-custom-calendar-zoom-container.md)
 - **BE counterpart**: n/a (read path unchanged — `GET /tasks?calendarId&from&to`)
+
+## Implementation notes (post-design)
+
+Options A, B, and C shipped together; deviations from the proposal:
+
+- **No store-side `EventDayIndex`.** `MonthPage` keeps a (now *bounded*)
+  `@Query` instead. Reason: the New Event sheet writes to the
+  `ModelContext` from outside the calendar's environment (it has no
+  `CalendarStore`), so only SwiftData reactivity keeps the month dots
+  correct for every write path. The bounded predicate gives the same
+  O(visible-month) cost without manual invalidation.
+- **Option C is `CalendarZoomContainer`** (`Features/Calendar/Zoom/`), per
+  [ADR 0002](../adr/0002-custom-calendar-zoom-container.md). The old
+  `ZoomSourceRegistry`, deep-link choreography, and `CalendarScopeRoute`
+  are deleted; `NavigationStack` keeps only the task-detail push.
+- **Phase 2 (launch-path) items are NOT included** and remain open:
+  optimistic cached-session bootstrap, the offline-bootstrap
+  comment/code mismatch in `AuthStore.bootstrap()`, and the
+  `TimelineDayPage` sleep-and-reveal.
 
 ## Context
 
