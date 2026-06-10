@@ -18,9 +18,6 @@ struct MonthScopeView: View {
     let monthAnchor: Date
     let namespace: Namespace.ID
     var onSelectDay: (Date) -> Void
-    /// Resets the whole calendar to today's day page. Supplied by
-    /// `CalendarRootView`; defaults to a no-op for previews.
-    var onOpenToday: () -> Void = {}
 
     @Environment(CalendarStore.self) private var store
     @Environment(\.modelContext) private var modelContext
@@ -46,13 +43,11 @@ struct MonthScopeView: View {
     init(
         monthAnchor: Date,
         namespace: Namespace.ID,
-        onSelectDay: @escaping (Date) -> Void,
-        onOpenToday: @escaping () -> Void = {}
+        onSelectDay: @escaping (Date) -> Void
     ) {
         self.monthAnchor = monthAnchor
         self.namespace = namespace
         self.onSelectDay = onSelectDay
-        self.onOpenToday = onOpenToday
         _monthAnchors = State(initialValue: CalendarMath.monthAnchors(around: monthAnchor, radius: Self.seedRadius))
         _centered = State(initialValue: CalendarMath.startOfMonth(monthAnchor))
     }
@@ -96,12 +91,9 @@ struct MonthScopeView: View {
         }
         .safeAreaInset(edge: .top) { weekdayHeader }
         .overlay(alignment: .bottomTrailing) {
-            HStack(spacing: 10) {
-                JumpToTodayButton(isVisible: !isOnCurrentMonth, action: scrollToCurrentMonth)
-                OpenTodayButton(action: onOpenToday)
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 24)
+            JumpToTodayButton(isVisible: true, action: todayButtonTapped)
+                .padding(.trailing, 20)
+                .padding(.bottom, 24)
         }
         .navigationTitle(monthTitle)
         .navigationBarTitleDisplayMode(.inline)
@@ -134,6 +126,17 @@ struct MonthScopeView: View {
     }
 
     // MARK: - Actions
+
+    /// Progressive "Today" action: scroll the current month back into view if it
+    /// isn't focused; if it already is, zoom one level into today's day. A single
+    /// animated push from the on-screen source cell — no full-stack rebuild.
+    private func todayButtonTapped() {
+        if isOnCurrentMonth {
+            onSelectDay(CalendarMath.startOfDay(.now))
+        } else {
+            scrollToCurrentMonth()
+        }
+    }
 
     /// Jumps back to the current month, reliably even while the list is still
     /// flinging. Mirrors `YearScopeView.scrollToCurrentYear` — see its doc for

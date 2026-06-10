@@ -8,10 +8,12 @@ import SwiftUI
 /// Initial splash shown while `AuthStore.bootstrap()` validates any persisted
 /// session. Intentionally quiet — the app logo and a subtle progress ring.
 struct LoadingView: View {
+    @Environment(\.theme) private var theme
+
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.appPrimary.opacity(0.25), Color.appBackground],
+                colors: [theme.primary.opacity(0.25), theme.background],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )

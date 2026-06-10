@@ -5,19 +5,18 @@
 
 import SwiftUI
 
-/// Floating "Today" pill shared by all three calendar scopes (day, month,
-/// year). Shown only while the scope is *not* already on the current
-/// day/month/year, giving the user a single consistent way to jump back —
-/// mirroring Apple Calendar's transient "Today" affordance.
+/// Floating "Today" pill used across the calendar scopes. Visibility and tap
+/// behavior are owned by the host scope via `isVisible` and `action`: the day
+/// scope shows it only while off-today (recenter the pager), while the year and
+/// month overviews keep it always visible with a progressive action — recenter
+/// to today when it's off-screen, otherwise zoom in one level.
 ///
-/// It floats as an overlay (rather than reserving layout via a safe-area
-/// inset) so appearing/disappearing never reflows the calendar content. Each
-/// scope decides when it's visible via `isVisible` and what "today" means via
-/// `action`.
+/// It floats as an overlay (rather than reserving layout via a safe-area inset)
+/// so appearing/disappearing never reflows the calendar content.
 struct JumpToTodayButton: View {
-    /// Whether the scope is currently off-today and the button should show.
+    /// Whether the button should show. Host-controlled.
     let isVisible: Bool
-    /// Recenters the hosting scope on today.
+    /// The host's "today" action (recenter and/or zoom in one level).
     let action: () -> Void
 
     var body: some View {

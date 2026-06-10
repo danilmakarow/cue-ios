@@ -62,6 +62,10 @@ struct cueApp: App {
                 .environment(notifications)
                 .environment(languageSettings)
                 .environment(telegramLink)
+                // Make the active palette's semantic colors available app-wide.
+                // Switching palette in Settings re-injects this and re-renders
+                // every screen that reads `@Environment(\.theme)`.
+                .environment(\.theme, themeSettings.palette.colors)
                 // Drive SwiftUI's localization (and date/number formatting) from
                 // the user's language choice, so most of the UI switches language
                 // live without a relaunch.
@@ -70,11 +74,13 @@ struct cueApp: App {
                 // their own gradients on top; scroll-backed tabs paint system
                 // surfaces — this shows through during transitions and behind
                 // any non-opaque content.
-                .background(Color.appBackground.ignoresSafeArea())
+                .background(themeSettings.palette.colors.background.ignoresSafeArea())
                 // Drive both the SwiftUI environment color scheme AND the
                 // asset-catalog appearance resolution from the user's choice.
                 .preferredColorScheme(themeSettings.appearance.colorScheme)
-                .tint(themeSettings.accentColor.color)
+                // The palette's hero color becomes the app-wide tint, so every
+                // `.accentColor` / `.tint` call site follows the chosen option.
+                .tint(themeSettings.palette.colors.primary)
                 // Rebuild the whole UI when the language changes — a clean in-app
                 // "reload" so every screen re-renders in the new language at once
                 // rather than leaving stale text behind.

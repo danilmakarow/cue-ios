@@ -36,6 +36,7 @@ struct CalendarRootView: View {
     @State private var store: CalendarStore
     @State private var path = NavigationPath()
     @State private var hasSeededPath = false
+    @State private var isDeepLinking = false
     @State private var zoomSources = ZoomSourceRegistry()
     @Namespace private var zoom
 
@@ -46,7 +47,7 @@ struct CalendarRootView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            YearScopeView(namespace: zoom, onSelectMonth: selectMonth, onOpenToday: openTodayDay)
+            YearScopeView(namespace: zoom, onSelectMonth: selectMonth)
                 .navigationDestination(for: CalendarScopeRoute.self) { route in
                     scopeDestination(route)
                 }
@@ -80,7 +81,7 @@ struct CalendarRootView: View {
     private func scopeDestination(_ route: CalendarScopeRoute) -> some View {
         switch route {
         case .month(let anchor):
-            MonthScopeView(monthAnchor: anchor, namespace: zoom, onSelectDay: selectDay, onOpenToday: openTodayDay)
+            MonthScopeView(monthAnchor: anchor, namespace: zoom, onSelectDay: selectDay)
                 .navigationTransition(.zoom(sourceID: anchor, in: zoom))
         case .day(let day):
             CalendarView(user: user, onOpenToday: openTodayInDayScope, onSelect: selectEvent)
@@ -111,17 +112,6 @@ struct CalendarRootView: View {
         Task { await deepLinkToDay(today, inMonth: CalendarMath.startOfMonth(today)) }
     }
 
-    /// Resets the calendar back to *today's day page* from the year or month
-    /// overview — the "back to right now" action behind the nav-bar button in
-    /// those scopes. Distinct from each scope's in-place "Today" pill, which only
-    /// recenters that scope (year stays on year, month on month): this drills all
-    /// the way down to today's day, regardless of where the user has scrolled to.
-    private func openTodayDay() {
-        Task {
-            await deepLinkToDay(CalendarMath.startOfDay(.now), inMonth: CalendarMath.startOfMonth(.now))
-        }
-    }
-
     /// Builds the stack to `[month(month), day(day)]` deterministically, pushing
     /// *both* levels via their zoom animation so *both* interactive zoom-outs are
     /// armed: any existing stack is first collapsed to the year root without
@@ -143,7 +133,16 @@ struct CalendarRootView: View {
     /// midnight, so this `day` is byte-equal to the cell's
     /// `matchedTransitionSource(id:)`, the registry key it reports, and the
     /// `.day(...)` route value — the three-way equality the zoom requires.
+    ///
+    /// Single-flight: re-entrant calls are ignored while a jump is already
+    /// staging, so a double-tap (or a "today" button tapped during the
+    /// cold-launch seed) can't interleave two path resets/pushes and strand a
+    /// duplicate `.day` on the stack.
     private func deepLinkToDay(_ day: Date, inMonth month: Date) async {
+        guard !isDeepLinking else { return }
+        isDeepLinking = true
+        defer { isDeepLinking = false }
+
         store.selectedDate = day
 
         // Collapse any existing stack to the year root without animation, so only

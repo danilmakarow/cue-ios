@@ -5,10 +5,12 @@
 //
 //  Renders the 1024×1024 App Store / home-screen icon headlessly with Core
 //  Graphics + ImageIO, mirroring the geometry of `BrandMark` /
-//  `BrandMarkRenderer` so the icon and the in-app logo stay visually identical.
+//  `BrandMarkRenderer` so the icon and the in-app logo stay visually identical:
+//  a white magnifying glass on a warm "Traveler" gradient.
 //
-//  The icon is fully opaque (iOS app icons must not have an alpha hole): the
-//  background is filled with the brand peach before the mark is drawn on top.
+//  The icon is fully opaque (iOS app icons must not have an alpha hole) and
+//  full-bleed — iOS applies its own rounded-superellipse mask, so the gradient
+//  fills the entire square with no baked-in corner radius.
 //
 //  Usage:
 //      swift Scripts/GenerateAppIcon.swift \
@@ -22,7 +24,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-// MARK: - Brand palette (mirror of BrandPalette in BrandMark.swift)
+// MARK: - Traveler palette (mirror of TravelerColor in Theme.swift)
 
 /// An sRGB colour expressed as 0...1 components.
 struct RGBA {
@@ -45,11 +47,11 @@ struct RGBA {
 }
 
 enum Palette {
-    static let paleYellow = RGBA(1.0, 0.976, 0.824)   // #FFF9D2
-    static let peach = RGBA(1.0, 0.922, 0.800)         // #FFEBCC
-    static let lightBlue = RGBA(0.749, 0.867, 0.941)   // #BFDDF0
-    static let mediumBlue = RGBA(0.549, 0.753, 0.922)  // #8CC0EB
-    static let ink = RGBA(0.149, 0.255, 0.353)         // desaturated deep blue
+    static let aperol = RGBA(0.7569, 0.3216, 0.1176) // #C1521E burnt sienna
+    static let orange = RGBA(0.8863, 0.4745, 0.1294) // #E27921 terracotta
+    static let mimosa = RGBA(0.9686, 0.7098, 0.3412) // #F7B557 golden amber
+    static let teal = RGBA(0.3176, 0.5922, 0.6667)   // #5197AA cool teal-slate
+    static let glass = RGBA(1.0, 1.0, 1.0)           // white magnifying glass
 }
 
 // MARK: - Geometry helpers
@@ -72,142 +74,51 @@ func length(_ unit: CGFloat) -> CGFloat { unit * iconSize }
 func drawIcon(in context: CGContext, colorSpace: CGColorSpace) {
     let fullRect = CGRect(x: 0, y: 0, width: iconSize, height: iconSize)
 
-    // 1. Opaque background — a soft peach→pale-yellow vertical wash.
+    // 1. Full-bleed Traveler gradient, top-left → bottom-right.
     if let gradient = CGGradient(
         colorsSpace: colorSpace,
         colors: [
-            Palette.paleYellow.cgColor(in: colorSpace),
-            Palette.peach.cgColor(in: colorSpace),
+            Palette.aperol.cgColor(in: colorSpace),
+            Palette.orange.cgColor(in: colorSpace),
+            Palette.mimosa.cgColor(in: colorSpace),
+            Palette.teal.cgColor(in: colorSpace),
         ] as CFArray,
-        locations: [0, 1]
+        locations: [0, 0.35, 0.65, 1]
     ) {
         context.saveGState()
         context.addRect(fullRect)
         context.clip()
         context.drawLinearGradient(
             gradient,
-            start: CGPoint(x: 0, y: iconSize),
-            end: CGPoint(x: 0, y: 0),
+            start: point(0, 0), // top-left
+            end: point(1, 1),   // bottom-right
             options: []
         )
         context.restoreGState()
     } else {
-        context.setFillColor(Palette.peach.cgColor(in: colorSpace))
+        context.setFillColor(Palette.orange.cgColor(in: colorSpace))
         context.fill(fullRect)
     }
 
-    // 2. Calendar sheet (rounded rect) with a blue gradient.
-    let sheetRect = CGRect(
-        x: length(0.16),
-        y: length(1 - 0.20 - 0.64), // top at unitY 0.20, height 0.64 (flipped)
-        width: length(0.68),
-        height: length(0.64)
+    // 2. Magnifying glass — white lens ring.
+    let lensCenter = point(0.458, 0.442)
+    let lensRadius = length(0.208)
+    let lensRect = CGRect(
+        x: lensCenter.x - lensRadius,
+        y: lensCenter.y - lensRadius,
+        width: lensRadius * 2,
+        height: lensRadius * 2
     )
-    let sheetPath = CGPath(
-        roundedRect: sheetRect,
-        cornerWidth: length(0.10),
-        cornerHeight: length(0.10),
-        transform: nil
-    )
-
-    context.saveGState()
-    context.addPath(sheetPath)
-    context.clip()
-    if let sheetGradient = CGGradient(
-        colorsSpace: colorSpace,
-        colors: [
-            Palette.lightBlue.cgColor(in: colorSpace),
-            Palette.mediumBlue.cgColor(in: colorSpace),
-        ] as CFArray,
-        locations: [0, 1]
-    ) {
-        context.drawLinearGradient(
-            sheetGradient,
-            start: CGPoint(x: sheetRect.minX, y: sheetRect.maxY),
-            end: CGPoint(x: sheetRect.maxX, y: sheetRect.minY),
-            options: []
-        )
-    }
-    context.restoreGState()
-
-    // 3. Header band across the top of the sheet, clipped to its rounded corners.
-    context.saveGState()
-    context.addPath(sheetPath)
-    context.clip()
-    let headerRect = CGRect(
-        x: sheetRect.minX,
-        y: sheetRect.maxY - length(0.16),
-        width: sheetRect.width,
-        height: length(0.16)
-    )
-    // Fully opaque: the bitmap has no alpha channel, so blend is meaningless here.
-    context.setFillColor(Palette.ink.cgColor(in: colorSpace))
-    context.fill(headerRect)
-    context.restoreGState()
-
-    // 4. Binding rings poking above the sheet.
-    let ringWidth = length(0.055)
-    let ringHeight = length(0.13)
-    for ringUnitX in [CGFloat(0.36), CGFloat(0.64)] {
-        let ringRect = CGRect(
-            x: point(ringUnitX, 0).x - ringWidth / 2,
-            y: point(0, 0.115).y - ringHeight, // top at unitY 0.115, grows downward in flipped space
-            width: ringWidth,
-            height: ringHeight
-        )
-        let ringPath = CGPath(
-            roundedRect: ringRect,
-            cornerWidth: ringWidth / 2,
-            cornerHeight: ringWidth / 2,
-            transform: nil
-        )
-        context.addPath(ringPath)
-        context.setFillColor(Palette.ink.cgColor(in: colorSpace))
-        context.fillPath()
-    }
-
-    // 5. Clock badge on the lower-right of the sheet.
-    let clockCenter = point(0.70, 0.70)
-    let clockRadius = length(0.20)
-    let clockRect = CGRect(
-        x: clockCenter.x - clockRadius,
-        y: clockCenter.y - clockRadius,
-        width: clockRadius * 2,
-        height: clockRadius * 2
-    )
-
-    // Filled pale face.
-    context.setFillColor(Palette.paleYellow.cgColor(in: colorSpace))
-    context.fillEllipse(in: clockRect)
-    // Ink ring.
-    context.setStrokeColor(Palette.ink.cgColor(in: colorSpace))
-    context.setLineWidth(length(0.035))
-    context.strokeEllipse(in: clockRect)
-
-    // 6. Clock hands at ~10:10.
-    context.setStrokeColor(Palette.ink.cgColor(in: colorSpace))
-    context.setLineWidth(length(0.030))
+    context.setStrokeColor(Palette.glass.cgColor(in: colorSpace))
+    context.setLineWidth(length(0.075))
     context.setLineCap(.round)
-    context.setLineJoin(.round)
-    context.beginPath()
-    // Minute hand (up).
-    context.move(to: clockCenter)
-    context.addLine(to: CGPoint(x: clockCenter.x, y: clockCenter.y + clockRadius * 0.58))
-    // Hour hand (down-right). +X right; -Y in flipped space means downward on screen.
-    context.move(to: clockCenter)
-    context.addLine(to: CGPoint(x: clockCenter.x + clockRadius * 0.46, y: clockCenter.y - clockRadius * 0.20))
-    context.strokePath()
+    context.strokeEllipse(in: lensRect)
 
-    // 7. Centre pin.
-    let pinRadius = length(0.018)
-    let pinRect = CGRect(
-        x: clockCenter.x - pinRadius,
-        y: clockCenter.y - pinRadius,
-        width: pinRadius * 2,
-        height: pinRadius * 2
-    )
-    context.setFillColor(Palette.ink.cgColor(in: colorSpace))
-    context.fillEllipse(in: pinRect)
+    // 3. Handle, from the lower-right of the ring outward.
+    context.beginPath()
+    context.move(to: point(0.55, 0.533))
+    context.addLine(to: point(0.725, 0.725))
+    context.strokePath()
 }
 
 // MARK: - Render & write PNG

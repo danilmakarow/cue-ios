@@ -6,11 +6,13 @@
 import SwiftUI
 
 /// The 7-column day grid for one month. Leading blanks align day 1 under its
-/// weekday; each real day is a tappable `MonthDayCell`.
+/// weekday; each real day is a tappable `MonthDayCell` listing that day's event
+/// titles.
 struct MonthGrid: View {
     let monthAnchor: Date
     let selectedDate: Date
-    let daysWithEvents: Set<Date>
+    /// Event titles per day (`startOfDay` key), ordered by start.
+    let titlesByDay: [Date: [String]]
     let namespace: Namespace.ID
     var onSelectDay: (Date) -> Void
 
@@ -26,7 +28,7 @@ struct MonthGrid: View {
                         day: day,
                         isSelected: CalendarMath.isSameDay(day, selectedDate),
                         isToday: CalendarMath.isToday(day),
-                        hasEvents: daysWithEvents.contains(CalendarMath.startOfDay(day)),
+                        titles: titlesByDay[CalendarMath.startOfDay(day)] ?? [],
                         namespace: namespace
                     )
                     .contentShape(.rect)
@@ -38,7 +40,7 @@ struct MonthGrid: View {
                     .onAppear { zoomSources.markPresent(day) }
                     .onDisappear { zoomSources.markAbsent(day) }
                 } else {
-                    Color.clear.frame(height: 44)
+                    Color.clear.frame(minHeight: MonthDayCell.minHeight)
                 }
             }
         }

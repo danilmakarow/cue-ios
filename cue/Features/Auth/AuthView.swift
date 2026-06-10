@@ -12,6 +12,7 @@ import UIKit
 struct AuthView: View {
     @Environment(AuthStore.self) private var authStore
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.theme) private var theme
 
     #if DEBUG
     @State private var isDevLoginPresented: Bool = false
@@ -22,7 +23,7 @@ struct AuthView: View {
 
         ZStack {
             LinearGradient(
-                colors: [Color.appPrimary.opacity(0.25), Color.appBackground],
+                colors: [theme.primary.opacity(0.25), theme.background],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )

@@ -125,18 +125,25 @@ final class CalendarStore {
     private func pruneOccurrences(in range: ClosedRange<Date>, context: ModelContext) {
         let from = range.lowerBound
         let to = range.upperBound
-        // Fetch all items and filter in memory — #Predicate macros don't support
-        // optional coalescing with Date.distantPast across all SwiftData versions.
-        let descriptor = FetchDescriptor<TaskItem>()
-        let all = (try? context.fetch(descriptor)) ?? []
-        for item in all {
+        // Bounded fetch: a predicate-filtered query of just the window's rows
+        // rather than materializing the whole table and filtering in Swift. The
+        // optional start is coalesced to `.distantPast` to keep the predicate a
+        // single expression (the macro's requirement); occurrence-less rows land
+        // below any real range and are excluded, which is correct.
+        let sentinel = Date.distantPast
+        let descriptor = FetchDescriptor<TaskItem>(
+            predicate: #Predicate { task in
+                (task.occurrenceStart ?? sentinel) >= from &&
+                (task.occurrenceStart ?? sentinel) <= to
+            }
+        )
+        let windowed = (try? context.fetch(descriptor)) ?? []
+        for item in windowed {
             // Use key membership (not subscript == nil) — the value type is `Date?`,
             // so an in-flight "mark incomplete" entry is stored as `.some(nil)` and
             // must still count as in-flight.
             guard !inFlightCompletions.keys.contains(item.occurrenceKey) else { continue }
-            if let start = item.occurrenceStart, start >= from && start <= to {
-                context.delete(item)
-            }
+            context.delete(item)
         }
     }
 
@@ -216,6 +223,18 @@ final class CalendarStore {
     /// While in flight, the occurrence key is registered in `inFlightCompletions`
     /// so a concurrent `ensureMonthSynced` neither prunes the optimistic row nor
     /// clobbers it with a not-yet-updated server row.
+    /// Toggles completion for the occurrence identified by `occurrenceKey`,
+    /// resolving the row via its `@Attribute(.unique)` (indexed) key. The day
+    /// pages no longer own a `@Query`, so they pass the key rather than a
+    /// pre-fetched `TaskItem`.
+    func toggleCompletion(occurrenceKey: String, context: ModelContext) async {
+        let descriptor = FetchDescriptor<TaskItem>(
+            predicate: #Predicate { $0.occurrenceKey == occurrenceKey }
+        )
+        guard let task = (try? context.fetch(descriptor))?.first else { return }
+        await toggleCompletion(task, context: context)
+    }
+
     func toggleCompletion(_ task: TaskItem, context: ModelContext) async {
         let previous = task.completedAt
         let willComplete = previous == nil

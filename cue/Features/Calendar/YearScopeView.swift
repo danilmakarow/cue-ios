@@ -16,9 +16,6 @@ import SwiftUI
 struct YearScopeView: View {
     let namespace: Namespace.ID
     var onSelectMonth: (Date) -> Void
-    /// Resets the whole calendar to today's day page. Supplied by
-    /// `CalendarRootView`; defaults to a no-op for previews.
-    var onOpenToday: () -> Void = {}
 
     @State private var yearAnchors: [Date]
     @State private var centered: Date?
@@ -40,12 +37,10 @@ struct YearScopeView: View {
 
     init(
         namespace: Namespace.ID,
-        onSelectMonth: @escaping (Date) -> Void,
-        onOpenToday: @escaping () -> Void = {}
+        onSelectMonth: @escaping (Date) -> Void
     ) {
         self.namespace = namespace
         self.onSelectMonth = onSelectMonth
-        self.onOpenToday = onOpenToday
         _yearAnchors = State(initialValue: CalendarMath.yearAnchors(around: .now, radius: 12))
         _centered = State(initialValue: CalendarMath.startOfYear(.now))
     }
@@ -86,12 +81,9 @@ struct YearScopeView: View {
         .navigationTitle(yearTitle)
         .navigationBarTitleDisplayMode(.large)
         .overlay(alignment: .bottomTrailing) {
-            HStack(spacing: 10) {
-                JumpToTodayButton(isVisible: !isOnCurrentYear, action: scrollToCurrentYear)
-                OpenTodayButton(action: onOpenToday)
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 24)
+            JumpToTodayButton(isVisible: true, action: todayButtonTapped)
+                .padding(.trailing, 20)
+                .padding(.bottom, 24)
         }
     }
 
@@ -105,6 +97,18 @@ struct YearScopeView: View {
     }
 
     // MARK: - Actions
+
+    /// Progressive "Today" action: scroll the current year back into view if it
+    /// isn't focused; if it already is, zoom one level into the current month. A
+    /// single animated push from the on-screen source cell — no full-stack
+    /// rebuild, so it stays snappy.
+    private func todayButtonTapped() {
+        if isOnCurrentYear {
+            onSelectMonth(CalendarMath.startOfMonth(.now))
+        } else {
+            scrollToCurrentYear()
+        }
+    }
 
     /// Jumps the column back to the current year. Snappy even mid-fling and
     /// even after scrolling centuries away.
