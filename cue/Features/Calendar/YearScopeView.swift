@@ -21,9 +21,6 @@ import SwiftUI
 /// changes (rare) — so scrolling never invalidates this view's body.
 struct YearScopeView: View {
     var onSelectMonth: (Date) -> Void
-    /// Resets the whole calendar to today's day page. Supplied by
-    /// `CalendarZoomContainer`; defaults to a no-op for previews.
-    var onOpenToday: () -> Void = {}
 
     @State private var yearAnchors: [Date]
     @State private var centered: Date?
@@ -49,11 +46,9 @@ struct YearScopeView: View {
     /// scope appears already showing the right year.
     init(
         centeredOn date: Date = .now,
-        onSelectMonth: @escaping (Date) -> Void,
-        onOpenToday: @escaping () -> Void = {}
+        onSelectMonth: @escaping (Date) -> Void
     ) {
         self.onSelectMonth = onSelectMonth
-        self.onOpenToday = onOpenToday
         _yearAnchors = State(initialValue: CalendarMath.yearAnchors(around: date, radius: 12))
         _centered = State(initialValue: CalendarMath.startOfYear(date))
     }
@@ -95,12 +90,9 @@ struct YearScopeView: View {
         .navigationTitle(yearTitle)
         .navigationBarTitleDisplayMode(.large)
         .overlay(alignment: .bottomTrailing) {
-            HStack(spacing: 10) {
-                JumpToTodayButton(isVisible: !isOnCurrentYear, action: scrollToCurrentYear)
-                OpenTodayButton(action: onOpenToday)
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 24)
+            JumpToTodayButton(isVisible: true, action: todayButtonTapped)
+                .padding(.trailing, 20)
+                .padding(.bottom, 24)
         }
     }
 
@@ -114,6 +106,18 @@ struct YearScopeView: View {
     }
 
     // MARK: - Actions
+
+    /// Progressive "Today" action: scroll the current year back into view if
+    /// it isn't focused; if it already is, zoom one level into the current
+    /// month — `onSelectMonth` plays the container's anchored zoom from the
+    /// month's cell.
+    private func todayButtonTapped() {
+        if isOnCurrentYear {
+            onSelectMonth(CalendarMath.startOfMonth(.now))
+        } else {
+            scrollToCurrentYear()
+        }
+    }
 
     /// Jumps the column back to the current year. Snappy even mid-fling and
     /// even after scrolling centuries away.

@@ -24,9 +24,6 @@ struct MonthScopeView: View {
     /// Month the scope mounts centered on.
     let monthAnchor: Date
     var onSelectDay: (Date) -> Void
-    /// Resets the whole calendar to today's day page. Supplied by
-    /// `CalendarZoomContainer`; defaults to a no-op for previews.
-    var onOpenToday: () -> Void = {}
     /// Reports the month the list has settled on, so the zoom container can
     /// anchor a month → year zoom-out (and seed the year scope) truthfully
     /// after the user scrolls this list away from `monthAnchor`.
@@ -57,12 +54,10 @@ struct MonthScopeView: View {
     init(
         monthAnchor: Date,
         onSelectDay: @escaping (Date) -> Void,
-        onOpenToday: @escaping () -> Void = {},
         onCenteredMonthChange: @escaping (Date) -> Void = { _ in }
     ) {
         self.monthAnchor = monthAnchor
         self.onSelectDay = onSelectDay
-        self.onOpenToday = onOpenToday
         self.onCenteredMonthChange = onCenteredMonthChange
         _monthAnchors = State(initialValue: CalendarMath.monthAnchors(around: monthAnchor, radius: Self.seedRadius))
         _centered = State(initialValue: CalendarMath.startOfMonth(monthAnchor))
@@ -109,12 +104,9 @@ struct MonthScopeView: View {
         }
         .safeAreaInset(edge: .top) { weekdayHeader }
         .overlay(alignment: .bottomTrailing) {
-            HStack(spacing: 10) {
-                JumpToTodayButton(isVisible: !isOnCurrentMonth, action: scrollToCurrentMonth)
-                OpenTodayButton(action: onOpenToday)
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 24)
+            JumpToTodayButton(isVisible: true, action: todayButtonTapped)
+                .padding(.trailing, 20)
+                .padding(.bottom, 24)
         }
         .navigationTitle(monthTitle)
         .navigationBarTitleDisplayMode(.inline)
@@ -152,6 +144,17 @@ struct MonthScopeView: View {
     }
 
     // MARK: - Actions
+
+    /// Progressive "Today" action: scroll the current month back into view if
+    /// it isn't focused; if it already is, zoom one level into today's day —
+    /// `onSelectDay` plays the container's anchored zoom from today's cell.
+    private func todayButtonTapped() {
+        if isOnCurrentMonth {
+            onSelectDay(CalendarMath.startOfDay(.now))
+        } else {
+            scrollToCurrentMonth()
+        }
+    }
 
     /// Jumps back to the current month, reliably even while the list is still
     /// flinging. Mirrors `YearScopeView.scrollToCurrentYear` — see its doc for
@@ -217,8 +220,8 @@ struct MonthScopeView: View {
         }
     }
 
-    /// Ensures the centered month and its neighbors are synced so dots are
-    /// ready just before they scroll into view.
+    /// Ensures the centered month and its neighbors are synced so day titles
+    /// are ready just before they scroll into view.
     private func syncAround(_ anchor: Date?) async {
         guard let anchor else { return }
         let calendar = Calendar.current

@@ -5,23 +5,24 @@
 //  The single source of truth for Cue's color system.
 //
 //  ─────────────────────────────────────────────────────────────────────────
-//  Brand palette (4 base colors)
+//  "The Traveler" — a warm desert-meets-dusk palette (5 source colors)
 //  ─────────────────────────────────────────────────────────────────────────
-//      #FFF9D2  pale warm yellow   →  app background (light canvas)
-//      #FFEBCC  soft peach         →  app surface    (cards / grouped rows)
-//      #BFDDF0  light sky blue     →  secondary accent (subtle tints, fills)
-//      #8CC0EB  medium blue        →  primary / accent (buttons, selection, tint)
+//      #CDD0DB  CLOUD   pale lavender-grey   →  cool neutral / background base
+//      #9197AA  AZUL    muted slate blue     →  calm cool grounding tone
+//      #F7B557  MIMOSA  warm golden amber    →  highlights, calls-to-attention
+//      #E27921  ORANGE  terracotta orange    →  the vibrant hero / primary
+//      #C1521E  APEROL  deep burnt sienna    →  darkest, strong contrast
 //
-//  Roles, not hex, are what the rest of the app references. Read the
-//  "Semantic tokens" section below for the full vocabulary
-//  (`Color.appBackground`, `.appSurface`, `.appPrimary`, …).
+//  The rest of the app never references hex or raw palette colors — it speaks in
+//  *roles* (`theme.background`, `theme.primary`, …) read from the environment.
 //
-//  Light vs dark: the supplied palette is light-leaning, so light mode uses it
-//  almost literally — warm "paper" canvas, warm surfaces, cool-blue ink. Dark
-//  mode is *designed*, not inverted: deep blue-charcoal neutrals (the brand's
-//  cool identity carried into the dark) with a slightly brightened blue accent.
-//  Warm tones are intentionally NOT used as dark surfaces (they read as muddy
-//  brown on black); they survive only as faint accent hints.
+//  Two switchable options, each fully designed for light AND dark:
+//    • Desert — warm-led. Sand canvas, terracotta-orange primary, mimosa accent.
+//    • Dusk   — cool-led. Lavender-grey canvas, slate-blue primary, mimosa spark.
+//
+//  Dark mode is *designed*, not inverted: Desert dark is a warm near-black, Dusk
+//  dark a cool blue-black, each with a brightened accent. Per the brand, plain
+//  white / black are avoided — neutrals are tinted toward the option's identity.
 //
 
 import SwiftUI
@@ -65,218 +66,157 @@ enum AppearanceMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-// MARK: - Brand palette (raw values)
+// MARK: - Traveler palette (raw source colors)
 
-/// The raw brand colors and their derived shades.
-///
-/// These are *implementation detail*: feature code should never reach in here.
-/// Use the semantic `Color.app…` tokens (declared further down) instead — they
-/// map intent ("background", "primary") onto these raw values and pick the
-/// right light/dark variant automatically.
-///
-/// Shades are derived from the four bases by mixing toward white or black
-/// (`mix(with:by:)`) so the whole system stays inside the brand's hue family
-/// instead of introducing unrelated colors.
-enum BrandPalette {
-    // The four supplied base colors.
-    static let warmYellow = Color(hex: 0xFFF9D2) // pale warm yellow
-    static let peach = Color(hex: 0xFFEBCC)      // soft peach
-    static let skyBlue = Color(hex: 0xBFDDF0)    // light sky blue
-    static let blue = Color(hex: 0x8CC0EB)       // medium blue (the hero color)
-
-    // Derived blue family — steps around the hero color for hierarchy.
-    /// A deeper, more saturated blue for pressed states and ink that must read
-    /// on light surfaces. Used as the *dark*-mode accent base too (brightened).
-    static let blueDeep = Color(hex: 0x4F96C9)
-    /// A brighter blue for dark mode so the accent stays vivid on dark fills.
-    static let blueBright = Color(hex: 0x9CCBF0)
-    /// Very dark navy used as "ink on accent": dark text/icons placed on top of
-    /// the light blue accent (white fails WCAG contrast on `#8CC0EB`).
-    static let navyInk = Color(hex: 0x0E2A3D)
-
-    // Derived warm family — lighter/darker paper tones for light mode.
-    /// Slightly deeper than `warmYellow`; used for elevated warm fills.
-    static let warmYellowDeep = Color(hex: 0xFCEFB0)
-    /// A soft warm hairline/separator tone for light mode.
-    static let warmBorder = Color(hex: 0xEAD9B0)
-
-    // Dark-mode neutral family — blue-leaning charcoals (cool, on-brand).
-    /// App canvas in dark mode (near-black with a hint of blue).
-    static let inkBackground = Color(hex: 0x12171D)
-    /// Card/surface in dark mode — one step lighter than the canvas.
-    static let inkSurface = Color(hex: 0x1C232B)
-    /// Elevated surface (sheets, popovers) in dark mode.
-    static let inkSurfaceElevated = Color(hex: 0x252E38)
-    /// Hairline/separator tone in dark mode.
-    static let inkBorder = Color(hex: 0x35404C)
-
-    // Text tones.
-    /// Primary text in dark mode — warm-leaning off-white for comfort.
-    static let textLight = Color(hex: 0xF3F6FA)
-    /// Secondary text in dark mode.
-    static let textLightMuted = Color(hex: 0xA8B4C2)
-    /// Primary text in light mode — deep navy (on-brand, not pure black).
-    static let textDark = Color(hex: 0x16242E)
-    /// Secondary text in light mode.
-    static let textDarkMuted = Color(hex: 0x5A6B78)
+/// The five raw "Traveler" colors. *Implementation detail* — feature code should
+/// never reach in here; read the semantic `ThemeColors` roles from the
+/// environment (`@Environment(\.theme)`) instead. These exist so the brand mark
+/// and the two palette options can compose from one source of truth.
+enum TravelerColor {
+    static let cloud = Color(hex: 0xCDD0DB)  // pale lavender-grey
+    static let azul = Color(hex: 0x9197AA)   // muted slate blue
+    static let mimosa = Color(hex: 0xF7B557) // warm golden amber
+    static let orange = Color(hex: 0xE27921) // terracotta orange (the hero)
+    static let aperol = Color(hex: 0xC1521E) // deep burnt sienna
 }
 
-// MARK: - Semantic tokens
+// MARK: - Semantic color roles
 
-/// Intent-named color tokens — the vocabulary the rest of the app speaks.
+/// A fully-resolved set of intent-named color roles for one palette option.
 ///
-/// Every token resolves to a different value in light and dark via the
-/// `Color(light:dark:)` initializer, so a single token name renders correctly
-/// in both appearances. Reference these (`Color.appBackground`, `.appPrimary`,
-/// …) instead of raw palette colors or `Color(hex:)`.
+/// Each role is a *dynamic* light/dark color, so a single value renders correctly
+/// in both appearances automatically (driven by `.preferredColorScheme` / the
+/// OS). The only thing that varies at runtime is *which option* is in force —
+/// that is injected once at the app root via `EnvironmentValues.theme` and read
+/// downstream with `@Environment(\.theme)`.
 ///
 /// Roles:
 /// - **background** — the app canvas behind everything.
-/// - **surface / surfaceElevated** — cards, grouped rows, sheets sitting on top.
-/// - **primary / primaryPressed** — the hero brand color for key actions.
-/// - **secondary** — quieter brand accent for subtle fills and selection tints.
-/// - **accent** — alias of `primary`; matches the system `Color.accentColor`.
-/// - **onAccent** — ink (text/icons) placed on top of a `primary`/`accent` fill.
+/// - **surface / surfaceElevated** — cards, grouped rows, sheets on top.
+/// - **primary / primaryPressed** — the hero color for key actions and the tint.
+/// - **secondary** — the warm highlight (mimosa) for subtle fills and selection.
+/// - **accent** — alias of `primary`; mirrors the system `Color.accentColor`.
+/// - **onAccent** — ink (text / icons) placed on top of a `primary` fill.
 /// - **textPrimary / textSecondary** — body and supporting text.
 /// - **separator** — hairlines and dividers.
-extension Color {
-    /// App canvas behind all content. Warm paper (light) / blue-charcoal (dark).
-    static let appBackground = Color(
-        light: BrandPalette.warmYellow,
-        dark: BrandPalette.inkBackground
-    )
+struct ThemeColors: Sendable {
+    let background: Color
+    let surface: Color
+    let surfaceElevated: Color
+    let primary: Color
+    let primaryPressed: Color
+    let secondary: Color
+    let onAccent: Color
+    let textPrimary: Color
+    let textSecondary: Color
+    let separator: Color
 
-    /// Card / grouped-row surface that sits on the background.
-    static let appSurface = Color(
-        light: BrandPalette.peach,
-        dark: BrandPalette.inkSurface
-    )
-
-    /// Higher-elevation surface for sheets, popovers, floating panels.
-    static let appSurfaceElevated = Color(
-        light: BrandPalette.warmYellowDeep,
-        dark: BrandPalette.inkSurfaceElevated
-    )
-
-    /// Hero brand color for primary actions, selection, and the app tint.
-    static let appPrimary = Color(
-        light: BrandPalette.blue,
-        dark: BrandPalette.blueBright
-    )
-
-    /// Pressed / active variant of `appPrimary`.
-    static let appPrimaryPressed = Color(
-        light: BrandPalette.blueDeep,
-        dark: BrandPalette.blue
-    )
-
-    /// Quieter brand accent — subtle tinted fills, selected-cell backgrounds.
-    static let appSecondary = Color(
-        light: BrandPalette.skyBlue,
-        dark: BrandPalette.blueDeep
-    )
-
-    /// Semantic alias of `appPrimary`. Mirrors the asset-backed
-    /// `Color.accentColor`, so either name yields the brand blue.
-    static let appAccent = appPrimary
-
-    /// Ink (text / icons) for content placed *on top of* `appPrimary`/`appAccent`.
-    /// Deep navy in both modes — white would fail WCAG contrast on the light blue.
-    static let appOnAccent = Color(
-        light: BrandPalette.navyInk,
-        dark: BrandPalette.navyInk
-    )
-
-    /// Primary body text.
-    static let appTextPrimary = Color(
-        light: BrandPalette.textDark,
-        dark: BrandPalette.textLight
-    )
-
-    /// Secondary / supporting text.
-    static let appTextSecondary = Color(
-        light: BrandPalette.textDarkMuted,
-        dark: BrandPalette.textLightMuted
-    )
-
-    /// Hairlines, dividers, and subtle borders.
-    static let appSeparator = Color(
-        light: BrandPalette.warmBorder,
-        dark: BrandPalette.inkBorder
-    )
+    /// Semantic alias of `primary`, for call sites that think in terms of the
+    /// system accent tint.
+    var accent: Color { primary }
 }
 
-// MARK: - Accent color
+// MARK: - Palette options
 
-/// Accent colors selectable in Settings.
+/// The user-selectable color options. Replaces the old free accent-color picker:
+/// instead of an arbitrary hue, the user chooses one of two cohesive, fully
+/// designed palettes built from "The Traveler".
 ///
-/// `.brand` is Cue's signature medium blue (`#8CC0EB`) and the default. The
-/// remaining cases let the user override the system tint with a standard hue.
 /// Stored as a raw string so it round-trips through `UserDefaults`.
-enum AppAccentColor: String, CaseIterable, Identifiable, Sendable {
-    case brand
-    case blue
-    case indigo
-    case purple
-    case pink
-    case red
-    case orange
-    case yellow
-    case green
-    case teal
+enum AppPalette: String, CaseIterable, Identifiable, Sendable {
+    /// Warm-led: sand canvas, terracotta-orange primary, mimosa accent. The
+    /// vibrant, energetic identity. The default.
+    case desert
+    /// Cool-led: lavender-grey canvas, slate-blue primary, mimosa as the warm
+    /// spark. The calm, blue-hour identity.
+    case dusk
 
     var id: String { rawValue }
 
-    /// SwiftUI color to tint the app with.
-    /// `.brand` resolves to the appearance-aware brand primary token.
-    var color: Color {
-        switch self {
-        case .brand: return .appPrimary
-        case .blue: return .blue
-        case .indigo: return .indigo
-        case .purple: return .purple
-        case .pink: return .pink
-        case .red: return .red
-        case .orange: return .orange
-        case .yellow: return .yellow
-        case .green: return .green
-        case .teal: return .teal
-        }
-    }
-
-    /// Human-readable label for accessibility and pickers. Localized via the
-    /// String Catalog so color names translate (e.g. "Blue" → "Синій").
-    var displayName: String {
-        switch self {
-        case .brand: return String(localized: "theme.accent.brand", defaultValue: "Cue Blue")
-        case .blue: return String(localized: "theme.accent.blue")
-        case .indigo: return String(localized: "theme.accent.indigo")
-        case .purple: return String(localized: "theme.accent.purple")
-        case .pink: return String(localized: "theme.accent.pink")
-        case .red: return String(localized: "theme.accent.red")
-        case .orange: return String(localized: "theme.accent.orange")
-        case .yellow: return String(localized: "theme.accent.yellow")
-        case .green: return String(localized: "theme.accent.green")
-        case .teal: return String(localized: "theme.accent.teal")
-        }
-    }
-
-    /// Accessibility label as a `LocalizedStringKey`, resolved by SwiftUI against
-    /// the current `\.locale` so the color names re-localize live.
+    /// Localized option name for the picker (e.g. "Desert").
     var titleKey: LocalizedStringKey {
         switch self {
-        case .brand: return "theme.accent.brand"
-        case .blue: return "theme.accent.blue"
-        case .indigo: return "theme.accent.indigo"
-        case .purple: return "theme.accent.purple"
-        case .pink: return "theme.accent.pink"
-        case .red: return "theme.accent.red"
-        case .orange: return "theme.accent.orange"
-        case .yellow: return "theme.accent.yellow"
-        case .green: return "theme.accent.green"
-        case .teal: return "theme.accent.teal"
+        case .desert: return "theme.palette.desert"
+        case .dusk: return "theme.palette.dusk"
         }
     }
+
+    /// Localized one-line description shown under the option name.
+    var subtitleKey: LocalizedStringKey {
+        switch self {
+        case .desert: return "theme.palette.desert.subtitle"
+        case .dusk: return "theme.palette.dusk.subtitle"
+        }
+    }
+
+    /// Three representative light-mode colors for the picker swatch:
+    /// canvas, primary, and secondary highlight.
+    var swatch: (canvas: Color, primary: Color, secondary: Color) {
+        switch self {
+        case .desert:
+            return (Color(hex: 0xF3EDE4), Color(hex: 0xBA4D17), TravelerColor.mimosa)
+        case .dusk:
+            return (Color(hex: 0xE9EBF1), Color(hex: 0x586280), TravelerColor.mimosa)
+        }
+    }
+
+    /// The resolved semantic colors for this option. Each role is a dynamic
+    /// light/dark color, so the same `ThemeColors` value renders in both
+    /// appearances; only the option selection changes it.
+    var colors: ThemeColors {
+        switch self {
+        case .desert: return Self.desertColors
+        case .dusk: return Self.duskColors
+        }
+    }
+
+    // MARK: Resolved tables
+
+    /// Desert — warm-led. Light: warm sand canvas + terracotta hero. Dark: warm
+    /// near-black with a brightened orange so the accent stays vivid.
+    ///
+    /// The light primary is a *deepened* terracotta (`#BA4D17`) rather than the
+    /// raw ORANGE `#E27921`: the bright orange is a mid-luminance "dead zone" hue
+    /// that can't clear WCAG 3:1 as a tint on the pale canvas nor carry AA ink, so
+    /// it would make every accent glyph/label inaccessible in the default theme.
+    /// The vivid `#E27921` still leads the app icon and the dark-mode accent.
+    private static let desertColors = ThemeColors(
+        background: Color(light: 0xF3EDE4, dark: 0x17120D),
+        surface: Color(light: 0xFBF7F0, dark: 0x211A13),
+        surfaceElevated: Color(light: 0xFFFDF9, dark: 0x2C241B),
+        primary: Color(light: 0xBA4D17, dark: 0xEE8B3B),
+        primaryPressed: Color(light: 0x9C3D12, dark: 0xE27921),
+        secondary: Color(light: 0xF7B557, dark: 0xF7B557),
+        onAccent: Color(light: 0xFFF7EC, dark: 0x2A190B),
+        textPrimary: Color(light: 0x2C2118, dark: 0xF4ECE1),
+        textSecondary: Color(light: 0x7A6657, dark: 0xB8A693),
+        separator: Color(light: 0xE6DBCB, dark: 0x3A3127)
+    )
+
+    /// Dusk — cool-led. Light: lavender-grey canvas + deepened slate-blue hero,
+    /// mimosa as the warm spark. Dark: cool blue-black with a light periwinkle
+    /// accent so the cool tone reads on the dark canvas.
+    private static let duskColors = ThemeColors(
+        background: Color(light: 0xE9EBF1, dark: 0x13151B),
+        surface: Color(light: 0xF4F5F9, dark: 0x1C1F27),
+        surfaceElevated: Color(light: 0xFCFCFE, dark: 0x252934),
+        primary: Color(light: 0x586280, dark: 0x97A0C2),
+        primaryPressed: Color(light: 0x434C66, dark: 0x7B85AB),
+        secondary: Color(light: 0xF7B557, dark: 0xF7B557),
+        onAccent: Color(light: 0xF5F6FA, dark: 0x14161D),
+        textPrimary: Color(light: 0x21242E, dark: 0xECEEF5),
+        textSecondary: Color(light: 0x5F6678, dark: 0xA2A8BA),
+        separator: Color(light: 0xD7DAE3, dark: 0x2E323D)
+    )
+}
+
+// MARK: - Theme environment
+
+extension EnvironmentValues {
+    /// The active semantic colors for the current palette option. Injected once
+    /// at the app root from `ThemeSettings.palette.colors`; defaults to Desert so
+    /// previews and detached views still resolve.
+    @Entry var theme: ThemeColors = AppPalette.desert.colors
 }
 
 // MARK: - ThemeSettings
@@ -291,7 +231,7 @@ final class ThemeSettings {
 
     private enum Keys {
         static let appearance = "theme.appearance"
-        static let accentColor = "theme.accentColor"
+        static let palette = "theme.palette"
     }
 
     private let userDefaults: UserDefaults
@@ -305,16 +245,16 @@ final class ThemeSettings {
         }
     }
 
-    /// Current accent color preference. Writing persists to `UserDefaults`.
-    var accentColor: AppAccentColor {
+    /// Current palette option. Writing persists to `UserDefaults`.
+    var palette: AppPalette {
         didSet {
-            userDefaults.set(accentColor.rawValue, forKey: Keys.accentColor)
+            userDefaults.set(palette.rawValue, forKey: Keys.palette)
         }
     }
 
     // MARK: Init
 
-    /// Loads persisted preferences, falling back to defaults (`.system`, `.brand`).
+    /// Loads persisted preferences, falling back to defaults (`.system`, `.desert`).
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
 
@@ -322,16 +262,16 @@ final class ThemeSettings {
             ?? AppearanceMode.system.rawValue
         self.appearance = AppearanceMode(rawValue: appearanceRaw) ?? .system
 
-        let accentRaw = userDefaults.string(forKey: Keys.accentColor)
-            ?? AppAccentColor.brand.rawValue
-        self.accentColor = AppAccentColor(rawValue: accentRaw) ?? .brand
+        let paletteRaw = userDefaults.string(forKey: Keys.palette)
+            ?? AppPalette.desert.rawValue
+        self.palette = AppPalette(rawValue: paletteRaw) ?? .desert
     }
 }
 
 // MARK: - Color utilities
 
 extension Color {
-    /// Builds a `Color` from a packed 24-bit RGB hex literal (e.g. `0x8CC0EB`).
+    /// Builds a `Color` from a packed 24-bit RGB hex literal (e.g. `0xE27921`).
     /// - Parameter hex: `0xRRGGBB`. The alpha component is always opaque.
     init(hex: UInt32) {
         let red = Double((hex >> 16) & 0xFF) / 255.0
@@ -356,9 +296,6 @@ extension Color {
     /// in dark mode, mirroring how an asset-catalog color with "Any/Dark"
     /// appearances behaves — but expressed in code so every role is reviewable
     /// in one file.
-    /// - Parameters:
-    ///   - light: color used in light (and unspecified) appearances.
-    ///   - dark: color used in dark appearance.
     init(light: Color, dark: Color) {
         self.init(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark
@@ -367,31 +304,9 @@ extension Color {
         })
     }
 
-    /// Returns a copy of this color blended toward `other` by `fraction`
-    /// (0 → unchanged, 1 → fully `other`). Used to derive shade steps inside
-    /// `BrandPalette` while staying in the brand hue family.
-    /// - Parameters:
-    ///   - other: the color to blend toward (commonly `.white` or `.black`).
-    ///   - fraction: blend amount in `0...1`.
-    func mix(with other: Color, by fraction: Double) -> Color {
-        let clamped = min(max(fraction, 0), 1)
-        let base = UIColor(self)
-        let target = UIColor(other)
-
-        var baseRed: CGFloat = 0, baseGreen: CGFloat = 0, baseBlue: CGFloat = 0, baseAlpha: CGFloat = 0
-        var targetRed: CGFloat = 0, targetGreen: CGFloat = 0, targetBlue: CGFloat = 0, targetAlpha: CGFloat = 0
-        base.getRed(&baseRed, green: &baseGreen, blue: &baseBlue, alpha: &baseAlpha)
-        target.getRed(&targetRed, green: &targetGreen, blue: &targetBlue, alpha: &targetAlpha)
-
-        let blend = { (lhs: CGFloat, rhs: CGFloat) -> Double in
-            Double(lhs + (rhs - lhs) * CGFloat(clamped))
-        }
-        return Color(
-            .sRGB,
-            red: blend(baseRed, targetRed),
-            green: blend(baseGreen, targetGreen),
-            blue: blend(baseBlue, targetBlue),
-            opacity: blend(baseAlpha, targetAlpha)
-        )
+    /// Convenience over `init(light:dark:)` that takes packed hex literals, so the
+    /// palette tables read as compact `0xRRGGBB` pairs.
+    init(light: UInt32, dark: UInt32) {
+        self.init(light: Color(hex: light), dark: Color(hex: dark))
     }
 }

@@ -22,16 +22,51 @@ struct CalendarView: View {
     @Environment(CalendarStore.self) private var store
     @Environment(\.modelContext) private var modelContext
 
-    /// Page window — ±90 days around today. Lazy-realized by `LazyHStack`.
-    private var pageDates: [Date] {
-        let today = CalendarMath.startOfDay(.now)
-        return (-90...90).compactMap { offset in
-            Calendar.current.date(byAdding: .day, value: offset, to: today)
-        }
+    /// One windowed query over the whole displayable range, replacing the old
+    /// one-`@Query`-per-page fan-out: a single live observer whose results are
+    /// bucketed by day and handed to pages as plain values. A `context.save()`
+    /// now re-evaluates this one query, not every realized page's query.
+    @Query private var windowTasks: [TaskItem]
+
+    /// Page window — ±90 days around today. Stored, not recomputed per `body`:
+    /// it depends only on "today", and `CalendarView.init` runs per navigation
+    /// (not per `selectedDate` change). Lazy-realized by `LazyHStack`.
+    private let pageDates: [Date]
+    private let calendar = Calendar.current
+
+    init(
+        user: UserDTO,
+        onOpenToday: @escaping () -> Void = {},
+        onSelect: @escaping (ScheduleEvent) -> Void = { _ in }
+    ) {
+        self.user = user
+        self.onOpenToday = onOpenToday
+        self.onSelect = onSelect
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let window = (-90...90).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+        self.pageDates = window
+
+        // Windowed range predicate. `#Predicate` requires a single expression, so
+        // the optional start is coalesced to `.distantPast` (matching the original
+        // per-day query); a nil/occurrence-less start lands below the window and is
+        // excluded — correct, since it can't be placed on a timeline anyway.
+        let lower = window.first ?? today
+        let upper = calendar.date(byAdding: .day, value: 1, to: window.last ?? today) ?? today
+        let sentinel = Date.distantPast
+        _windowTasks = Query(
+            filter: #Predicate<TaskItem> { task in
+                (task.occurrenceStart ?? sentinel) >= lower &&
+                (task.occurrenceStart ?? sentinel) < upper
+            },
+            sort: \.occurrenceStart
+        )
     }
 
     var body: some View {
         @Bindable var store = store
+        let eventsByDay = bucketedEvents()
 
         VStack(alignment: .leading, spacing: 12) {
             WeekStripPicker(selectedDate: $store.selectedDate)
@@ -42,7 +77,7 @@ struct CalendarView: View {
                     .transition(.opacity)
             }
 
-            paginatedContent
+            paginatedContent(eventsByDay: eventsByDay)
         }
         .padding(.top, 8)
         .navigationTitle(dayTitle)
@@ -89,22 +124,46 @@ struct CalendarView: View {
 
     // MARK: - Horizontally paged content
 
+    /// Groups the windowed occurrences into per-day slices, keyed by `startOfDay`
+    /// so each page looks up its events in O(1). Runs once per `body` eval (cheap
+    /// array work over the windowed rows — not N SwiftData fetches). Keys are
+    /// byte-equal to `pageDates` (both `startOfDay`-normalized, same calendar).
+    private func bucketedEvents() -> [Date: [ScheduleEvent]] {
+        Dictionary(grouping: windowTasks.compactMap { $0.asScheduleEvent() }) { event in
+            calendar.startOfDay(for: event.startAt)
+        }
+    }
+
     /// Horizontal paging of day pages. The child rendered per page is chosen by
-    /// `DayEventsProvider` based on `store.viewMode`; switching modes preserves
-    /// the current day because the window and scroll binding are unchanged.
-    private var paginatedContent: some View {
+    /// `store.viewMode`; switching modes preserves the current day because the
+    /// window and scroll binding are unchanged. Each page gets its pre-bucketed
+    /// `events` slice — no per-page query.
+    private func paginatedContent(eventsByDay: [Date: [ScheduleEvent]]) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 0) {
                 ForEach(pageDates, id: \.self) { date in
-                    DayEventsProvider(date: date, onSelect: onSelect)
-                        .containerRelativeFrame(.horizontal)
-                        .id(date)
+                    DayEventsProvider(
+                        date: date,
+                        events: eventsByDay[date] ?? [],
+                        viewMode: store.viewMode,
+                        onToggle: toggleCompletion,
+                        onSelect: onSelect
+                    )
+                    .containerRelativeFrame(.horizontal)
+                    .id(date)
                 }
             }
             .scrollTargetLayout()
         }
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: pageScrollBinding, anchor: .center)
+    }
+
+    /// Toggles an occurrence's completion by its (indexed, unique) key. Pages no
+    /// longer own a `@Query`, so they pass the event id rather than a pre-fetched
+    /// `TaskItem`; the store resolves the row.
+    private func toggleCompletion(_ event: ScheduleEvent) {
+        Task { await store.toggleCompletion(occurrenceKey: event.id, context: modelContext) }
     }
 
     /// Two-way bridge between the horizontal scroll position and the store's

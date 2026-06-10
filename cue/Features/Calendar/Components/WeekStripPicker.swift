@@ -34,7 +34,7 @@ struct WeekStripPicker: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 0) {
-                ForEach(groups) { group in
+                ForEach(Self.homeGroups) { group in
                     groupView(group)
                         .containerRelativeFrame(.horizontal)
                         .id(group.startDate)
@@ -58,9 +58,12 @@ struct WeekStripPicker: View {
         var id: Date { startDate }
     }
 
-    private var groups: [WeekGroup] {
-        Self.groupRange.compactMap { Self.makeGroup(offset: $0) }
-    }
+    /// The full ±12-week window of day-pill groups, computed once. The window is
+    /// anchored on "today" (fixed for the session), and this view is re-created on
+    /// every `selectedDate` write, so rebuilding 25×7 dates per body was pure
+    /// waste. Captured at first use; a session left open across midnight keeps the
+    /// launch-day center, matching how the rest of the calendar seeds.
+    private static let homeGroups: [WeekGroup] = groupRange.compactMap { makeGroup(offset: $0) }
 
     /// Builds the group that's `offset` groups away from the home group.
     /// The home group (offset 0) contains today at its center index.
@@ -84,7 +87,7 @@ struct WeekStripPicker: View {
     /// user paged the main schedule to a different week), scroll the strip
     /// to the group containing that date.
     private func alignGroupIfNeeded(for date: Date) {
-        let targetGroup = groups.first { group in
+        let targetGroup = Self.homeGroups.first { group in
             group.dates.contains { calendar.isDate($0, inSameDayAs: date) }
         }
         guard let targetGroup, targetGroup.startDate != visibleGroupStart else { return }
@@ -104,6 +107,10 @@ struct WeekStripPicker: View {
                     isToday: calendar.isDateInToday(date),
                     showMonthLabel: isOutsideCurrentWindow(date)
                 )
+                // Equatable-gated: a `selectedDate` change flips `isSelected` on
+                // only two pills, so the other ~173 realized pills skip re-render
+                // (and their three DateFormatter calls) entirely.
+                .equatable()
                 .frame(maxWidth: .infinity)
                 .contentShape(.rect)
                 .onTapGesture {
@@ -130,8 +137,10 @@ struct WeekStripPicker: View {
 // MARK: - DatePill
 
 /// Single day pill inside `WeekStripPicker`. Fills the width it's given
-/// so 7 pills evenly fill a paged group.
-private struct DatePill: View {
+/// so 7 pills evenly fill a paged group. `Equatable` so the strip can skip
+/// re-rendering unchanged pills on a selection change (see the `.equatable()`
+/// call site) — its inputs are all value types, so the synthesized `==` is exact.
+private struct DatePill: View, Equatable {
     let date: Date
     let isSelected: Bool
     let isToday: Bool

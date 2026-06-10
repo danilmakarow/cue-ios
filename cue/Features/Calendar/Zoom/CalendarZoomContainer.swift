@@ -68,8 +68,7 @@ struct CalendarZoomContainer: View {
                     let transform = transform(for: .year, in: size)
                     YearScopeView(
                         centeredOn: monthAnchor,
-                        onSelectMonth: zoomToMonth,
-                        onOpenToday: openToday
+                        onSelectMonth: zoomToMonth
                     )
                     .scaleEffect(transform.scale, anchor: transform.anchor)
                     .opacity(transform.opacity)
@@ -79,7 +78,6 @@ struct CalendarZoomContainer: View {
                     MonthScopeView(
                         monthAnchor: monthAnchor,
                         onSelectDay: zoomToDay,
-                        onOpenToday: openToday,
                         onCenteredMonthChange: { monthAnchor = $0 }
                     )
                     .scaleEffect(transform.scale, anchor: transform.anchor)
@@ -324,7 +322,7 @@ struct CalendarZoomContainer: View {
     /// Animated zoom into the adjacent inner scope (cell tap or programmatic).
     /// Mounts the inner scope at visibility 0, then animates the commit on the
     /// next tick so mount and zoom stay separate transactions.
-    private func zoomIn(to scope: CalendarScope, anchorFrame: CGRect?, completion: (() -> Void)? = nil) {
+    private func zoomIn(to scope: CalendarScope, anchorFrame: CGRect?) {
         guard transition == nil, scope == activeScope.zoomedIn else { return }
         let new = ScopeZoomTransition(
             inner: scope,
@@ -337,17 +335,13 @@ struct CalendarZoomContainer: View {
         Task { @MainActor in
             await Task.yield()
             guard transition != nil else { return }
-            finishTransition(new, commit: true, completion: completion)
+            finishTransition(new, commit: true)
         }
     }
 
     /// Animates the in-flight transition to its endpoint, then settles
     /// `activeScope` and unmounts the outgoing scope.
-    private func finishTransition(
-        _ current: ScopeZoomTransition,
-        commit: Bool,
-        completion: (() -> Void)? = nil
-    ) {
+    private func finishTransition(_ current: ScopeZoomTransition, commit: Bool) {
         // Ends on the inner scope when a zoom-in commits or a zoom-out cancels.
         let endsInner = (current.kind == .zoomIn) == commit
         withAnimation(.smooth(duration: 0.32)) {
@@ -355,31 +349,17 @@ struct CalendarZoomContainer: View {
         } completion: {
             activeScope = endsInner ? current.inner : current.outer
             transition = nil
-            completion?()
         }
     }
 
-    /// Brings the calendar back to *today's day page* from any scope — the
-    /// action behind every `OpenTodayButton`. Zooms in level by level so the
-    /// return reads as the same continuous motion as manual navigation.
+    /// Recenters the day pager on today — the action behind the day scope's
+    /// nav-bar "today" button. The pager's window is built around today, so
+    /// today is always reachable. The month and year scopes handle "today"
+    /// themselves via their progressive `JumpToTodayButton` (recenter, then
+    /// zoom in one level through `onSelectMonth` / `onSelectDay`).
     private func openToday() {
-        let today = CalendarMath.startOfDay(.now)
-        let thisMonth = CalendarMath.startOfMonth(today)
-
-        switch activeScope {
-        case .day:
-            // Already at day depth — recenter the pager (its window is built
-            // around today, so today is always reachable).
-            withAnimation(.snappy) { store.selectedDate = today }
-        case .month:
-            store.selectedDate = today
-            zoomIn(to: .day, anchorFrame: frames.dayFrame(for: today))
-        case .year:
-            store.selectedDate = today
-            monthAnchor = thisMonth
-            zoomIn(to: .month, anchorFrame: frames.monthFrame(for: thisMonth)) {
-                zoomIn(to: .day, anchorFrame: frames.dayFrame(for: today))
-            }
+        withAnimation(.snappy) {
+            store.selectedDate = CalendarMath.startOfDay(.now)
         }
     }
 }

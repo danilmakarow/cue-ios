@@ -36,9 +36,9 @@ struct SettingsView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("settings.appearance.accentColor")
-                    AccentColorPicker(selection: $theme.accentColor)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("settings.appearance.palette")
+                    PalettePicker(selection: $theme.palette)
                 }
                 .padding(.vertical, 4)
             }
@@ -199,57 +199,84 @@ private struct UserProfileRow: View {
     }
 }
 
-// MARK: - Accent color picker
+// MARK: - Palette picker
 
-/// Row of tappable colored circles — replaces SwiftUI's palette-style picker,
-/// which drops per-option tint inside a Form and renders every swatch black.
-private struct AccentColorPicker: View {
-    @Binding var selection: AppAccentColor
+/// Two selectable color options, each shown as a labelled row with a small
+/// swatch preview (canvas + primary + secondary). Replaces the old free
+/// accent-color picker — the user now chooses one of two cohesive palettes
+/// rather than an arbitrary hue.
+private struct PalettePicker: View {
+    @Binding var selection: AppPalette
 
     var body: some View {
-        HStack(spacing: 10) {
-            ForEach(AppAccentColor.allCases) { accent in
-                swatch(for: accent)
+        VStack(spacing: 10) {
+            ForEach(AppPalette.allCases) { palette in
+                row(for: palette)
             }
         }
     }
 
-    private func swatch(for accent: AppAccentColor) -> some View {
-        let isSelected = selection == accent
+    private func row(for palette: AppPalette) -> some View {
+        let isSelected = selection == palette
         return Button {
-            selection = accent
+            selection = palette
         } label: {
-            Circle()
-                .fill(accent.color)
-                .frame(width: 28, height: 28)
-                .overlay {
-                    Circle()
-                        .strokeBorder(.primary, lineWidth: isSelected ? 2 : 0)
-                        .padding(-3)
+            HStack(spacing: 14) {
+                PaletteSwatch(palette: palette)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(palette.titleKey)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                    Text(palette.subtitleKey)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .overlay {
-                    if isSelected {
-                        Image(systemName: "checkmark")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(checkmarkColor(for: accent))
-                    }
-                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    .symbolRenderingMode(.hierarchical)
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 1.5)
+            )
+            .contentShape(.rect(cornerRadius: 12))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(accent.titleKey)
+        .accessibilityLabel(palette.titleKey)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
+}
 
-    /// Picks a checkmark color with enough contrast against the swatch fill.
-    /// Light swatches (the brand blue and yellow) get the dark on-accent ink;
-    /// saturated swatches keep a white check.
-    private func checkmarkColor(for accent: AppAccentColor) -> Color {
-        switch accent {
-        case .brand, .yellow:
-            return .appOnAccent
-        default:
-            return .white
+/// The three overlapping representative colors of a palette option.
+private struct PaletteSwatch: View {
+    let palette: AppPalette
+
+    var body: some View {
+        let swatch = palette.swatch
+        return ZStack {
+            circle(swatch.canvas).offset(x: -12)
+            circle(swatch.secondary)
+            circle(swatch.primary).offset(x: 12)
         }
+        .frame(width: 56, height: 32)
+    }
+
+    private func circle(_ color: Color) -> some View {
+        Circle()
+            .fill(color)
+            .frame(width: 28, height: 28)
+            .overlay(Circle().strokeBorder(.background, lineWidth: 2))
     }
 }
 

@@ -19,6 +19,16 @@ import SwiftData
 /// edits all address the server by `(seriesId, occurrenceStart)`.
 @Model
 final class TaskItem {
+    /// Index on the occurrence start — the column the day-scope `@Query` orders by
+    /// (`sort: \.occurrenceStart`) and the month prune scans. It primarily serves
+    /// the `ORDER BY` (SQLite walks the index instead of doing a filesort); the
+    /// windowed predicates coalesce the optional start (`?? .distantPast`) to stay
+    /// a single expression, and a plain index can't seek a `COALESCE`-wrapped
+    /// range — so the *ordering* is the concrete win here, not the range filter.
+    /// The schema bump needs no migration plan — the store is a re-syncable cache
+    /// with a destroy-and-recreate fallback in `cueApp`.
+    #Index<TaskItem>([\.occurrenceStart])
+
     /// Composite unique key: `"\(seriesId)#\(isoOccurrenceStart)"`.
     /// This is what SwiftData indexes; use `upsert(from:in:)` to maintain it.
     @Attribute(.unique) var occurrenceKey: String
@@ -90,12 +100,18 @@ final class TaskItem {
     /// True when the occurrence has been completed.
     var isCompleted: Bool { completedAt != nil }
 
+    /// Shared formatter for the local occurrence key. Cached because a month sync
+    /// builds one key per occurrence — allocating a fresh `ISO8601DateFormatter`
+    /// each time added up on the open-time sync. Default options (no fractional
+    /// seconds), so the produced key — and the `.unique` constraint — is unchanged.
+    private static let keyFormatter = ISO8601DateFormatter()
+
     /// Builds the composite occurrence key from a series id and optional
     /// occurrence-start date, in a consistent ISO-8601 format.
     static func makeKey(seriesId: String, occurrenceStart: Date?) -> String {
         guard let start = occurrenceStart else {
             return "\(seriesId)#"
         }
-        return "\(seriesId)#\(ISO8601DateFormatter().string(from: start))"
+        return "\(seriesId)#\(keyFormatter.string(from: start))"
     }
 }

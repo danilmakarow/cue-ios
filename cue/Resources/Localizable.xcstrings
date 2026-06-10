@@ -1521,20 +1521,20 @@
         }
       }
     },
-    "settings.appearance.accentColor" : {
-      "comment" : "Label for the accent color picker in Settings",
+    "settings.appearance.palette" : {
+      "comment" : "Label for the color-theme (palette) picker in Settings",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Accent Color"
+            "value" : "Color Theme"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Акцентний колір"
+            "value" : "Колірна тема"
           }
         }
       }
@@ -1809,182 +1809,74 @@
         }
       }
     },
-    "theme.accent.blue" : {
-      "comment" : "Name of the blue accent color",
+    "theme.palette.desert" : {
+      "comment" : "Name of the warm-led (Desert) color theme option",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Blue"
+            "value" : "Desert"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Синій"
+            "value" : "Пустеля"
           }
         }
       }
     },
-    "theme.accent.brand" : {
-      "comment" : "Display name for the default brand accent color",
+    "theme.palette.desert.subtitle" : {
+      "comment" : "One-line description of the Desert color theme",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cue Blue"
+            "value" : "Warm terracotta & gold"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Синій Cue"
+            "value" : "Тепла теракота й золото"
           }
         }
       }
     },
-    "theme.accent.green" : {
-      "comment" : "Name of the green accent color",
+    "theme.palette.dusk" : {
+      "comment" : "Name of the cool-led (Dusk) color theme option",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Green"
+            "value" : "Dusk"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Зелений"
+            "value" : "Сутінки"
           }
         }
       }
     },
-    "theme.accent.indigo" : {
-      "comment" : "Name of the indigo accent color",
+    "theme.palette.dusk.subtitle" : {
+      "comment" : "One-line description of the Dusk color theme",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Indigo"
+            "value" : "Cool slate & amber"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Індиго"
-          }
-        }
-      }
-    },
-    "theme.accent.orange" : {
-      "comment" : "Name of the orange accent color",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Orange"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Помаранчевий"
-          }
-        }
-      }
-    },
-    "theme.accent.pink" : {
-      "comment" : "Name of the pink accent color",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pink"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Рожевий"
-          }
-        }
-      }
-    },
-    "theme.accent.purple" : {
-      "comment" : "Name of the purple accent color",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Purple"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Фіолетовий"
-          }
-        }
-      }
-    },
-    "theme.accent.red" : {
-      "comment" : "Name of the red accent color",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Red"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Червоний"
-          }
-        }
-      }
-    },
-    "theme.accent.teal" : {
-      "comment" : "Name of the teal accent color",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Teal"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бірюзовий"
-          }
-        }
-      }
-    },
-    "theme.accent.yellow" : {
-      "comment" : "Name of the yellow accent color",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yellow"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жовтий"
+            "value" : "Прохолодний сланець і бурштин"
           }
         }
       }

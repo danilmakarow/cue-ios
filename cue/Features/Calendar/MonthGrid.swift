@@ -6,9 +6,10 @@
 import SwiftUI
 
 /// The 7-column day grid for one month. Leading blanks align day 1 under its
-/// weekday; each real day is a tappable `MonthDayCell`.
+/// weekday; each real day is a tappable `MonthDayCell` listing that day's
+/// event titles.
 ///
-/// Renders entirely from a precomputed `MonthGridModel` plus day-key flags —
+/// Renders entirely from a precomputed `MonthGridModel` plus per-day values —
 /// no `Calendar` math or formatting happens here, so realizing a month while
 /// the list scrolls stays cheap.
 ///
@@ -22,7 +23,8 @@ struct MonthGrid: View {
     let selectedDayKey: Date
     /// `startOfDay` key of today (drives the today highlight).
     let todayKey: Date
-    let daysWithEvents: Set<Date>
+    /// Event titles per day (`startOfDay` key), ordered by start.
+    let titlesByDay: [Date: [String]]
     var onSelectDay: (Date) -> Void
 
     @Environment(ScopeFrameRegistry.self) private var frames
@@ -37,7 +39,7 @@ struct MonthGrid: View {
                         number: cell.number,
                         isSelected: cell.date == selectedDayKey,
                         isToday: cell.date == todayKey,
-                        hasEvents: daysWithEvents.contains(cell.date)
+                        titles: titlesByDay[cell.date] ?? []
                     )
                     .contentShape(.rect)
                     .onTapGesture { onSelectDay(cell.date) }
@@ -48,7 +50,7 @@ struct MonthGrid: View {
                     }
                     .onDisappear { frames.clearDayFrame(for: cell.date) }
                 } else {
-                    Color.clear.frame(height: 44)
+                    Color.clear.frame(minHeight: MonthDayCell.minHeight)
                 }
             }
         }

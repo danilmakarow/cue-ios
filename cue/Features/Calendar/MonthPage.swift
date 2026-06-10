@@ -8,8 +8,8 @@ import SwiftUI
 
 /// A single month in the month scope: month heading + `MonthGrid`. Owns the
 /// `@Query` for this month's tasks (configured from the month bounds in its
-/// init — the dynamic-query pattern) and reduces them to the set of days that
-/// have events, which drives each day cell's dot.
+/// init — the dynamic-query pattern) and groups them by day into ordered title
+/// lists, which the grid shows under each day number.
 struct MonthPage: View {
     let monthAnchor: Date
     let selectedDate: Date
@@ -39,9 +39,6 @@ struct MonthPage: View {
     var body: some View {
         let model = MonthGridModel.model(for: monthAnchor)
         let todayKey = CalendarMath.startOfDay(.now)
-        let daysWithEvents = Set(tasks.compactMap { task in
-            task.occurrenceStart.map(CalendarMath.startOfDay)
-        })
 
         VStack(alignment: .leading, spacing: 12) {
             Text(heading(for: model, todayKey: todayKey))
@@ -52,10 +49,23 @@ struct MonthPage: View {
                 model: model,
                 selectedDayKey: CalendarMath.startOfDay(selectedDate),
                 todayKey: todayKey,
-                daysWithEvents: daysWithEvents,
+                titlesByDay: eventTitlesByDay(),
                 onSelectDay: onSelectDay
             )
         }
+    }
+
+    /// Groups this month's tasks by day (`startOfDay` key), each day's titles
+    /// ordered by occurrence start, so the grid can list them under the day
+    /// number instead of a single dot. The query is already month-bounded, so
+    /// this is cheap array work over a handful of rows.
+    private func eventTitlesByDay() -> [Date: [String]] {
+        let entries = tasks.compactMap { task -> (day: Date, start: Date, title: String)? in
+            guard let start = task.occurrenceStart else { return nil }
+            return (CalendarMath.startOfDay(start), start, task.title)
+        }
+        return Dictionary(grouping: entries, by: \.day)
+            .mapValues { dayEntries in dayEntries.sorted { $0.start < $1.start }.map(\.title) }
     }
 
     /// "May" within the current year; "May 2027" elsewhere, so the year is
