@@ -6,7 +6,8 @@
 //  Renders the 1024×1024 App Store / home-screen icon headlessly with Core
 //  Graphics + ImageIO, mirroring the geometry of `BrandMark` /
 //  `BrandMarkRenderer` so the icon and the in-app logo stay visually identical:
-//  a white magnifying glass on a warm "Traveler" gradient.
+//  a cream magnifying glass (with a soft lift shadow) on the "Traveler"
+//  gradient — silver mist → teal → amber → terracotta → burnt sienna.
 //
 //  The icon is fully opaque (iOS app icons must not have an alpha hole) and
 //  full-bleed — iOS applies its own rounded-superellipse mask, so the gradient
@@ -47,11 +48,13 @@ struct RGBA {
 }
 
 enum Palette {
-    static let aperol = RGBA(0.7569, 0.3216, 0.1176) // #C1521E burnt sienna
-    static let orange = RGBA(0.8863, 0.4745, 0.1294) // #E27921 terracotta
-    static let mimosa = RGBA(0.9686, 0.7098, 0.3412) // #F7B557 golden amber
+    static let silver = RGBA(0.8039, 0.8157, 0.8588) // #CDD0DB silver mist
     static let teal = RGBA(0.3176, 0.5922, 0.6667)   // #5197AA cool teal-slate
-    static let glass = RGBA(1.0, 1.0, 1.0)           // white magnifying glass
+    static let mimosa = RGBA(0.9686, 0.7098, 0.3412) // #F7B557 golden amber
+    static let orange = RGBA(0.8863, 0.4745, 0.1294) // #E27921 terracotta
+    static let aperol = RGBA(0.7569, 0.3216, 0.1176) // #C1521E burnt sienna
+    static let glass = RGBA(0.9490, 0.9098, 0.8235)  // #F2E8D2 cream magnifying glass
+    static let shadow = RGBA(0, 0, 0, 0.16)          // soft lift under the glass
 }
 
 // MARK: - Geometry helpers
@@ -74,16 +77,18 @@ func length(_ unit: CGFloat) -> CGFloat { unit * iconSize }
 func drawIcon(in context: CGContext, colorSpace: CGColorSpace) {
     let fullRect = CGRect(x: 0, y: 0, width: iconSize, height: iconSize)
 
-    // 1. Full-bleed Traveler gradient, top-left → bottom-right.
+    // 1. Full-bleed Traveler gradient, top-left → bottom-right:
+    //    silver mist → teal → amber → terracotta → burnt sienna.
     if let gradient = CGGradient(
         colorsSpace: colorSpace,
         colors: [
-            Palette.aperol.cgColor(in: colorSpace),
-            Palette.orange.cgColor(in: colorSpace),
-            Palette.mimosa.cgColor(in: colorSpace),
+            Palette.silver.cgColor(in: colorSpace),
             Palette.teal.cgColor(in: colorSpace),
+            Palette.mimosa.cgColor(in: colorSpace),
+            Palette.orange.cgColor(in: colorSpace),
+            Palette.aperol.cgColor(in: colorSpace),
         ] as CFArray,
-        locations: [0, 0.35, 0.65, 1]
+        locations: [0, 0.28, 0.56, 0.8, 1]
     ) {
         context.saveGState()
         context.addRect(fullRect)
@@ -100,7 +105,9 @@ func drawIcon(in context: CGContext, colorSpace: CGColorSpace) {
         context.fill(fullRect)
     }
 
-    // 2. Magnifying glass — white lens ring.
+    // 2. Magnifying glass — cream lens ring with a soft black lift behind it
+    //    (the shadow rides the stroke pass via CGContext's shadow state, which
+    //    matches the blurred duplicate-stroke layer in the brand SVG).
     let lensCenter = point(0.458, 0.442)
     let lensRadius = length(0.208)
     let lensRect = CGRect(
@@ -108,6 +115,12 @@ func drawIcon(in context: CGContext, colorSpace: CGColorSpace) {
         y: lensCenter.y - lensRadius,
         width: lensRadius * 2,
         height: lensRadius * 2
+    )
+    context.saveGState()
+    context.setShadow(
+        offset: .zero,
+        blur: length(0.0217), // stdDeviation 2.6 in the SVG's 120-unit space
+        color: Palette.shadow.cgColor(in: colorSpace)
     )
     context.setStrokeColor(Palette.glass.cgColor(in: colorSpace))
     context.setLineWidth(length(0.075))
@@ -119,6 +132,7 @@ func drawIcon(in context: CGContext, colorSpace: CGColorSpace) {
     context.move(to: point(0.55, 0.533))
     context.addLine(to: point(0.725, 0.725))
     context.strokePath()
+    context.restoreGState()
 }
 
 // MARK: - Render & write PNG
