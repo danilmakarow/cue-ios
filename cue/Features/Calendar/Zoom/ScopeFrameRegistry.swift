@@ -5,6 +5,7 @@
 
 import Foundation
 import Observation
+internal import CoreGraphics
 
 /// Tracks the on-screen frames of the calendar's zoomable cells — day cells in
 /// the month scope and month cells in the year scope — in the zoom container's

@@ -5,4 +5,4 @@
 
 #include "Shared.xcconfig"
 
-API_BASE_URL = https:/$()/cue.ngrok.app
+API_BASE_URL = https:/$()/cue-api.makarov.my
