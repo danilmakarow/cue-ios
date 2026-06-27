@@ -42,6 +42,7 @@ struct GroupsScreen: View {
                         }
                     }
                 }
+                .onMove(perform: moveGroups)
             }
         }
         .scrollContentBackground(.hidden)
@@ -102,6 +103,43 @@ struct GroupsScreen: View {
         }
     }
 
+    /// Reorders groups in response to a drag. Optimistically renumbers every
+    /// row's local `sortOrder` to its new index so the `@Query` reflects the move
+    /// immediately, then persists the full ordered id list via
+    /// `APIClient.reorderGroups(orderedIds:)`. On failure the prior order is
+    /// restored from the returned (or cached) DTOs and the error is surfaced.
+    private func moveGroups(from source: IndexSet, to destination: Int) {
+        var ordered = localGroups
+        ordered.move(fromOffsets: source, toOffset: destination)
+
+        // Optimistic local renumber so the list animates into place at once.
+        let previousOrder: [(id: String, sortOrder: Int)] = ordered.map { ($0.id, $0.sortOrder) }
+        for (index, group) in ordered.enumerated() {
+            group.sortOrder = index
+        }
+        try? modelContext.save()
+
+        let orderedIds = ordered.map(\.id)
+        Task {
+            do {
+                let updated = try await APIClient.shared.reorderGroups(orderedIds: orderedIds)
+                for dto in updated {
+                    EventTaskGroup.upsert(from: dto, in: modelContext)
+                }
+                remoteDTOs = updated
+                try? modelContext.save()
+            } catch {
+                // Roll back to the pre-drag ordering.
+                let byId = Dictionary(uniqueKeysWithValues: localGroups.map { ($0.id, $0) })
+                for entry in previousOrder {
+                    byId[entry.id]?.sortOrder = entry.sortOrder
+                }
+                try? modelContext.save()
+                notifications.postError(error, title: String(localized: "groups.error.reorder"))
+            }
+        }
+    }
+
     private func deleteGroup(_ group: EventTaskGroup) {
         Task {
             do {
@@ -150,10 +188,11 @@ private struct GroupRow: View {
     }
 
     /// Tokenized icon tile: a sheet-fill paper square with a functional border.
-    /// The persisted group color (read from `group.colorHex` via `Color(hex:)`)
-    /// tints the glyph; absent a color it falls back to espresso ink.
+    /// The persisted group color (resolved via `TaskColorResolver`, which handles
+    /// both `TaskColor` preset names and `#RRGGBB` hex) tints the glyph; absent a
+    /// color it falls back to espresso ink.
     private var groupIcon: some View {
-        let color = group.colorHex.flatMap { Color(hex: $0) } ?? theme.primary
+        let color = TaskColorResolver.color(from: group.colorHex) ?? theme.primary
         return ZStack {
             RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
                 .fill(theme.surface)

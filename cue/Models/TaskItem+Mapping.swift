@@ -105,6 +105,9 @@ extension TaskItem {
             notes: notes,
             startAt: start,
             endAt: resolvedEnd,
+            isAllDay: isAllDay,
+            groupId: groupId,
+            groupColorToken: groupColorToken,
             requiresCompletion: requiresCompletion,
             completedAt: completedAt,
             isRecurring: isRecurring
@@ -128,6 +131,7 @@ extension TaskItem {
             notes: notes,
             startAt: start,
             endAt: resolvedEnd,
+            isAllDay: isAllDay,
             requiresCompletion: requiresCompletion,
             completedAt: completedAt,
             isRecurring: isRecurring

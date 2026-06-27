@@ -55,6 +55,19 @@ final class TelegramLinkStore {
     /// covers the initial *read*.
     private(set) var isMutating: Bool = false
 
+    /// True after a `link` attempt was rejected with the typed
+    /// `APIError.linkCodeInvalid` (a permanently bad / expired / used nonce).
+    /// Drives a *persistent* brass "bad code" notice on the form — distinct from
+    /// the transient error banner — that keeps the user in place to fetch a fresh
+    /// code. Cleared the moment the user edits the code or a new attempt starts.
+    private(set) var lastCodeRejected: Bool = false
+
+    /// Dismisses the persistent bad-code notice. Called when the user edits the
+    /// code field, so the brass warning never lingers over a fresh value.
+    func clearCodeRejection() {
+        lastCodeRejected = false
+    }
+
     // MARK: Init
 
     init(api: APIClient = .shared, notifications: NotificationStore? = nil) {
@@ -104,6 +117,7 @@ final class TelegramLinkStore {
     func link(code: String) async -> Bool {
         guard !isMutating else { return false }
         isMutating = true
+        lastCodeRejected = false
         defer { isMutating = false }
 
         do {
@@ -122,7 +136,10 @@ final class TelegramLinkStore {
             // transient failure: the former is a "this code is no longer valid"
             // state the user fixes by getting a fresh code, not by retrying.
             if let apiError = error as? APIError, apiError.isInvalidLinkCode {
-                notifications?.postError(error, title: String(localized: "telegram.error.invalidCode"))
+                // Latch the persistent in-form brass notice. No transient banner:
+                // the inline notice is the dedicated affordance for this case and
+                // a banner would double-surface it.
+                lastCodeRejected = true
             } else {
                 notifications?.postError(error, title: String(localized: "telegram.error.linkFailed"))
             }

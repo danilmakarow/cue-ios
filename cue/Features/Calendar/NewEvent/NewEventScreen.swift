@@ -7,50 +7,63 @@ import SwiftData
 import SwiftUI
 
 /// Push-navigated screen for creating a new calendar event. The Save action is
-/// the app's second wax-seal moment: committing the event presses the seal.
+/// the app's second wax-seal moment: committing the event presses the seal and
+/// fires the GREEN roots-commit motion.
 struct NewEventScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.theme) private var theme
     @State private var viewModel = NewEventViewModel()
-    @State private var showRecurrenceEditor = false
     @State private var groups: [TaskGroupDTO] = []
     /// Drives the seal-press animation in the saving overlay (false → true on
     /// appear so the seal stamps down once per submit).
     @State private var sealStamped = false
+    /// Bumped once on a successful save to fire the GREEN roots-commit motion.
+    @State private var commitTrigger = 0
 
     var body: some View {
         @Bindable var viewModel = viewModel
 
         Form {
+            Section {
+                QuickCreateWell { draft in
+                    withAnimation(.snappy) { viewModel.applyDraft(draft) }
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+            }
+
             Section("newEvent.details") {
                 TextField("newEvent.titleField", text: $viewModel.title)
                     .textInputAutocapitalization(.sentences)
                 TextField("newEvent.notesField", text: $viewModel.notes, axis: .vertical)
                     .lineLimit(3...6)
+                iconRow(viewModel: viewModel)
             }
 
             Section("newEvent.time") {
                 Toggle("newEvent.allDay", isOn: $viewModel.isAllDay.animation(.default))
 
                 if viewModel.isAllDay {
-                    DatePicker(
-                        "newEvent.date",
-                        selection: $viewModel.startAt,
-                        displayedComponents: .date
+                    InlineDateTimePicker(
+                        label: String(localized: "newEvent.date"),
+                        date: $viewModel.startAt,
+                        mode: .date
                     )
+                    .listRowInsets(timeRowInsets)
                 } else if viewModel.useClassicPicker {
-                    DatePicker(
-                        "newEvent.start",
-                        selection: $viewModel.startAt,
-                        displayedComponents: [.date, .hourAndMinute]
+                    InlineDateTimePicker(
+                        label: String(localized: "newEvent.start"),
+                        date: $viewModel.startAt,
+                        mode: .dateAndTime
                     )
-                    DatePicker(
-                        "newEvent.end",
-                        selection: $viewModel.endAt,
-                        in: viewModel.startAt...,
-                        displayedComponents: [.date, .hourAndMinute]
+                    .listRowInsets(timeRowInsets)
+                    InlineDateTimePicker(
+                        label: String(localized: "newEvent.end"),
+                        date: $viewModel.endAt,
+                        mode: .dateAndTime
                     )
+                    .listRowInsets(timeRowInsets)
                     Button("newEvent.useQuickPicker") {
                         withAnimation { viewModel.useClassicPicker = false }
                     }
@@ -58,11 +71,12 @@ struct NewEventScreen: View {
                     .foregroundStyle(theme.accentText)
                 } else {
                     durationChipStrip(viewModel: viewModel)
-                    DatePicker(
-                        "newEvent.starts",
-                        selection: $viewModel.startAt,
-                        displayedComponents: [.date, .hourAndMinute]
+                    InlineDateTimePicker(
+                        label: String(localized: "newEvent.starts"),
+                        date: $viewModel.startAt,
+                        mode: .dateAndTime
                     )
+                    .listRowInsets(timeRowInsets)
                     Button("newEvent.switchToClassicPicker") {
                         withAnimation { viewModel.useClassicPicker = true }
                     }
@@ -78,6 +92,12 @@ struct NewEventScreen: View {
             }
 
             RecurrenceSection(recurrence: $viewModel.recurrenceInput)
+
+            Section("reminder.section") {
+                ReminderEditor(reminders: $viewModel.reminders)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            }
 
             if !groups.isEmpty {
                 Section(String(localized: "newEvent.group.section")) {
@@ -102,6 +122,15 @@ struct NewEventScreen: View {
                 savingOverlay
             }
         }
+        .overlay {
+            // Rendered only after the first successful save so it plays exactly
+            // once (the GREEN commit motion), never on mount.
+            if commitTrigger > 0 {
+                RootsCommitView(tone: .save, trigger: commitTrigger)
+                    .frame(width: 96, height: 96)
+                    .allowsHitTesting(false)
+            }
+        }
         .alert(
             "newEvent.alert.saveFailed.title",
             isPresented: Binding(
@@ -121,14 +150,31 @@ struct NewEventScreen: View {
         .task { await loadGroups() }
     }
 
+    /// Standard insets for the inline date-time picker rows so the well fills the
+    /// row width without the default form leading inset.
+    private var timeRowInsets: EdgeInsets {
+        EdgeInsets(top: Spacing.xs, leading: Spacing.lg, bottom: Spacing.xs, trailing: Spacing.lg)
+    }
+
     private func loadGroups() async {
-        // Only fetch once; the `.task` can re-fire on re-appear.
         guard groups.isEmpty else { return }
         do {
             let fetched: [TaskGroupDTO] = try await APIClient.shared.get("/task-groups")
             groups = fetched
         } catch {
             // Non-fatal — group picker just won't appear.
+        }
+    }
+
+    /// The per-task icon row: an eyebrow label + the round icon-picker trigger.
+    @ViewBuilder
+    private func iconRow(viewModel: NewEventViewModel) -> some View {
+        @Bindable var viewModel = viewModel
+        HStack {
+            Text("newEvent.icon")
+                .foregroundStyle(theme.textPrimary)
+            Spacer()
+            IconPickerButton(selection: $viewModel.icon)
         }
     }
 
@@ -151,18 +197,19 @@ struct NewEventScreen: View {
         .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg, bottom: Spacing.sm, trailing: Spacing.lg))
     }
 
-    /// The key CTA — the one rationed terracotta `.decisive` button (a 6pt cut
-    /// sheet, not a pill), anchored to the bottom safe area. Submitting presses the
-    /// wax seal in the overlay.
+    /// The key CTA — the one rationed terracotta `.decisive` button anchored to
+    /// the bottom safe area. Submitting presses the wax seal in the overlay and,
+    /// on success, fires the GREEN roots-commit motion.
     @ViewBuilder
     private func saveButton(viewModel: NewEventViewModel) -> some View {
         Button {
             Task {
                 guard let created = await viewModel.submit() else { return }
-                // Upsert locally so the new event appears immediately — the
-                // month it lands in may already be marked synced.
+                commitTrigger += 1
                 TaskItem.upsert(from: created, in: modelContext)
                 try? modelContext.save()
+                // Let the commit motion read before dismissing.
+                try? await Task.sleep(for: .milliseconds(420))
                 dismiss()
             }
         } label: {

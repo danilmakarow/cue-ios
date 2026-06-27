@@ -18,6 +18,15 @@ import UIKit
 /// the day number, the today/selected flags, the day's titles, and the theme. It
 /// does no date math, no formatting, and no store access. It renders constantly
 /// while the month list scrolls, so the configure path stays allocation-light.
+/// One day's worth of event presentation for the month grid: a title and the
+/// resolved GROUP color used to tint its chip / draw its dot. The color is
+/// `nil` when the occurrence's group is uncolored (the cell falls back to the
+/// neutral sunken chip / clay dot).
+struct MonthDayChip {
+    let title: String
+    let color: UIColor?
+}
+
 final class MonthDayGridCell: UICollectionViewCell {
 
     static let reuseIdentifier = "MonthDayGridCell"
@@ -56,6 +65,10 @@ final class MonthDayGridCell: UICollectionViewCell {
     /// ``YearMiniMonthCell`` keeps `isCurrentMonth` for its restyle path).
     private var highlightIsToday = false
     private var highlightIsSelected = false
+
+    /// The day's chips, kept so a theme-only restyle re-applies the per-group
+    /// chip tints / dot colors with the new theme's neutral fallbacks.
+    private var lastChips: [MonthDayChip] = []
 
     // MARK: - Init
 
@@ -137,20 +150,20 @@ final class MonthDayGridCell: UICollectionViewCell {
         number: String,
         isToday: Bool,
         isSelected: Bool,
-        indicatorCount: Int,
-        titles: [String],
+        chips: [MonthDayChip],
         theme: CalendarTheme
     ) {
         self.theme = theme
         highlightIsToday = isToday
         highlightIsSelected = isSelected
+        lastChips = chips
         numberLabel.text = number
         numberLabel.font = theme.codeSmall
 
         applyDayHighlight(isToday: isToday, isSelected: isSelected, theme: theme)
-        applyIndicators(indicatorCount, theme: theme)
-        applyTitles(titles, theme: theme)
-        applyAccessibility(number: number, isToday: isToday, titles: titles)
+        applyIndicators(chips, theme: theme)
+        applyTitles(chips, theme: theme)
+        applyAccessibility(number: number, isToday: isToday, titles: chips.map(\.title))
     }
 
     /// Re-styles the cell in place when only the theme changed (no content change).
@@ -160,14 +173,10 @@ final class MonthDayGridCell: UICollectionViewCell {
         numberLabel.font = theme.codeSmall
         applyDayHighlight(isToday: highlightIsToday, isSelected: highlightIsSelected, theme: theme)
         overflowLabel.font = theme.codeSmall
-        for chip in titleChips where !chip.isHidden {
-            chip.font = theme.caption
-            chip.textColor = theme.textPrimary
-            chip.backgroundColor = theme.surfaceSunken
-        }
-        for dot in indicatorDots where !dot.isHidden {
-            dot.backgroundColor = theme.primary
-        }
+        // Re-apply per-group chip tints / dot colors against the new theme's
+        // neutral fallbacks (a theme change keeps the same chip set).
+        applyIndicators(lastChips, theme: theme)
+        applyTitles(lastChips, theme: theme)
     }
 
     // MARK: - Number chip
@@ -200,20 +209,23 @@ final class MonthDayGridCell: UICollectionViewCell {
 
     // MARK: - Indicators
 
-    /// Shows up to ``maxIndicatorDots`` event-indicator dots for the day, hiding the
-    /// whole row when the day has no events. The dot pool is reused across
-    /// configures so scrolling stays allocation-light.
-    private func applyIndicators(_ count: Int, theme: CalendarTheme) {
-        guard count > 0 else {
+    /// Shows up to ``maxIndicatorDots`` event-indicator dots for the day, each
+    /// colored by its occurrence's GROUP (falling back to clay `primary` when the
+    /// group is uncolored), hiding the whole row when the day has no events. The
+    /// dot pool is reused across configures so scrolling stays allocation-light.
+    private func applyIndicators(_ chips: [MonthDayChip], theme: CalendarTheme) {
+        guard !chips.isEmpty else {
             indicatorStack.isHidden = true
             for dot in indicatorDots { dot.isHidden = true }
             return
         }
-        let visible = min(count, Self.maxIndicatorDots)
+        let visible = min(chips.count, Self.maxIndicatorDots)
         ensureDotCount(visible, theme: theme)
         for (index, dot) in indicatorDots.enumerated() {
             dot.isHidden = index >= visible
-            if index < visible { dot.backgroundColor = theme.primary }
+            if index < visible {
+                dot.backgroundColor = chips[index].color ?? theme.primary
+            }
         }
         indicatorStack.isHidden = false
     }
@@ -238,20 +250,27 @@ final class MonthDayGridCell: UICollectionViewCell {
 
     // MARK: - Titles
 
-    private func applyTitles(_ titles: [String], theme: CalendarTheme) {
-        let visible = Array(titles.prefix(Self.maxVisibleTitles))
+    private func applyTitles(_ chips: [MonthDayChip], theme: CalendarTheme) {
+        let visible = Array(chips.prefix(Self.maxVisibleTitles))
         ensureChipCount(visible.count, theme: theme)
 
-        for (index, chip) in titleChips.enumerated() {
+        for (index, label) in titleChips.enumerated() {
             if index < visible.count {
-                chip.text = visible[index]
-                chip.isHidden = false
+                let chip = visible[index]
+                label.text = chip.title
+                label.font = theme.caption
+                label.textColor = theme.textPrimary
+                // A faint group-color wash behind the ink title (the spec's
+                // `rgba(group, 0.12)` chip), or the neutral sunken fill when the
+                // group is uncolored.
+                label.backgroundColor = chip.color?.withAlphaComponent(0.12) ?? theme.surfaceSunken
+                label.isHidden = false
             } else {
-                chip.isHidden = true
+                label.isHidden = true
             }
         }
 
-        let overflow = titles.count - Self.maxVisibleTitles
+        let overflow = chips.count - Self.maxVisibleTitles
         if overflow > 0 {
             overflowLabel.text = "+\(overflow)"
             overflowLabel.font = theme.codeSmall
@@ -263,7 +282,8 @@ final class MonthDayGridCell: UICollectionViewCell {
     }
 
     /// Grows the pool of reusable title chips to at least `count`, styling any
-    /// newly created ones. Existing chips are reused across configures.
+    /// newly created ones. Existing chips are reused across configures; their
+    /// per-group tint is set in ``applyTitles(_:theme:)``.
     private func ensureChipCount(_ count: Int, theme: CalendarTheme) {
         while titleChips.count < count {
             let chip = PaddedLabel()

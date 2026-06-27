@@ -38,12 +38,23 @@ struct OccurrenceVM: Identifiable, Hashable, Sendable {
     /// Resolved placement end. Falls back to `startAt + 1h` when the row has no
     /// `occurrenceEnd`, mirroring ``ScheduleEvent``.
     let endAt: Date
+    /// True when the occurrence spans the whole day and has no meaningful
+    /// intra-day placement. Drives the "all-day" label (instead of a clock time)
+    /// in the agenda/timeline rather than placing it at its midnight start.
+    let isAllDay: Bool
     /// Whether this entry is a task (can be completed) vs a pure event.
     let requiresCompletion: Bool
     /// Timestamp at which the occurrence was completed, if ever.
     let completedAt: Date?
     /// True when this occurrence is part of a recurring series.
     let isRecurring: Bool
+    /// The occurrence's group color token — a `TaskColor` preset name (e.g.
+    /// `"BLUE"`) OR a `#RRGGBB` hex, straight off `OccurrenceDTO.groupColorHex`.
+    /// Resolved to a render color via ``CalendarColor/rail(for:theme:)`` so the
+    /// day timeline/agenda rails and month chips/dots paint by GROUP, falling
+    /// back to the clay structural rail when the group has no color. `nil` when
+    /// the occurrence belongs to no group (or the group is uncolored).
+    let groupColorToken: String?
 
     /// Designated initializer mirroring ``ScheduleEvent``'s field set.
     init(
@@ -55,9 +66,11 @@ struct OccurrenceVM: Identifiable, Hashable, Sendable {
         notes: String? = nil,
         startAt: Date,
         endAt: Date,
+        isAllDay: Bool = false,
         requiresCompletion: Bool = false,
         completedAt: Date? = nil,
-        isRecurring: Bool = false
+        isRecurring: Bool = false,
+        groupColorToken: String? = nil
     ) {
         self.id = id
         self.seriesId = seriesId
@@ -67,11 +80,34 @@ struct OccurrenceVM: Identifiable, Hashable, Sendable {
         self.notes = notes
         self.startAt = startAt
         self.endAt = endAt
+        self.isAllDay = isAllDay
         self.requiresCompletion = requiresCompletion
         self.completedAt = completedAt
         self.isRecurring = isRecurring
+        self.groupColorToken = groupColorToken
     }
 
     /// Convenience: true when `completedAt` is set.
     var isCompleted: Bool { completedAt != nil }
+
+    /// Returns a copy carrying `token` as the group color. Used by
+    /// ``CalendarDataAdapter`` to fold the group color onto the base value the
+    /// shared `TaskItem.asOccurrenceVM()` mapping produces (which omits it).
+    func withGroupColorToken(_ token: String?) -> OccurrenceVM {
+        OccurrenceVM(
+            id: id,
+            seriesId: seriesId,
+            occurrenceStart: occurrenceStart,
+            originalStart: originalStart,
+            title: title,
+            notes: notes,
+            startAt: startAt,
+            endAt: endAt,
+            isAllDay: isAllDay,
+            requiresCompletion: requiresCompletion,
+            completedAt: completedAt,
+            isRecurring: isRecurring,
+            groupColorToken: token
+        )
+    }
 }

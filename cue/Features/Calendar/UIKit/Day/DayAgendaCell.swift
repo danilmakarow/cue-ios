@@ -172,10 +172,13 @@ final class DayAgendaCell: UICollectionViewCell {
         card.layer.shadowRadius = theme.restShadowRadius
         card.layer.shadowOffset = theme.restShadowOffset
         card.layer.shadowOpacity = theme.restShadowOpacity
-        // The spine carries the row's state: olive (`success`) once the task is
-        // done — a positive earthy "completed" mark — and clay (`primary`,
-        // structural/brand) while it's still open.
-        spine.backgroundColor = event.isCompleted ? theme.success : theme.primary
+        // The spine names the row's GROUP (resolved via `CalendarColor`, falling
+        // back to clay `primary` when the group is uncolored) while the task is
+        // open, and flips to olive (`success`) once done — the positive earthy
+        // "completed" mark, matching the Day/Today specs' group-colored rails.
+        spine.backgroundColor = event.isCompleted
+            ? theme.success
+            : CalendarColor.rail(for: event, theme: theme)
 
         let titleAttributes: [NSAttributedString.Key: Any] = [
             .font: theme.titleM,
@@ -230,7 +233,11 @@ final class DayAgendaCell: UICollectionViewCell {
     // MARK: - Formatting
 
     /// Localized "9:00 AM – 10:30 AM" style range, matching `CueEventCard.timeString`.
+    /// All-day occurrences read as the "all-day" label rather than a midnight range.
     private static func timeRange(for event: OccurrenceVM) -> String {
+        if event.isAllDay {
+            return String(localized: "newEvent.allDay")
+        }
         let start = event.startAt.formatted(date: .omitted, time: .shortened)
         let end = event.endAt.formatted(date: .omitted, time: .shortened)
         return "\(start) – \(end)"

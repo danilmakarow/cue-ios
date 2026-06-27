@@ -11,17 +11,54 @@ import SwiftUI
 /// Telegram deep link (with the code pre-filled). It renders five states off
 /// `TelegramLinkStore.status`:
 /// - **loading** — initial status fetch (`LoadingStateView`).
-/// - **not connected** — explanation + a pre-fillable code field, "Paste from
-///   Clipboard", and a **Connect** button (disabled while empty or mutating).
-///   The code is *never* auto-submitted; the user always confirms.
-/// - **connected** — the linked `@handle` + formatted timestamp and a
-///   destructive **Disconnect** action.
+/// - **not connected** — explanation card, an "Open in Telegram" platform row,
+///   a pre-fillable code field (`CueField`), "Paste from Clipboard", and the
+///   hero clay **Connect** button (disabled while empty or mutating). The code is
+///   *never* auto-submitted; the user always confirms. When the last attempt was
+///   rejected with the typed `APIError.linkCodeInvalid`, a *persistent* brass
+///   notice sits above the CTA and keeps the user here to fetch a fresh code —
+///   distinct from a transient error banner.
+/// - **connected** — the linked `@handle` + formatted timestamp (a "ticket"
+///   `CueCard`) and a destructive **Disconnect** action.
 /// - **in progress** — a blocking `.loadingOverlay` while a link/unlink runs.
 /// - **fetch failure** — `ErrorStateView` with retry.
 ///
 /// On a successful `link()` the screen dismisses itself (so the sheet closes and
 /// a re-tap of the now-burned nonce can't happen here).
 struct ConnectTelegramView: View {
+    /// The Cue assistant bot handle and its deep link, surfaced as the
+    /// "Open in Telegram" affordance on the not-connected form.
+    private static let botHandle = "@cue_bot"
+    private static let botURL = URL(string: "https://t.me/cue_bot")
+
+    // Copy that has no catalog entry yet. Carried with explicit default values so
+    // it renders correctly now and auto-extracts into Localizable.xcstrings later
+    // (the strings catalog is owned by another workstream this pass).
+    private static let notConnectedTitle = String(
+        localized: "telegram.notConnected.title",
+        defaultValue: "Your assistant, on Telegram"
+    )
+    private static let openInTelegram = String(
+        localized: "telegram.open",
+        defaultValue: "Open in Telegram"
+    )
+    private static let connectedEyebrow = String(
+        localized: "telegram.connected.eyebrow",
+        defaultValue: "Assistant active"
+    )
+    private static let connectedStatus = String(
+        localized: "telegram.connected.status",
+        defaultValue: "Connected"
+    )
+    private static let connectedHint = String(
+        localized: "telegram.connected.hint",
+        defaultValue: "Forward a message to the Cue bot any time to capture it as a task."
+    )
+    private static let badCodeNoticeText = String(
+        localized: "telegram.badCode.notice",
+        defaultValue: "That code didn’t work — get a fresh one from the bot."
+    )
+
     @Environment(\.theme) private var theme
     @Environment(TelegramLinkStore.self) private var store
     @Environment(NotificationStore.self) private var notifications
@@ -38,19 +75,24 @@ struct ConnectTelegramView: View {
     var body: some View {
         @Bindable var viewModel = viewModel
 
-        Form {
-            switch store.status {
-            case .unknown, .loading:
-                loadingState
-            case .notConnected:
-                notConnectedState(viewModel: viewModel)
-            case .connected(let username, let linkedAt):
-                connectedState(username: username, linkedAt: linkedAt)
-            case .failed(let message):
-                failedState(message: message)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.xl) {
+                switch store.status {
+                case .unknown, .loading:
+                    loadingState
+                case .notConnected:
+                    notConnectedState(viewModel: viewModel)
+                case .connected(let username, let linkedAt):
+                    connectedState(username: username, linkedAt: linkedAt)
+                case .failed(let message):
+                    failedState(message: message)
+                }
             }
+            .padding(.horizontal, Spacing.lg)
+            .padding(.vertical, Spacing.xl)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .scrollContentBackground(.hidden)
+        .scrollDismissesKeyboard(.interactively)
         .background(theme.background.ignoresSafeArea())
         .navigationTitle("telegram.title")
         .navigationBarTitleDisplayMode(.inline)
@@ -66,100 +108,213 @@ struct ConnectTelegramView: View {
 
     @ViewBuilder
     private var loadingState: some View {
-        Section {
-            LoadingStateView(label: String(localized: "telegram.status.loading"))
-                .frame(maxWidth: .infinity)
-                .listRowBackground(Color.clear)
-        }
+        LoadingStateView(label: String(localized: "telegram.status.loading"))
+            .frame(maxWidth: .infinity, minHeight: 320)
     }
 
     @ViewBuilder
     private func notConnectedState(viewModel: ConnectTelegramViewModel) -> some View {
-        Section {
-            Text("telegram.explanation")
-                .cueText(.callout)
-                .foregroundStyle(theme.textSecondary)
+        Text(Self.notConnectedTitle)
+            .cueText(.titleM)
+            .foregroundStyle(theme.textPrimary)
+
+        // Explanation card — sparkle eyebrow icon + how-it-works copy.
+        CueCard {
+            HStack(alignment: .top, spacing: Spacing.md) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(theme.accentText)
+                    .padding(.top, 1)
+                Text("telegram.explanation")
+                    .cueText(.callout)
+                    .foregroundStyle(theme.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
 
-        Section {
-            TextField("telegram.code.placeholder", text: $viewModel.code)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .cueText(.code)
-                .foregroundStyle(theme.textPrimary)
+        openInTelegramRow
+
+        // Linking code field + the clipboard affordance.
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            CueField(
+                label: String(localized: "telegram.code.section"),
+                text: $viewModel.code,
+                placeholder: String(localized: "telegram.code.placeholder"),
+                mono: true
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .onChange(of: viewModel.code) { _, _ in
+                // The brass notice describes a *stale* code; the moment the user
+                // changes the value it no longer applies, so retire it.
+                store.clearCodeRejection()
+            }
 
             Button {
                 viewModel.pasteFromClipboard()
             } label: {
                 Label("telegram.paste", systemImage: "doc.on.clipboard")
-                    .cueText(.body)
+                    .cueText(.bodyEmphasis)
                     .foregroundStyle(theme.primary)
             }
-        } header: {
-            Text("telegram.code.section")
-                .cueText(.label)
-                .textCase(nil)
-                .foregroundStyle(theme.textSecondary)
         }
 
-        Section {
-            Button {
-                Task { await connect(viewModel: viewModel) }
-            } label: {
-                Text("telegram.connect")
-            }
-            .buttonStyle(.cue(.primary))
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
-            .disabled(!viewModel.canSubmit || store.isMutating)
+        Spacer(minLength: Spacing.sm)
+
+        // Persistent brass "bad code" notice — kept distinct from a transient
+        // banner: it lives in the form and survives until the code is edited.
+        if store.lastCodeRejected {
+            badCodeNotice
         }
+
+        Button {
+            Task { await connect(viewModel: viewModel) }
+        } label: {
+            Label("telegram.connect", systemImage: "seal")
+        }
+        .buttonStyle(.cue(.decisive))
+        .disabled(!viewModel.canSubmit || store.isMutating)
     }
 
     @ViewBuilder
     private func connectedState(username: String?, linkedAt: String?) -> some View {
-        Section {
-            LabeledContent("telegram.connectedAs") {
-                Text(handleDisplay(for: username))
-                    .cueText(.code)
-                    .foregroundStyle(theme.textSecondary)
-            }
-            if let formatted = Self.formattedLinkedAt(linkedAt) {
-                LabeledContent("telegram.linkedAt") {
-                    Text(formatted)
-                        .cueText(.code)
-                        .foregroundStyle(theme.textSecondary)
+        // Eyebrow — olive dot + "assistant active".
+        HStack(spacing: Spacing.sm) {
+            Circle()
+                .fill(theme.success)
+                .frame(width: 7, height: 7)
+            Text(Self.connectedEyebrow)
+                .cueText(.label)
+                .foregroundStyle(theme.accentText)
+        }
+        .frame(maxWidth: .infinity)
+
+        // Ticket card — the linked handle, status, and linked-at receipt row.
+        CueCard(header: { Text("telegram.title") }) {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                HStack(spacing: Spacing.md) {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(theme.primary)
+                        .frame(width: 40, height: 40)
+                        .background(Circle().fill(theme.surfaceSunken))
+                        .overlay(Circle().strokeBorder(theme.primary, lineWidth: 1.5))
+                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                        Text(handleDisplay(for: username))
+                            .cueText(.titleM)
+                            .foregroundStyle(theme.textPrimary)
+                            .lineLimit(1)
+                        HStack(spacing: Spacing.xs) {
+                            Circle()
+                                .fill(theme.success)
+                                .frame(width: 7, height: 7)
+                            Text(Self.connectedStatus)
+                                .cueText(.caption)
+                                .foregroundStyle(theme.textSecondary)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                if let formatted = Self.formattedLinkedAt(linkedAt) {
+                    Divider().overlay(theme.separator)
+                    LabeledContent {
+                        Text(formatted)
+                            .cueText(.code)
+                            .foregroundStyle(theme.textPrimary)
+                    } label: {
+                        Text("telegram.linkedAt")
+                            .cueText(.caption)
+                            .foregroundStyle(theme.textSecondary)
+                    }
                 }
             }
-        } header: {
-            Text("telegram.connected.section")
-                .cueText(.label)
-                .textCase(nil)
-                .foregroundStyle(theme.textSecondary)
         }
 
-        Section {
-            Button(role: .destructive) {
-                Task { await store.unlink() }
-            } label: {
-                Text("telegram.disconnect")
-            }
-            .buttonStyle(.cue(.destructive))
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
+        Text(Self.connectedHint)
+            .cueText(.callout)
+            .foregroundStyle(theme.textSecondary)
+
+        Spacer(minLength: Spacing.sm)
+
+        Button(role: .destructive) {
+            Task { await store.unlink() }
+        } label: {
+            Label("telegram.disconnect", systemImage: "trash")
         }
+        .buttonStyle(.cue(.destructive))
     }
 
     @ViewBuilder
     private func failedState(message: String) -> some View {
-        Section {
-            ErrorStateView(
-                title: String(localized: "telegram.error.loadStatus"),
-                message: message,
-                systemImage: "wifi.exclamationmark",
-                retry: { Task { await store.refreshStatus() } }
-            )
-            .listRowBackground(Color.clear)
+        ErrorStateView(
+            title: String(localized: "telegram.error.loadStatus"),
+            message: message,
+            systemImage: "wifi.exclamationmark",
+            retry: { Task { await store.refreshStatus() } }
+        )
+        .frame(maxWidth: .infinity, minHeight: 320)
+    }
+
+    // MARK: - Components
+
+    /// The "Open in Telegram" platform affordance — a tappable row that deep-links
+    /// to the Cue bot. Telegram-blue accents (a real platform colour, deliberately
+    /// outside the Cue palette) signal "you're leaving for Telegram".
+    @ViewBuilder
+    private var openInTelegramRow: some View {
+        let telegramBlue = Color(red: 0.133, green: 0.620, blue: 0.851)
+        Link(destination: Self.botURL ?? URL(fileURLWithPath: "/")) {
+            CueCard {
+                HStack(spacing: Spacing.md) {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(telegramBlue)
+                        .frame(width: 40, height: 40)
+                        .background(Circle().fill(telegramBlue.opacity(0.12)))
+                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                        Text(Self.openInTelegram)
+                            .cueText(.bodyEmphasis)
+                            .foregroundStyle(theme.textPrimary)
+                        Text(Self.botHandle)
+                            .cueText(.codeSmall)
+                            .foregroundStyle(telegramBlue)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(telegramBlue)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(.isLink)
+    }
+
+    /// Persistent brass advisory shown when the last code was rejected as invalid.
+    /// Brass `warning` is a *fill only*, so the surface is a low-opacity brass wash
+    /// with a brass edge and dark ink — never brass text.
+    @ViewBuilder
+    private var badCodeNotice: some View {
+        HStack(alignment: .top, spacing: Spacing.sm) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(theme.textPrimary)
+            Text(Self.badCodeNoticeText)
+                .cueText(.caption)
+                .foregroundStyle(theme.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+                .fill(theme.warning.opacity(0.12))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+                .strokeBorder(theme.warning.opacity(0.4), lineWidth: 1)
+        )
     }
 
     // MARK: - Actions
@@ -202,7 +357,7 @@ struct ConnectTelegramView: View {
     }
 }
 
-#Preview {
+#Preview("Not connected") {
     NavigationStack {
         ConnectTelegramView()
     }

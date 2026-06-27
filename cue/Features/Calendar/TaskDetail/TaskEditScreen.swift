@@ -25,6 +25,15 @@ struct TaskEditScreen: View {
     @State private var endAt: Date = .now.addingTimeInterval(3600)
     @State private var isAllDay: Bool = false
     @State private var requiresCompletion: Bool = false
+    /// Per-task icon (SF Symbol name); nil == iconless.
+    @State private var icon: String?
+    /// The icon the form started with, used to compute the icon tri-state.
+    @State private var initialIcon: String?
+    /// Editable reminder rows. Compared against `initialReminders` to decide
+    /// whether to send a replacement set at save.
+    @State private var reminders: [EditableReminder] = []
+    /// The reminders the form started with (offset+channel only — ids are local).
+    @State private var initialReminders: [ReminderInput] = []
     /// Current edited recurrence (`nil` == off). Compared against
     /// `initialRecurrence` at save time to decide unchanged / clear / set.
     @State private var recurrenceInput: RecurrenceRuleInput?
@@ -43,35 +52,41 @@ struct TaskEditScreen: View {
                     .textInputAutocapitalization(.sentences)
                 TextField("newEvent.notesField", text: $notes, axis: .vertical)
                     .lineLimit(3...6)
+                HStack {
+                    Text("newEvent.icon")
+                        .foregroundStyle(theme.textPrimary)
+                    Spacer()
+                    IconPickerButton(selection: $icon)
+                }
             } header: {
-                Text("newEvent.details")
-                    .cueText(.label)
-                    .textCase(nil)
-                    .foregroundStyle(theme.textSecondary)
+                sectionHeader("newEvent.details")
             }
 
             Section {
                 Toggle("newEvent.allDay", isOn: $isAllDay.animation(.default))
                 if isAllDay {
-                    DatePicker("newEvent.date", selection: $startAt, displayedComponents: .date)
+                    InlineDateTimePicker(
+                        label: String(localized: "newEvent.date"),
+                        date: $startAt,
+                        mode: .date
+                    )
+                    .listRowInsets(timeRowInsets)
                 } else {
-                    DatePicker(
-                        "newEvent.start",
-                        selection: $startAt,
-                        displayedComponents: [.date, .hourAndMinute]
+                    InlineDateTimePicker(
+                        label: String(localized: "newEvent.start"),
+                        date: $startAt,
+                        mode: .dateAndTime
                     )
-                    DatePicker(
-                        "newEvent.end",
-                        selection: $endAt,
-                        in: startAt...,
-                        displayedComponents: [.date, .hourAndMinute]
+                    .listRowInsets(timeRowInsets)
+                    InlineDateTimePicker(
+                        label: String(localized: "newEvent.end"),
+                        date: $endAt,
+                        mode: .dateAndTime
                     )
+                    .listRowInsets(timeRowInsets)
                 }
             } header: {
-                Text("newEvent.time")
-                    .cueText(.label)
-                    .textCase(nil)
-                    .foregroundStyle(theme.textSecondary)
+                sectionHeader("newEvent.time")
             }
 
             Section {
@@ -79,6 +94,14 @@ struct TaskEditScreen: View {
             }
 
             RecurrenceSection(recurrence: $recurrenceInput)
+
+            Section {
+                ReminderEditor(reminders: $reminders)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            } header: {
+                sectionHeader("reminder.section")
+            }
         }
         .scrollContentBackground(.hidden)
         .background(theme.background.ignoresSafeArea())
@@ -118,6 +141,18 @@ struct TaskEditScreen: View {
         .onAppear { populateFromDTO() }
     }
 
+    /// Standard insets for the inline date-time picker rows.
+    private var timeRowInsets: EdgeInsets {
+        EdgeInsets(top: Spacing.xs, leading: Spacing.lg, bottom: Spacing.xs, trailing: Spacing.lg)
+    }
+
+    private func sectionHeader(_ key: LocalizedStringKey) -> some View {
+        Text(key)
+            .cueText(.label)
+            .textCase(nil)
+            .foregroundStyle(theme.textSecondary)
+    }
+
     // MARK: - Population
 
     private func populateFromDTO() {
@@ -127,14 +162,20 @@ struct TaskEditScreen: View {
         endAt = seriesDTO.endAt ?? event.endAt
         isAllDay = seriesDTO.isAllDay
         requiresCompletion = seriesDTO.requiresCompletion
+        icon = seriesDTO.icon
+        initialIcon = seriesDTO.icon
+        let editable = seriesDTO.reminders.map(EditableReminder.init(from:))
+        reminders = editable
+        initialReminders = editable.map(\.input)
         let baseline = seriesDTO.recurrence.map(Self.input(from:))
         initialRecurrence = baseline
         recurrenceInput = baseline
     }
 
-    /// Maps a response rule into the request-shaped input used by the editor.
-    /// `nonisolated` (pure transform) so it's callable from the `Optional.map`
-    /// closure in `populateFromDTO` without an actor-isolation warning.
+    /// Maps a response rule into the request-shaped input used by the editor,
+    /// carrying the advanced monthly fields (`bySetPos`, `monthlyAnchor`) so the
+    /// baseline round-trips losslessly. `nonisolated` (pure transform) so it's
+    /// callable from the `Optional.map` closure in `populateFromDTO`.
     private nonisolated static func input(from rule: RecurrenceRuleDTO) -> RecurrenceRuleInput {
         RecurrenceRuleInput(
             frequency: rule.frequency,
@@ -142,6 +183,8 @@ struct TaskEditScreen: View {
             byWeekday: rule.byWeekday,
             byMonthDay: rule.byMonthDay,
             byMonth: rule.byMonth,
+            bySetPos: rule.bySetPos,
+            monthlyAnchor: rule.monthlyAnchor,
             endType: rule.endType,
             endDate: rule.endDate,
             count: rule.count
@@ -163,6 +206,8 @@ struct TaskEditScreen: View {
                     isAllDay: isAllDay,
                     requiresCompletion: requiresCompletion,
                     groupId: seriesDTO.groupId,
+                    icon: iconFieldUpdate,
+                    reminders: remindersUpdate,
                     recurrence: recurrenceFieldUpdate
                 )
                 let updated: TaskDTO = try await api.patch(
@@ -191,6 +236,22 @@ struct TaskEditScreen: View {
             return .clear
         }
         return .set(recurrenceInput)
+    }
+
+    /// Tri-state for the icon: unchanged when identical to the baseline, `.clear`
+    /// (explicit null) when removed, `.set` when added/changed.
+    private var iconFieldUpdate: FieldUpdate<String> {
+        if icon == initialIcon { return .unchanged }
+        guard let icon else { return .clear }
+        return .set(icon)
+    }
+
+    /// Reminders replacement set: `nil` (omit the key, leave untouched) when the
+    /// edited rows match the baseline; otherwise the full replacement array (an
+    /// empty array clears all reminders, a populated one replaces them).
+    private var remindersUpdate: [ReminderInput]? {
+        let current = reminders.map(\.input)
+        return current == initialReminders ? nil : current
     }
 }
 

@@ -49,7 +49,14 @@ final class CalendarDataAdapter {
             sortBy: [SortDescriptor(\.occurrenceStart, order: .forward)]
         )
         let rows = (try? context.fetch(descriptor)) ?? []
-        return rows.compactMap { $0.asOccurrenceVM() }
+        return rows.compactMap { row in
+            // `asOccurrenceVM()` (in the shared Models mapping) doesn't carry the
+            // group color token, so enrich the value here — the adapter owns the
+            // read path and `TaskItem.groupColorToken` is local. This is what lets
+            // the day rails and month chips/dots paint by GROUP.
+            guard let base = row.asOccurrenceVM() else { return nil }
+            return base.withGroupColorToken(row.groupColorToken)
+        }
     }
 
     /// Occurrences in `[from, to)` grouped by `CalendarMath.startOfDay`, each

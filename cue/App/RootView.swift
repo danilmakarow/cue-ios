@@ -57,12 +57,27 @@ struct RootView: View {
 /// auth branches needing it.
 private struct MainTabs: View {
     @Environment(AppNavigation.self) private var navigation
+    @Environment(NotificationStore.self) private var notifications
     let user: UserDTO
+    /// The shared calendar store, owned here so the Today and Calendar tabs read
+    /// the *same* instance from the environment — a completion on Today bumps the
+    /// store revision the UIKit calendar observes, so both surfaces stay in sync.
+    @State private var store: CalendarStore
+
+    init(user: UserDTO) {
+        self.user = user
+        _store = State(initialValue: CalendarStore(user: user))
+    }
 
     var body: some View {
         @Bindable var navigation = navigation
 
         TabView(selection: tabSelection) {
+            Tab(AppTab.today.titleKey, systemImage: AppTab.today.systemImage, value: AppTab.today) {
+                NavigationStack {
+                    TodayView(user: user)
+                }
+            }
             Tab(AppTab.calendar.titleKey, systemImage: AppTab.calendar.systemImage, value: AppTab.calendar) {
                 CalendarHostView(user: user)
             }
@@ -91,6 +106,8 @@ private struct MainTabs: View {
         // Keep the Liquid Glass tab bar fully expanded at all times — it must
         // never minimize/collapse while a tab's content scrolls.
         .tabBarMinimizeBehavior(.never)
+        .environment(store)
+        .task { store.bind(notifications: notifications) }
         .sheet(isPresented: $navigation.isPresentingNewEvent) {
             NavigationStack {
                 NewEventScreen()

@@ -10,6 +10,7 @@ import SwiftUI
 /// One of the top-level sections of the app, plus the tab-bar "New Event"
 /// action item.
 enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
+    case today
     case calendar
     case dashboard
     case settings
@@ -21,7 +22,7 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
 
     /// The real, selectable destination tabs — excludes the `newEvent` action
     /// item. Use this for anything that iterates over genuine tabs.
-    static var destinations: [AppTab] { [.calendar, .dashboard, .settings] }
+    static var destinations: [AppTab] { [.today, .calendar, .dashboard, .settings] }
 
     var id: String { rawValue }
 
@@ -29,6 +30,7 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
     /// ``titleKey`` so the text re-localizes live with the `\.locale` environment.
     var title: String {
         switch self {
+        case .today: return String(localized: "tab.today")
         case .calendar: return String(localized: "tab.calendar")
         case .dashboard: return String(localized: "tab.dashboard")
         case .settings: return String(localized: "tab.settings")
@@ -40,6 +42,7 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
     /// the current `\.locale` — so the tab bar switches language live.
     var titleKey: LocalizedStringKey {
         switch self {
+        case .today: return "tab.today"
         case .calendar: return "tab.calendar"
         case .dashboard: return "tab.dashboard"
         case .settings: return "tab.settings"
@@ -50,6 +53,7 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
     /// SF Symbol shown in the native `TabView` bar for this tab.
     var systemImage: String {
         switch self {
+        case .today: return "sun.max.fill"
         case .calendar: return "calendar"
         case .dashboard: return "chart.bar.fill"
         case .settings: return "gearshape"
@@ -65,7 +69,7 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
 @Observable
 @MainActor
 final class AppNavigation {
-    var selectedTab: AppTab = .calendar
+    var selectedTab: AppTab = .today
 
     /// Drives the global "New Event" sheet. Presented from the tab-bar "+"
     /// action item — a tab-level create action belongs in a modal, not pushed

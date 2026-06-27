@@ -88,14 +88,11 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
     /// the centered month; grown/trimmed on scroll-settle only.
     private var window = InfiniteSectionWindow(step: .month)
 
-    /// Per-day event titles for every windowed month, keyed by `startOfDay`.
-    /// Refreshed on every `revision` change (and incrementally as months sync).
-    private var titlesByDay: [Date: [String]] = [:]
-
-    /// Per-day event counts for every windowed month, keyed by `startOfDay`, used
-    /// to render the day grid's event-indicator dots. Refreshed alongside
-    /// `titlesByDay` on every `revision` change.
-    private var indicatorsByDay: [Date: Int] = [:]
+    /// Per-day event chips (title + resolved GROUP color) for every windowed month,
+    /// keyed by `startOfDay`. Drives both the day grid's title chips and its
+    /// event-indicator dots, colored by group. Refreshed on every `revision` change
+    /// (and incrementally as months sync).
+    private var chipsByDay: [Date: [MonthDayChip]] = [:]
 
     /// The month the scope considers "centered" — drives Jump-to-Today and the
     /// edge-growth decision. Updated on scroll-settle.
@@ -151,7 +148,7 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
     /// - Parameters:
     ///   - store: the shared calendar store (selection, per-month sync, revision).
     ///   - adapter: the windowed read-side bridge over SwiftData; this VC observes
-    ///     its `revision` and rebuilds `titlesByDay` on change.
+    ///     its `revision` and rebuilds `chipsByDay` on change.
     ///   - modelContext: the SwiftData context passed to store sync calls.
     ///   - theme: the initial pushed UIKit theme.
     init(
@@ -258,7 +255,7 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
         case .blank:
             cell.configure(
                 number: "", isToday: false, isSelected: false,
-                indicatorCount: 0, titles: [], theme: theme
+                chips: [], theme: theme
             )
             cell.isUserInteractionEnabled = false
             cell.isAccessibilityElement = false
@@ -269,8 +266,7 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
                     ?? date.formatted(.dateTime.day()),
                 isToday: CalendarMath.isToday(date),
                 isSelected: key == CalendarMath.startOfDay(store.selectedDate),
-                indicatorCount: indicatorsByDay[key] ?? 0,
-                titles: titlesByDay[key] ?? [],
+                chips: chipsByDay[key] ?? [],
                 theme: theme
             )
             cell.isUserInteractionEnabled = true
@@ -352,7 +348,7 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
         reconfigureVisible()
     }
 
-    /// Rebuilds `titlesByDay` and `indicatorsByDay` from a single windowed fetch
+    /// Rebuilds `chipsByDay` (title + resolved group color) from a single windowed fetch
     /// spanning the whole window `[firstMonth, monthAfterLast)`, grouped by day and
     /// ordered by start. The indicator counts derive from the same grouped result,
     /// so no extra fetch is needed.
@@ -361,14 +357,16 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
         let (from, _) = CalendarMath.monthBounds(first)
         let (_, to) = CalendarMath.monthBounds(last)
         let byDay = adapter.occurrencesByDay(from: from, to: to)
-        var titles: [Date: [String]] = [:]
-        var indicators: [Date: Int] = [:]
+        var chips: [Date: [MonthDayChip]] = [:]
         for (day, occurrences) in byDay {
-            titles[day] = occurrences.map(\.title)
-            indicators[day] = occurrences.count
+            chips[day] = occurrences.map { occurrence in
+                MonthDayChip(
+                    title: occurrence.title,
+                    color: CalendarColor.resolved(occurrence.groupColorToken)
+                )
+            }
         }
-        titlesByDay = titles
-        indicatorsByDay = indicators
+        chipsByDay = chips
     }
 
     /// Reconfigures the currently-visible items in place (no reload flash), so a

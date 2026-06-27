@@ -14,14 +14,67 @@ struct AuthView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.theme) private var theme
 
+    /// Device-local "intro carousel seen" flag, persisted in `UserDefaults`.
+    /// Defaults to `false`, so a fresh install runs onboarding once; persists
+    /// across sign-out/sign-in. Honors Skip (the carousel sets it on its way to
+    /// the sign-in page).
+    @AppStorage(OnboardingFlags.completedKey) private var onboardingCompleted: Bool = false
+
+    /// Snapshot of `onboardingCompleted` taken once when this view first mounts.
+    /// The branch keys off this rather than the live `@AppStorage`, so when the
+    /// carousel persists completion mid-flow the user is NOT yanked off the
+    /// carousel's terminal sign-in page — the swap to the standalone screen only
+    /// happens on a fresh mount (the next launch), by which point onboarding is
+    /// genuinely behind them.
+    @State private var showOnboarding: Bool
+
+    init() {
+        let completed = UserDefaults.standard.bool(forKey: OnboardingFlags.completedKey)
+        _showOnboarding = State(initialValue: !completed)
+    }
+
     #if DEBUG
     @State private var isDevLoginPresented: Bool = false
     #endif
 
     var body: some View {
+        // First run: the intro carousel hosts the sign-in path on its terminal
+        // page, so onboarding and auth are one continuous flow. On later mounts
+        // (onboarding already seen) we land straight on the standalone sign-in.
+        if showOnboarding {
+            OnboardingView(
+                signIn: { AnyView(signInControl) },
+                onFinished: { onboardingCompleted = true }
+            )
+            .alert(
+                "auth.alert.signInFailed.title",
+                isPresented: signInFailedBinding
+            ) {
+                Button("common.ok", role: .cancel) {}
+            } message: {
+                Text(authStore.errorMessage ?? "")
+            }
+        } else {
+            signInScreen
+        }
+    }
+
+    /// Binding that surfaces `authStore.errorMessage` as a one-shot alert, shared
+    /// by both the onboarding-hosted and standalone sign-in screens.
+    private var signInFailedBinding: Binding<Bool> {
+        Binding(
+            get: { authStore.errorMessage != nil },
+            set: { isPresented in
+                if !isPresented { authStore.errorMessage = nil }
+            }
+        )
+    }
+
+    /// The standalone sign-in screen, shown once onboarding has been completed.
+    private var signInScreen: some View {
         @Bindable var authStore = authStore
 
-        ZStack {
+        return ZStack {
             theme.background
                 .ignoresSafeArea()
 
@@ -50,12 +103,7 @@ struct AuthView: View {
         }
         .alert(
             "auth.alert.signInFailed.title",
-            isPresented: Binding(
-                get: { authStore.errorMessage != nil },
-                set: { isPresented in
-                    if !isPresented { authStore.errorMessage = nil }
-                }
-            )
+            isPresented: signInFailedBinding
         ) {
             Button("common.ok", role: .cancel) {}
         } message: {
@@ -101,6 +149,24 @@ struct AuthView: View {
         .frame(height: 52)
         .clipShape(.rect(cornerRadius: Radius.medium))
         .disabled(authStore.isAuthenticating)
+    }
+
+    /// The Apple button plus the "Signing you in…" spinner row, so the
+    /// onboarding-hosted terminal page shows the same in-flight state as the
+    /// standalone sign-in screen (the spec's D · Signing in… variant).
+    private var signInControl: some View {
+        VStack(spacing: Spacing.lg) {
+            signInButton
+
+            if authStore.isAuthenticating {
+                HStack(spacing: Spacing.sm) {
+                    ProgressView().controlSize(.small)
+                    Text("auth.signingIn")
+                        .cueText(.caption)
+                        .foregroundStyle(theme.textSecondary)
+                }
+            }
+        }
     }
 
     private var disclaimer: some View {

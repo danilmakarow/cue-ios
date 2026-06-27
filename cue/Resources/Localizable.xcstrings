@@ -1,6 +1,206 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "account.avatar.accessibility": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile photo"
+          }
+        }
+      }
+    },
+    "account.delete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete account"
+          }
+        }
+      }
+    },
+    "account.delete.confirm.action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete account"
+          }
+        }
+      }
+    },
+    "account.delete.confirm.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This permanently erases your account and all your data. This can't be undone."
+          }
+        }
+      }
+    },
+    "account.delete.confirm.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete your account?"
+          }
+        }
+      }
+    },
+    "account.delete.error": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't delete account"
+          }
+        }
+      }
+    },
+    "account.displayName.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Display name"
+          }
+        }
+      }
+    },
+    "account.displayName.placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your name"
+          }
+        }
+      }
+    },
+    "account.edited": {
+      "comment": "Inline pill shown next to the display-name label when the value has unsaved edits.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edited"
+          }
+        }
+      }
+    },
+    "account.manageAppleID": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage Apple ID"
+          }
+        }
+      }
+    },
+    "account.manageAppleID.accessibility": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage Apple ID in Settings"
+          }
+        }
+      }
+    },
+    "account.manageAppleID.offline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable offline — needs a connection."
+          }
+        }
+      }
+    },
+    "account.memberSince": {
+      "comment": "Account-creation receipt line. %@ is an abbreviated month + year, e.g. 'Mar 2026'.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Member since · %@"
+          }
+        }
+      }
+    },
+    "account.offline.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your changes will sync when you reconnect."
+          }
+        }
+      }
+    },
+    "account.offline.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved offline"
+          }
+        }
+      }
+    },
+    "account.photo.add": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add photo"
+          }
+        }
+      }
+    },
+    "account.photo.change": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change photo"
+          }
+        }
+      }
+    },
+    "account.photo.error": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load that photo"
+          }
+        }
+      }
+    },
     "account.placeholder.message": {
       "extractionState": "manual",
       "localizations": {
@@ -12,6 +212,127 @@
         }
       }
     },
+    "account.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save changes"
+          }
+        }
+      }
+    },
+    "account.save.error": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save profile"
+          }
+        }
+      }
+    },
+    "account.saved.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your changes are synced to Cue."
+          }
+        }
+      }
+    },
+    "account.saved.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile saved"
+          }
+        }
+      }
+    },
+    "account.saving": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving…"
+          }
+        }
+      }
+    },
+    "account.section.profile": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile"
+          }
+        }
+      }
+    },
+    "account.section.signInMethod": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign-in method"
+          }
+        }
+      }
+    },
+    "account.signInMethod.apple": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signed in with Apple"
+          }
+        }
+      }
+    },
+    "account.signOut.confirm.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This also disconnects Telegram. You can sign back in any time with Apple."
+          }
+        }
+      }
+    },
+    "account.signOut.confirm.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign out of Cue?"
+          }
+        }
+      }
+    },
+    "account.timeZone.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time zone"
+          }
+        }
+      }
+    },
     "account.title": {
       "extractionState": "manual",
       "localizations": {
@@ -19,6 +340,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "Account"
+          }
+        }
+      }
+    },
+    "account.userId": {
+      "comment": "Support footer. %@ is the truncated user id, e.g. 'usr_a1b2…f93'.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "User ID  %@"
+          }
+        }
+      }
+    },
+    "account.userId.copied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "User ID copied"
+          }
+        }
+      }
+    },
+    "account.userId.copy.accessibility": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy user ID"
           }
         }
       }
@@ -675,6 +1030,18 @@
         }
       }
     },
+    "common.clear": {
+      "comment": "Generic clear-field action / accessibility label.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear"
+          }
+        }
+      }
+    },
     "common.delete": {
       "comment": "Generic Delete action",
       "extractionState": "manual",
@@ -783,6 +1150,23 @@
         }
       }
     },
+    "dashboard.busiestDay.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "—"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "—"
+          }
+        }
+      }
+    },
     "dashboard.empty.description": {
       "comment": "Description of the placeholder dashboard screen",
       "extractionState": "manual",
@@ -797,6 +1181,312 @@
           "stringUnit": {
             "state": "translated",
             "value": "Тут зʼявляться звіти про виконане."
+          }
+        }
+      }
+    },
+    "dashboard.empty.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Complete a task and it'll show up here."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Завершіть задачу — і вона зʼявиться тут."
+          }
+        }
+      }
+    },
+    "dashboard.empty.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing finished yet"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поки нічого не завершено"
+          }
+        }
+      }
+    },
+    "dashboard.error.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load your report"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося завантажити звіт"
+          }
+        }
+      }
+    },
+    "dashboard.loading": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tallying your wins…"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Підраховуємо ваші перемоги…"
+          }
+        }
+      }
+    },
+    "dashboard.range.30": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 days"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 днів"
+          }
+        }
+      }
+    },
+    "dashboard.range.7": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 days"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 днів"
+          }
+        }
+      }
+    },
+    "dashboard.range.90": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "90 days"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "90 днів"
+          }
+        }
+      }
+    },
+    "dashboard.recent.section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recently finished"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нещодавно завершені"
+          }
+        }
+      }
+    },
+    "dashboard.report.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you finished"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Що ви завершили"
+          }
+        }
+      }
+    },
+    "dashboard.report.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last %lld days"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Останні %lld дн."
+          }
+        }
+      }
+    },
+    "dashboard.tile.busiestDay": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Busiest day"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Найактивніший день"
+          }
+        }
+      }
+    },
+    "dashboard.tile.busiestDayCaption": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "most finished"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "найбільше завершено"
+          }
+        }
+      }
+    },
+    "dashboard.tile.completed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completed"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Завершено"
+          }
+        }
+      }
+    },
+    "dashboard.tile.completedCaption": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tasks in this window"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "задач за період"
+          }
+        }
+      }
+    },
+    "dashboard.tile.rate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completion rate"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Рівень завершення"
+          }
+        }
+      }
+    },
+    "dashboard.tile.rateCaption": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "of scheduled occurrences"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "із запланованих"
+          }
+        }
+      }
+    },
+    "dashboard.tile.streak": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active days"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Активні дні"
+          }
+        }
+      }
+    },
+    "dashboard.tile.streakCaption": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "with a completion"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "із завершенням"
           }
         }
       }
@@ -1179,6 +1869,42 @@
         }
       }
     },
+    "groups.edit.requiresCompletion": {
+      "comment": "Group edit — toggle label: tasks in this group require completion",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Require completion"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Потребує виконання"
+          }
+        }
+      }
+    },
+    "groups.edit.requiresCompletion.footnote": {
+      "comment": "Group edit — explanatory footnote under the require-completion toggle",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tasks added to this group are marked as requiring completion by default. A task's own setting still wins."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Завдання, додані до цієї групи, типово потребують виконання. Власне налаштування завдання має перевагу."
+          }
+        }
+      }
+    },
     "groups.edit.title.create": {
       "comment": "Groups edit sheet — nav title when creating",
       "extractionState": "manual",
@@ -1287,6 +2013,24 @@
         }
       }
     },
+    "groups.error.reorder": {
+      "comment": "Groups screen — error notification title when reordering fails",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't reorder groups"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося змінити порядок груп"
+          }
+        }
+      }
+    },
     "groups.row.hasRecurrence": {
       "comment": "Groups list row — badge when group has a default recurrence",
       "extractionState": "manual",
@@ -1359,6 +2103,186 @@
         }
       }
     },
+    "icon.category.finance": {
+      "comment": "Icon category",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finance"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Фінанси"
+          }
+        }
+      }
+    },
+    "icon.category.health": {
+      "comment": "Icon category",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Здоров'я"
+          }
+        }
+      }
+    },
+    "icon.category.home": {
+      "comment": "Icon category",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дім"
+          }
+        }
+      }
+    },
+    "icon.category.social": {
+      "comment": "Icon category",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Social"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Спілкування"
+          }
+        }
+      }
+    },
+    "icon.category.travel": {
+      "comment": "Icon category",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Travel"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подорожі"
+          }
+        }
+      }
+    },
+    "icon.category.work": {
+      "comment": "Icon category",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Work"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Робота"
+          }
+        }
+      }
+    },
+    "icon.clear": {
+      "comment": "Icon picker — clear the chosen icon",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear icon"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прибрати значок"
+          }
+        }
+      }
+    },
+    "icon.picker.title": {
+      "comment": "Icon picker — sheet title",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose icon"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Оберіть значок"
+          }
+        }
+      }
+    },
+    "icon.search.empty": {
+      "comment": "Icon picker — no search results",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No icons match your search."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Немає значків за запитом."
+          }
+        }
+      }
+    },
+    "icon.search.prompt": {
+      "comment": "Icon picker — search field prompt",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search icons"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пошук значків"
+          }
+        }
+      }
+    },
     "loading.accessibility": {
       "comment": "Accessibility label for the initial loading splash screen",
       "extractionState": "manual",
@@ -1373,6 +2297,222 @@
           "stringUnit": {
             "state": "translated",
             "value": "Завантаження Cue"
+          }
+        }
+      }
+    },
+    "month.abbr.apr": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apr"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Кві"
+          }
+        }
+      }
+    },
+    "month.abbr.aug": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aug"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сер"
+          }
+        }
+      }
+    },
+    "month.abbr.dec": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dec"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Гру"
+          }
+        }
+      }
+    },
+    "month.abbr.feb": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feb"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Лют"
+          }
+        }
+      }
+    },
+    "month.abbr.jan": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jan"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Січ"
+          }
+        }
+      }
+    },
+    "month.abbr.jul": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jul"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Лип"
+          }
+        }
+      }
+    },
+    "month.abbr.jun": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jun"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Чер"
+          }
+        }
+      }
+    },
+    "month.abbr.mar": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mar"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Бер"
+          }
+        }
+      }
+    },
+    "month.abbr.may": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "May"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Тра"
+          }
+        }
+      }
+    },
+    "month.abbr.nov": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nov"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Лис"
+          }
+        }
+      }
+    },
+    "month.abbr.oct": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oct"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Жов"
+          }
+        }
+      }
+    },
+    "month.abbr.sep": {
+      "comment": "Month abbreviation",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sep"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вер"
           }
         }
       }
@@ -1517,6 +2657,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Група"
+          }
+        }
+      }
+    },
+    "newEvent.icon": {
+      "comment": "New event — icon row label",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Icon"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Значок"
           }
         }
       }
@@ -1899,6 +3057,150 @@
         }
       }
     },
+    "quickCreate.chip.repeats": {
+      "comment": "Quick-create — draft chip: has a repeat rule",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repeats"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Повторюється"
+          }
+        }
+      }
+    },
+    "quickCreate.dismiss": {
+      "comment": "Quick-create — dismiss the parsed draft",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dismiss"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відхилити"
+          }
+        }
+      }
+    },
+    "quickCreate.duration.hours": {
+      "comment": "Quick-create — duration chip in hours. Parameter is the count.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld h"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld год"
+          }
+        }
+      }
+    },
+    "quickCreate.duration.minutes": {
+      "comment": "Quick-create — duration chip in minutes. Parameter is the count.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld min"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld хв"
+          }
+        }
+      }
+    },
+    "quickCreate.failed": {
+      "comment": "Quick-create — parse failed notice",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't parse that."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося розібрати."
+          }
+        }
+      }
+    },
+    "quickCreate.parse": {
+      "comment": "Quick-create — parse button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parse"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Розібрати"
+          }
+        }
+      }
+    },
+    "quickCreate.placeholder": {
+      "comment": "Quick-create — input placeholder",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try: Standup every weekday 9:30am 15m #Work"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Напр.: Стендап щобудня о 9:30 15хв #Робота"
+          }
+        }
+      }
+    },
+    "quickCreate.use": {
+      "comment": "Quick-create — accept the parsed draft",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Застосувати"
+          }
+        }
+      }
+    },
     "recurrence.editor.title": {
       "comment": "Recurrence editor nav title",
       "extractionState": "manual",
@@ -2259,6 +3561,222 @@
         }
       }
     },
+    "recurrence.monthly.onDay": {
+      "comment": "Recurrence — monthly mode: fixed day of month",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On day"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "У день"
+          }
+        }
+      }
+    },
+    "recurrence.monthly.onDay.header": {
+      "comment": "Recurrence — day-of-month grid header",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Days of the month"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дні місяця"
+          }
+        }
+      }
+    },
+    "recurrence.monthly.onThe": {
+      "comment": "Recurrence — monthly mode: nth weekday",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On the"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "У"
+          }
+        }
+      }
+    },
+    "recurrence.monthly.onThe.header": {
+      "comment": "Recurrence — nth-weekday header",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which weekday"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Який день тижня"
+          }
+        }
+      }
+    },
+    "recurrence.monthly.section": {
+      "comment": "Recurrence — monthly mode section header",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monthly"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Щомісяця"
+          }
+        }
+      }
+    },
+    "recurrence.monthly.workday": {
+      "comment": "Recurrence — monthly mode: working-day anchor",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workday"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Робочий день"
+          }
+        }
+      }
+    },
+    "recurrence.monthly.workday.header": {
+      "comment": "Recurrence — workday anchor header",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working day"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Робочий день"
+          }
+        }
+      }
+    },
+    "recurrence.nth.first": {
+      "comment": "Recurrence — nth ordinal",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перший"
+          }
+        }
+      }
+    },
+    "recurrence.nth.fourth": {
+      "comment": "Recurrence — nth ordinal",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fourth"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Четвертий"
+          }
+        }
+      }
+    },
+    "recurrence.nth.last": {
+      "comment": "Recurrence — nth ordinal",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Останній"
+          }
+        }
+      }
+    },
+    "recurrence.nth.second": {
+      "comment": "Recurrence — nth ordinal",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Second"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Другий"
+          }
+        }
+      }
+    },
+    "recurrence.nth.third": {
+      "comment": "Recurrence — nth ordinal",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Third"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Третій"
+          }
+        }
+      }
+    },
     "recurrence.off": {
       "comment": "Recurrence — no recurrence selected",
       "extractionState": "manual",
@@ -2439,6 +3957,42 @@
         }
       }
     },
+    "recurrence.summary.onDay": {
+      "comment": "Recurrence summary — on day(s) of month. Parameter is the day list.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "on day %@"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "у день %@"
+          }
+        }
+      }
+    },
+    "recurrence.summary.onThe": {
+      "comment": "Recurrence summary — nth weekday. Params: ordinal, weekday.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "on the %@ %@"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "у %@ %@"
+          }
+        }
+      }
+    },
     "recurrence.summary.week": {
       "comment": "Recurrence summary unit — week singular",
       "extractionState": "manual",
@@ -2471,6 +4025,60 @@
           "stringUnit": {
             "state": "translated",
             "value": "тижні"
+          }
+        }
+      }
+    },
+    "recurrence.summary.workday.beforeLast": {
+      "comment": "Recurrence summary — day before last workday",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the day before the last working day"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "за день до останнього робочого дня"
+          }
+        }
+      }
+    },
+    "recurrence.summary.workday.first": {
+      "comment": "Recurrence summary — first workday",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "on the first working day"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "у перший робочий день"
+          }
+        }
+      }
+    },
+    "recurrence.summary.workday.last": {
+      "comment": "Recurrence summary — last workday",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "on the last working day"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "в останній робочий день"
           }
         }
       }
@@ -2655,6 +4263,567 @@
         }
       }
     },
+    "recurrence.workday.beforeLast": {
+      "comment": "Recurrence — workday anchor",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Day before last working day"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Передостанній робочий день"
+          }
+        }
+      }
+    },
+    "recurrence.workday.first": {
+      "comment": "Recurrence — workday anchor",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First working day"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перший робочий день"
+          }
+        }
+      }
+    },
+    "recurrence.workday.last": {
+      "comment": "Recurrence — workday anchor",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last working day"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Останній робочий день"
+          }
+        }
+      }
+    },
+    "recurrence.yearly.section": {
+      "comment": "Recurrence — yearly months section header",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "У місяцях"
+          }
+        }
+      }
+    },
+    "reminder.add": {
+      "comment": "Reminders — add a reminder row",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add reminder"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Додати нагадування"
+          }
+        }
+      }
+    },
+    "reminder.channel.push": {
+      "comment": "Reminder channel — push notification",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Push"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сповіщення"
+          }
+        }
+      }
+    },
+    "reminder.channel.telegram": {
+      "comment": "Reminder channel — Telegram",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telegram"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telegram"
+          }
+        }
+      }
+    },
+    "reminder.offset.15minAfter": {
+      "comment": "Reminder offset",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "15 min after"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Через 15 хв"
+          }
+        }
+      }
+    },
+    "reminder.offset.15minBefore": {
+      "comment": "Reminder offset",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "15 min before"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "За 15 хв"
+          }
+        }
+      }
+    },
+    "reminder.offset.1dayBefore": {
+      "comment": "Reminder offset",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 day before"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "За 1 день"
+          }
+        }
+      }
+    },
+    "reminder.offset.1hrBefore": {
+      "comment": "Reminder offset",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 hr before"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "За 1 год"
+          }
+        }
+      }
+    },
+    "reminder.offset.30minBefore": {
+      "comment": "Reminder offset",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 min before"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "За 30 хв"
+          }
+        }
+      }
+    },
+    "reminder.offset.5minBefore": {
+      "comment": "Reminder offset",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 min before"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "За 5 хв"
+          }
+        }
+      }
+    },
+    "reminder.offset.atEventTime": {
+      "comment": "Reminder offset",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "At event time"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "У час події"
+          }
+        }
+      }
+    },
+    "reminder.remindMe": {
+      "comment": "Reminders — toggle to enable reminders",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remind me"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нагадати мені"
+          }
+        }
+      }
+    },
+    "reminder.remove": {
+      "comment": "Reminders — remove a reminder row (a11y)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove reminder"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити нагадування"
+          }
+        }
+      }
+    },
+    "reminder.section": {
+      "comment": "Reminders section header",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminders"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нагадування"
+          }
+        }
+      }
+    },
+    "reports.assistant.section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assistant"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Асистент"
+          }
+        }
+      }
+    },
+    "reports.channel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Channel"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Канал"
+          }
+        }
+      }
+    },
+    "reports.channel.push": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Push"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Push"
+          }
+        }
+      }
+    },
+    "reports.channel.telegram": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telegram"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telegram"
+          }
+        }
+      }
+    },
+    "reports.dailyReport.row": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daily report"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Щоденний звіт"
+          }
+        }
+      }
+    },
+    "reports.dailyReport.section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daily report"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Щоденний звіт"
+          }
+        }
+      }
+    },
+    "reports.error.deviceRegister": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't register for push"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося зареєструвати push"
+          }
+        }
+      }
+    },
+    "reports.error.loadTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load settings"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося завантажити налаштування"
+          }
+        }
+      }
+    },
+    "reports.error.saveFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося зберегти"
+          }
+        }
+      }
+    },
+    "reports.eveningRecap": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evening recap"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вечірній підсумок"
+          }
+        }
+      }
+    },
+    "reports.eveningRecap.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A push to wrap it up"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Push наприкінці дня"
+          }
+        }
+      }
+    },
+    "reports.inAppBrief.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your morning brief always appears in the app."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ранковий бриф завжди доступний у застосунку."
+          }
+        }
+      }
+    },
+    "reports.loading": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading your report settings…"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Завантаження налаштувань звіту…"
+          }
+        }
+      }
+    },
+    "reports.morningBrief": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Morning brief"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ранковий бриф"
+          }
+        }
+      }
+    },
+    "reports.morningBrief.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A push to start the day"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Push на початку дня"
+          }
+        }
+      }
+    },
     "reports.notifications.placeholder.message": {
       "extractionState": "manual",
       "localizations": {
@@ -2673,6 +4842,74 @@
           "stringUnit": {
             "state": "translated",
             "value": "Notifications & Report"
+          }
+        }
+      }
+    },
+    "reports.saveError": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save — reverted to last setting."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося зберегти — повернуто попереднє значення."
+          }
+        }
+      }
+    },
+    "reports.saved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Збережено"
+          }
+        }
+      }
+    },
+    "reports.time": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Час"
+          }
+        }
+      }
+    },
+    "reports.timezone.prefix": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent at this time in "
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Надсилається у цей час за "
           }
         }
       }
@@ -3027,6 +5264,24 @@
         }
       }
     },
+    "tab.today": {
+      "comment": "Title of the Today tab",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сьогодні"
+          }
+        }
+      }
+    },
     "task.toggle.markDone": {
       "comment": "Accessibility label for the checkbox that marks a task as done",
       "extractionState": "manual",
@@ -3117,6 +5372,42 @@
         }
       }
     },
+    "taskDetail.delete.confirm.series.message": {
+      "comment": "Task detail — delete series confirm message",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This removes every occurrence, past and future."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Це видалить усі повторення, минулі й майбутні."
+          }
+        }
+      }
+    },
+    "taskDetail.delete.confirm.series.title": {
+      "comment": "Task detail — delete recurring series confirm title",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this entire series?"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити всю серію?"
+          }
+        }
+      }
+    },
     "taskDetail.delete.confirm.title": {
       "comment": "Task detail delete confirmation — dialog title",
       "extractionState": "manual",
@@ -3131,6 +5422,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "Видалити завдання?"
+          }
+        }
+      }
+    },
+    "taskDetail.delete.occurrence.action": {
+      "comment": "Task detail — skip just this occurrence",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip this occurrence"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пропустити це повторення"
+          }
+        }
+      }
+    },
+    "taskDetail.delete.series.action": {
+      "comment": "Task detail — delete the whole series",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete series"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити серію"
           }
         }
       }
@@ -3243,6 +5570,42 @@
         }
       }
     },
+    "taskDetail.markDone": {
+      "comment": "Task detail — mark the occurrence done",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mark done"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Позначити виконаним"
+          }
+        }
+      }
+    },
+    "taskDetail.markNotDone": {
+      "comment": "Task detail — undo completion",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mark not done"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скасувати виконання"
+          }
+        }
+      }
+    },
     "taskDetail.recurrence.unknown": {
       "comment": "Task detail — recurrence row when rule is not yet loaded",
       "extractionState": "manual",
@@ -3275,6 +5638,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Повторюване завдання"
+          }
+        }
+      }
+    },
+    "taskDetail.reminders.header": {
+      "comment": "Task detail — attached reminders header",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminders"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нагадування"
           }
         }
       }

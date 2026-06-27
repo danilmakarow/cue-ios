@@ -9,9 +9,10 @@ import SwiftUI
 /// Full-detail screen for a task occurrence. Pushed from the day views when the
 /// user taps an event card (not the completion checkbox).
 ///
-/// Displays all occurrence fields, allows editing the full series via
-/// `PATCH /tasks/:id`, deleting the series via `DELETE /tasks/:id`, and skipping
-/// this specific occurrence via `POST /tasks/:id/skip` (recurring only).
+/// Displays all occurrence fields (incl. attached reminders), allows editing the
+/// full series via `PATCH /tasks/:id`, completing the occurrence (the CLAY
+/// roots-commit "done" moment), deleting the series via `DELETE /tasks/:id`, and
+/// skipping this specific occurrence via `POST /tasks/:id/skip` (recurring only).
 struct TaskDetailScreen: View {
     let event: ScheduleEvent
 
@@ -24,25 +25,56 @@ struct TaskDetailScreen: View {
     @State private var showDeleteConfirm = false
     @State private var isDeleting = false
     @State private var isSkipping = false
+    @State private var isToggling = false
     @State private var errorMessage: String?
     @State private var seriesDTO: TaskDTO?
     @State private var isLoadingDetail = false
+    /// Local optimistic completion mirror so the header + CTA update instantly
+    /// while the store round-trips. `nil` falls back to `event.isCompleted`.
+    @State private var localDone: Bool?
+    /// Bumped on a successful completion to fire the CLAY roots-commit motion.
+    @State private var commitTrigger = 0
     /// True when the series-detail fetch failed. Editing is blocked in this state
     /// so a failed load can't make the form read recurrence as "off" and then
     /// clear an existing rule on save.
     @State private var detailLoadFailed = false
+
+    /// Locally-synced groups, used only to resolve the owning group's display name
+    /// for the header meta row (the wire DTOs carry the group's color + id but not
+    /// its name).
+    @Query private var groups: [EventTaskGroup]
+
+    /// Effective completion state — local optimistic value wins over the event's.
+    private var isDone: Bool { localDone ?? event.isCompleted }
+
+    /// The event's GROUP-resolved accent (clay fallback when ungrouped/uncolored).
+    /// Drives the header accent bar, group dot, and the title underline so every
+    /// event reads by its group identity rather than the generic clay.
+    private var accentColor: Color {
+        TaskColorResolver.color(from: event.groupColorToken) ?? theme.primary
+    }
+
+    /// The owning group's display name, resolved from the locally-synced groups by
+    /// `event.groupId`. `nil` when the event has no group or it isn't synced yet.
+    private var groupName: String? {
+        guard let groupId = event.groupId else { return nil }
+        return groups.first { $0.id == groupId }?.name
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xl) {
                 headerSection
                 timeSection
+                if event.isRecurring {
+                    recurrenceSection
+                }
                 if let notes = event.notes?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !notes.isEmpty {
                     notesSection(notes: notes)
                 }
-                if event.isRecurring {
-                    recurrenceSection
+                if let reminders = seriesDTO?.reminders, !reminders.isEmpty {
+                    remindersSection(reminders: reminders)
                 }
                 if detailLoadFailed {
                     detailLoadFailedRow
@@ -56,6 +88,17 @@ struct TaskDetailScreen: View {
         .background(theme.background.ignoresSafeArea())
         .navigationTitle(String(localized: "taskDetail.title"))
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+            primaryCTA
+        }
+        .overlay {
+            // Fires once per completion (CLAY done motion); never on mount.
+            if commitTrigger > 0 {
+                RootsCommitView(tone: .done, trigger: commitTrigger)
+                    .frame(width: 96, height: 96)
+                    .allowsHitTesting(false)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 editButton
@@ -68,7 +111,6 @@ struct TaskDetailScreen: View {
                         event: event,
                         seriesDTO: seriesDTO
                     ) { _ in
-                        // After a successful edit, refresh the affected month(s).
                         isEditing = false
                         Task {
                             await store.invalidateAndResync(
@@ -80,18 +122,13 @@ struct TaskDetailScreen: View {
                 }
             }
         }
-        .confirmationDialog(
-            String(localized: "taskDetail.delete.confirm.title"),
+        .confirmActionSheet(
             isPresented: $showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button(String(localized: "taskDetail.delete.confirm.action"), role: .destructive) {
-                performDelete()
-            }
-            Button(String(localized: "common.cancel"), role: .cancel) {}
-        } message: {
-            Text("taskDetail.delete.confirm.message")
-        }
+            title: deleteConfirmTitle,
+            message: deleteConfirmMessage,
+            primary: ConfirmAction(deletePrimaryLabel) { performDelete() },
+            secondary: deleteSecondaryAction
+        )
         .alert(
             "taskDetail.error.title",
             isPresented: Binding(
@@ -103,6 +140,7 @@ struct TaskDetailScreen: View {
         } message: {
             Text(errorMessage ?? "")
         }
+        .disabled(isDeleting)
         .task {
             await loadSeriesDetail()
         }
@@ -111,74 +149,110 @@ struct TaskDetailScreen: View {
     // MARK: - Sections
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text(event.title)
-                .cueText(.titleL)
-                .foregroundStyle(theme.textPrimary)
-            Capsule()
-                .fill(theme.secondary)
-                .frame(width: 44, height: 2)
-            if event.isRecurring {
-                Label("taskDetail.recurring.badge", systemImage: "repeat")
-                    .cueText(.caption)
-                    .foregroundStyle(theme.textSecondary)
+        HStack(alignment: .top, spacing: Spacing.md) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(isDone ? theme.success : accentColor)
+                .frame(width: 4)
+                .frame(maxHeight: .infinity)
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                if let groupName, !groupName.isEmpty {
+                    HStack(spacing: Spacing.xs) {
+                        Circle()
+                            .fill(accentColor)
+                            .frame(width: 8, height: 8)
+                        Text(groupName)
+                            .cueText(.label)
+                            .foregroundStyle(theme.textSecondary)
+                    }
+                }
+                if event.isRecurring {
+                    Label("taskDetail.recurring.badge", systemImage: "repeat")
+                        .cueText(.caption)
+                        .foregroundStyle(theme.textSecondary)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+                    if isDone {
+                        OliveCheck(isDone: true, size: 22)
+                    }
+                    Text(event.title)
+                        .strikethrough(isDone, color: theme.success)
+                        .cueText(.titleL)
+                        .foregroundStyle(isDone ? theme.success : theme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Capsule()
+                    .fill(accentColor.opacity(0.55))
+                    .frame(width: 44, height: 2)
             }
+            .opacity(isDone ? 0.7 : 1)
         }
     }
 
     private var timeSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            Label {
-                Text(formattedDateRange)
-                    .cueText(.code)
-                    .foregroundStyle(theme.textSecondary)
-            } icon: {
-                Image(systemName: "clock")
-                    .foregroundStyle(theme.primary)
-            }
+        Label {
+            Text(formattedDateRange)
+                .cueText(.code)
+                .foregroundStyle(theme.textPrimary)
+        } icon: {
+            Image(systemName: "clock")
+                .foregroundStyle(theme.primary)
         }
     }
 
     private func notesSection(notes: String) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            Label {
-                Text(notes)
-                    .cueText(.body)
-                    .foregroundStyle(theme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } icon: {
-                Image(systemName: "note.text")
-                    .foregroundStyle(theme.primary)
-            }
+        Label {
+            Text(notes)
+                .cueText(.body)
+                .foregroundStyle(theme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "note.text")
+                .foregroundStyle(theme.primary)
         }
     }
 
     private var recurrenceSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            Label {
-                if let rule = seriesDTO?.recurrence {
-                    Text(rule.humanSummary)
-                        .cueText(.callout)
-                        .foregroundStyle(theme.textSecondary)
-                } else if isLoadingDetail {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(theme.primary)
-                } else {
-                    Text("taskDetail.recurrence.unknown")
-                        .cueText(.callout)
-                        .foregroundStyle(theme.textSecondary)
-                }
-            } icon: {
-                Image(systemName: "repeat")
-                    .foregroundStyle(theme.primary)
+        Label {
+            if let rule = seriesDTO?.recurrence {
+                Text(rule.humanSummary)
+                    .cueText(.callout)
+                    .foregroundStyle(theme.textSecondary)
+            } else if isLoadingDetail {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(theme.primary)
+            } else {
+                Text("taskDetail.recurrence.unknown")
+                    .cueText(.callout)
+                    .foregroundStyle(theme.textSecondary)
             }
+        } icon: {
+            Image(systemName: "repeat")
+                .foregroundStyle(theme.primary)
         }
     }
 
+    /// Lists the task's attached reminders (offset + channel), earliest first.
+    private func remindersSection(reminders: [ReminderDTO]) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Label("taskDetail.reminders.header", systemImage: "bell")
+                .cueText(.label)
+                .foregroundStyle(theme.textSecondary)
+            ForEach(reminders, id: \.id) { reminder in
+                HStack(spacing: Spacing.sm) {
+                    Text(ReminderOffset.nearest(to: reminder.offsetMinutes).label)
+                        .cueText(.code)
+                        .foregroundStyle(theme.textPrimary)
+                    Spacer(minLength: 0)
+                    CueChip(reminder.channel.reminderLabel, isSelected: false) {}
+                        .allowsHitTesting(false)
+                }
+            }
+        }
+        .padding(.leading, Spacing.xl)
+    }
+
     /// Inline, non-blocking notice shown when the series detail failed to load.
-    /// Editing is disabled in this state (see `editButton`); Retry re-attempts the
-    /// fetch so the user can recover without leaving the screen.
     private var detailLoadFailedRow: some View {
         HStack(spacing: Spacing.md) {
             Image(systemName: "exclamationmark.triangle")
@@ -205,6 +279,8 @@ struct TaskDetailScreen: View {
         )
     }
 
+    /// Secondary actions — skip (recurring) + delete. The delete fork (series vs
+    /// occurrence) is surfaced via the ConfirmActionSheet.
     private var actionsSection: some View {
         VStack(spacing: Spacing.md) {
             if event.isRecurring {
@@ -217,8 +293,7 @@ struct TaskDetailScreen: View {
                 .disabled(isSkipping || isDeleting)
                 .overlay {
                     if isSkipping {
-                        ProgressView()
-                            .tint(theme.primary)
+                        ProgressView().tint(theme.primary)
                     }
                 }
             }
@@ -232,10 +307,33 @@ struct TaskDetailScreen: View {
             .disabled(isDeleting || isSkipping)
             .overlay {
                 if isDeleting {
-                    ProgressView()
-                        .tint(theme.onAccent)
+                    ProgressView().tint(theme.onAccent)
                 }
             }
+        }
+    }
+
+    /// Pinned bottom CTA — the completion fork. A task that requires completion
+    /// shows Mark done (decisive clay) / Mark not done; a pure event shows nothing.
+    @ViewBuilder
+    private var primaryCTA: some View {
+        if event.requiresCompletion {
+            Group {
+                if isDone {
+                    Button { toggleCompletion() } label: {
+                        Label("taskDetail.markNotDone", systemImage: "arrow.uturn.backward")
+                    }
+                    .buttonStyle(.cue(.secondary))
+                } else {
+                    Button { toggleCompletion() } label: {
+                        Label("taskDetail.markDone", systemImage: "checkmark.seal")
+                    }
+                    .buttonStyle(.cue(.decisive))
+                }
+            }
+            .disabled(isToggling || isDeleting)
+            .padding(.horizontal, Spacing.lg)
+            .padding(.bottom, Spacing.sm)
         }
     }
 
@@ -243,10 +341,36 @@ struct TaskDetailScreen: View {
         Button(String(localized: "taskDetail.edit.action")) {
             isEditing = true
         }
-        // Editing requires the authoritative series (for the recurrence baseline).
-        // Disabled while loading or after a failed load — the inline retry in
-        // `recurrenceSection` lets the user recover.
         .disabled(isDeleting || isSkipping || isLoadingDetail || seriesDTO == nil)
+    }
+
+    // MARK: - Delete confirmation copy
+
+    private var deleteConfirmTitle: String {
+        event.isRecurring
+            ? String(localized: "taskDetail.delete.confirm.series.title")
+            : String(localized: "taskDetail.delete.confirm.title")
+    }
+
+    private var deleteConfirmMessage: String? {
+        event.isRecurring
+            ? String(localized: "taskDetail.delete.confirm.series.message")
+            : String(localized: "taskDetail.delete.confirm.message")
+    }
+
+    private var deletePrimaryLabel: String {
+        event.isRecurring
+            ? String(localized: "taskDetail.delete.series.action")
+            : String(localized: "taskDetail.delete.confirm.action")
+    }
+
+    /// For recurring tasks, the confirm sheet offers a second branch: skip just
+    /// this occurrence instead of deleting the whole series.
+    private var deleteSecondaryAction: ConfirmAction? {
+        guard event.isRecurring else { return nil }
+        return ConfirmAction(String(localized: "taskDetail.delete.occurrence.action"), isDestructive: false) {
+            performSkip()
+        }
     }
 
     // MARK: - Formatting
@@ -270,9 +394,29 @@ struct TaskDetailScreen: View {
             seriesDTO = dto
             detailLoadFailed = false
         } catch {
-            // Editing stays disabled (see editButton) so we never wipe the rule
-            // from a form that couldn't load the authoritative series.
             detailLoadFailed = true
+        }
+    }
+
+    /// Toggles completion through the store, mirroring the result locally and
+    /// firing the CLAY roots-commit motion when transitioning to done. On a
+    /// store-side failure (which rolls back its own `completedAt` and posts an
+    /// error banner) the local mirror + commit motion are reverted so the header
+    /// doesn't diverge from the rolled-back store value.
+    private func toggleCompletion() {
+        guard !isToggling else { return }
+        let previous = localDone
+        let willComplete = !isDone
+        isToggling = true
+        localDone = willComplete
+        if willComplete { commitTrigger += 1 }
+        Task {
+            let succeeded = await store.toggleCompletion(occurrenceKey: event.id, context: modelContext)
+            if !succeeded {
+                localDone = previous
+                if willComplete { commitTrigger -= 1 }
+            }
+            isToggling = false
         }
     }
 
@@ -295,9 +439,6 @@ struct TaskDetailScreen: View {
     }
 
     private func performSkip() {
-        // Skip keys on the stable originalStart; the effective occurrenceStart is
-        // only used to choose which months to refresh. Fall back to the display
-        // start if originalStart is somehow absent.
         let displayStart = event.occurrenceStart ?? event.startAt
         guard let originalStart = event.originalStart ?? event.occurrenceStart else { return }
         isSkipping = true
@@ -330,6 +471,8 @@ private extension RecurrenceRuleDTO {
             byWeekday: byWeekday,
             byMonthDay: byMonthDay,
             byMonth: byMonth,
+            bySetPos: bySetPos,
+            monthlyAnchor: monthlyAnchor,
             endType: endType,
             endDate: endDate,
             count: count

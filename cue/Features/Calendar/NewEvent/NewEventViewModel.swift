@@ -54,6 +54,11 @@ final class NewEventViewModel {
     var recurrenceInput: RecurrenceRuleInput?
     /// Optional group to assign the new task to.
     var selectedGroupId: String?
+    /// Optional per-task icon (SF Symbol name); nil leaves the task iconless.
+    var icon: String?
+    /// Editable reminder rows; empty means no reminders. Mapped to
+    /// `[ReminderInput]` at submit time.
+    var reminders: [EditableReminder] = []
 
     /// Selected preset duration. Nil when user is in classic mode and freely edits `endAt`.
     var duration: EventDuration? = .oneHour {
@@ -103,6 +108,7 @@ final class NewEventViewModel {
         do {
             let calendarId = try await ensureDefaultCalendar()
             let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            let reminderInputs = reminders.map(\.input)
             let request = CreateTaskRequest(
                 calendarId: calendarId,
                 groupId: selectedGroupId,
@@ -113,6 +119,8 @@ final class NewEventViewModel {
                 isAllDay: isAllDay,
                 timezone: TimeZone.current.identifier,
                 requiresCompletion: requiresCompletion,
+                icon: icon,
+                reminders: reminderInputs.isEmpty ? nil : reminderInputs,
                 recurrence: recurrenceInput
             )
             let created: TaskDTO = try await api.post("/tasks", body: request)
@@ -126,6 +134,27 @@ final class NewEventViewModel {
     /// Clears any error message currently surfaced to the UI.
     func clearError() {
         errorMessage = nil
+    }
+
+    /// Prefills the form from a parsed quick-create draft. Only fields the parser
+    /// resolved are overwritten; everything else is left as the user had it.
+    @MainActor
+    func applyDraft(_ draft: TaskDraftDTO) {
+        title = draft.title
+        if let startString = draft.start, let parsed = QuickCreateWell.parseISO(startString) {
+            isAllDay = false
+            startAt = parsed
+        }
+        if let minutes = draft.durationMinutes {
+            duration = EventDuration(rawValue: minutes)
+            endAt = startAt.addingTimeInterval(TimeInterval(minutes * 60))
+        }
+        if let parsedRecurrence = draft.recurrence {
+            recurrenceInput = parsedRecurrence
+        }
+        if let groupId = draft.groupId {
+            selectedGroupId = groupId
+        }
     }
 
     // MARK: Private helpers

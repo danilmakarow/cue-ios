@@ -30,20 +30,16 @@ struct CalendarHostView: View {
     @Environment(AuthStore.self) private var authStore
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
-    @Environment(NotificationStore.self) private var notifications
     @Environment(\.theme) private var theme
-
-    @State private var store: CalendarStore
+    @Environment(AppNavigation.self) private var navigation
+    /// The shared calendar store, owned by `MainTabs` and injected into the
+    /// environment so the Today and Calendar tabs operate on the same instance.
+    @Environment(CalendarStore.self) private var store
     @State private var path = NavigationPath()
     /// A one-shot "jump to date" handed to the representable. Set by the nav-bar
     /// Today control (and any future deep link); cleared once the container
     /// consumes it so it fires exactly once.
     @State private var pendingJump: Date?
-
-    init(user: UserDTO) {
-        self.user = user
-        _store = State(initialValue: CalendarStore(user: user))
-    }
 
     var body: some View {
         @Bindable var store = store
@@ -68,8 +64,6 @@ struct CalendarHostView: View {
                 TaskDetailScreen(event: event)
             }
         }
-        .environment(store)
-        .task { store.bind(notifications: notifications) }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             handleScenePhaseChange(from: oldPhase, to: newPhase)
         }
@@ -88,6 +82,17 @@ struct CalendarHostView: View {
             Text(dayTitle)
                 .cueText(.titleM)
                 .foregroundStyle(theme.textPrimary)
+        }
+        // Search affordance — every calendar scope's nav carries it (matching the
+        // Day/Month/Year design specs). Routes to the global search sheet parked on
+        // `AppNavigation`, the same entry RootView presents.
+        ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                navigation.isPresentingSearch = true
+            } label: {
+                Image(systemName: "magnifyingglass")
+            }
+            .accessibilityLabel("calendar.chrome.search.accessibility")
         }
         if !isOnToday {
             ToolbarItem(placement: .topBarTrailing) {
@@ -162,6 +167,8 @@ extension OccurrenceVM {
             notes: notes,
             startAt: startAt,
             endAt: endAt,
+            isAllDay: isAllDay,
+            groupColorToken: groupColorToken,
             requiresCompletion: requiresCompletion,
             completedAt: completedAt,
             isRecurring: isRecurring

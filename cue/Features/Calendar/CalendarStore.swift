@@ -761,15 +761,21 @@ final class CalendarStore {
     /// resolving the row via its `@Attribute(.unique)` (indexed) key. The day
     /// pages no longer own a `@Query`, so they pass the key rather than a
     /// pre-fetched `TaskItem`.
-    func toggleCompletion(occurrenceKey: String, context: ModelContext) async {
+    /// - Returns: `true` when the backend confirmed the toggle, `false` when the
+    ///   row was missing or the request failed (and the optimistic change was
+    ///   rolled back). Callers mirroring completion locally (e.g. the detail
+    ///   screen) restore their own mirror on `false`.
+    @discardableResult
+    func toggleCompletion(occurrenceKey: String, context: ModelContext) async -> Bool {
         let descriptor = FetchDescriptor<TaskItem>(
             predicate: #Predicate { $0.occurrenceKey == occurrenceKey }
         )
-        guard let task = (try? context.fetch(descriptor))?.first else { return }
-        await toggleCompletion(task, context: context)
+        guard let task = (try? context.fetch(descriptor))?.first else { return false }
+        return await toggleCompletion(task, context: context)
     }
 
-    func toggleCompletion(_ task: TaskItem, context: ModelContext) async {
+    @discardableResult
+    func toggleCompletion(_ task: TaskItem, context: ModelContext) async -> Bool {
         let previous = task.completedAt
         let willComplete = previous == nil
         let optimistic: Date? = willComplete ? .now : nil
@@ -801,11 +807,13 @@ final class CalendarStore {
             task.completedAt = result.completedAt
             inFlightCompletions[key] = nil
             commit(context)
+            return true
         } catch {
             task.completedAt = previous
             inFlightCompletions[key] = nil
             commit(context)
             notifications?.postError(error, title: String(localized: "calendar.error.updateTask"))
+            return false
         }
     }
 

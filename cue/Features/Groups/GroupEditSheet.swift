@@ -18,6 +18,12 @@ struct GroupEditSheet: View {
     @State private var name: String = ""
     @State private var colorHex: String? = nil
     @State private var icon: String? = nil
+    /// Group default completion requirement inherited by tasks (a task's own value
+    /// still wins). Edited as a plain `Bool`; an unset baseline reads as `false`.
+    @State private var requiresCompletion: Bool = false
+    /// Baseline `requiresCompletion` the sheet opened with, used to compute the
+    /// tri-state `FieldUpdate` on save (clear when toggled back to the unset default).
+    @State private var initialRequiresCompletion: Bool? = nil
     /// Current edited recurrence (`nil` == off). Compared against
     /// `initialRecurrence` on save to decide unchanged / clear / set.
     @State private var recurrenceInput: RecurrenceRuleInput?
@@ -30,9 +36,9 @@ struct GroupEditSheet: View {
     private var isEditing: Bool { existingDTO != nil }
     private let api: APIClient = .shared
 
-    /// Preset color swatches — the six Kraft & Ink semantic inks (persisted as
-    /// hex strings the backend round-trips). Resolved to a `Color` at render time
-    /// via `Color(hex:)` so what's stored is exactly what ships to the API.
+    /// Preset color swatches — the six Clean semantic inks (persisted as hex
+    /// strings the backend round-trips). Resolved to a `Color` at render time via
+    /// `TaskColorResolver` so what's stored is exactly what ships to the API.
     private let colorOptions: [String] = [
         "#5A3A24", // espresso
         "#BE4A28", // clay
@@ -76,6 +82,24 @@ struct GroupEditSheet: View {
                 Text("groups.edit.icon")
                     .cueText(.label)
                     .textCase(nil)
+                    .foregroundStyle(theme.textSecondary)
+            }
+
+            Section {
+                HStack(spacing: Spacing.md) {
+                    Text("groups.edit.requiresCompletion")
+                        .cueText(.body)
+                        .foregroundStyle(theme.textPrimary)
+                    Spacer(minLength: 0)
+                    CueToggle(
+                        isOn: $requiresCompletion,
+                        accessibilityLabel: String(localized: "groups.edit.requiresCompletion")
+                    )
+                }
+                .listRowBackground(theme.surface)
+            } footer: {
+                Text("groups.edit.requiresCompletion.footnote")
+                    .cueText(.caption)
                     .foregroundStyle(theme.textSecondary)
             }
 
@@ -144,11 +168,12 @@ struct GroupEditSheet: View {
     }
 
     /// One color swatch. `hex == nil` is the "no color" option, drawn as a
-    /// hollow paper chip; otherwise the persisted hex resolves to its ink via
-    /// `Color(hex:)`. Selection is marked with an espresso ring (primary).
+    /// hollow paper chip; otherwise the persisted token resolves to its ink via
+    /// `TaskColorResolver` (handles preset names and `#RRGGBB` hex). Selection is
+    /// marked with an espresso ring (primary).
     private func colorSwatch(hex: String?) -> some View {
         let isSelected = colorHex == hex
-        let fill = hex.flatMap { Color(hex: $0) }
+        let fill = TaskColorResolver.color(from: hex)
         return Button {
             colorHex = hex
         } label: {
@@ -219,6 +244,8 @@ struct GroupEditSheet: View {
         name = dto.name
         colorHex = dto.color
         icon = dto.icon
+        initialRequiresCompletion = dto.requiresCompletion
+        requiresCompletion = dto.requiresCompletion ?? false
         let baseline = dto.recurrence.map { rule in
             RecurrenceRuleInput(
                 frequency: rule.frequency,
@@ -248,6 +275,7 @@ struct GroupEditSheet: View {
                         color: colorHex,
                         icon: icon,
                         sortOrder: nil,
+                        requiresCompletion: requiresCompletionFieldUpdate,
                         recurrence: recurrenceFieldUpdate
                     )
                     dto = try await api.patch("/task-groups/\(existing.id)", body: body)
@@ -260,6 +288,7 @@ struct GroupEditSheet: View {
                         color: colorHex,
                         icon: icon,
                         sortOrder: nil,
+                        requiresCompletion: requiresCompletion ? true : nil,
                         recurrence: recurrenceInput
                     )
                     dto = try await api.post("/task-groups", body: body)
@@ -281,6 +310,21 @@ struct GroupEditSheet: View {
             body: CreateCalendarRequest(name: "Default", color: nil, icon: nil)
         )
         return created.id
+    }
+
+    /// Tri-state for the group's `requiresCompletion` field on update: unchanged
+    /// when it still equals the baseline; otherwise `.clear` when the user toggled
+    /// back to the unset default (`false` with no prior value) so the group
+    /// re-inherits, else `.set(true/false)` for an explicit value.
+    private var requiresCompletionFieldUpdate: FieldUpdate<Bool> {
+        if requiresCompletion == (initialRequiresCompletion ?? false) {
+            // No effective change: leave the stored value (and its set/unset-ness) be.
+            return .unchanged
+        }
+        if requiresCompletion == false && initialRequiresCompletion == nil {
+            return .clear
+        }
+        return .set(requiresCompletion)
     }
 
     /// Tri-state for the group's default-recurrence field on update: unchanged

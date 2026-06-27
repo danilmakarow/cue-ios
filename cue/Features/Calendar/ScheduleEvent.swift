@@ -29,6 +29,18 @@ struct ScheduleEvent: Identifiable, Hashable, Sendable {
     let notes: String?
     let startAt: Date
     let endAt: Date
+    /// True when the occurrence spans the whole day (no intra-day placement), so
+    /// the detail header renders an "all-day" label instead of a clock range.
+    let isAllDay: Bool
+    /// The owning group id, used to resolve the group's display name from the
+    /// locally-synced `EventTaskGroup` for the detail header's meta row. `nil`
+    /// when the occurrence belongs to no group.
+    let groupId: String?
+    /// The owning group's color token — a `TaskColor` preset name OR a `#RRGGBB`
+    /// hex (straight off `OccurrenceDTO.groupColorHex`). Resolved via
+    /// ``TaskColorResolver`` to paint the detail accent + group dot by GROUP,
+    /// falling back to the clay structural accent when absent.
+    let groupColorToken: String?
     /// Whether this entry is a task (can be completed) vs a pure event.
     let requiresCompletion: Bool
     /// Timestamp at which the occurrence was completed, if ever.
@@ -45,6 +57,9 @@ struct ScheduleEvent: Identifiable, Hashable, Sendable {
         notes: String? = nil,
         startAt: Date,
         endAt: Date,
+        isAllDay: Bool = false,
+        groupId: String? = nil,
+        groupColorToken: String? = nil,
         requiresCompletion: Bool = false,
         completedAt: Date? = nil,
         isRecurring: Bool = false
@@ -57,6 +72,9 @@ struct ScheduleEvent: Identifiable, Hashable, Sendable {
         self.notes = notes
         self.startAt = startAt
         self.endAt = endAt
+        self.isAllDay = isAllDay
+        self.groupId = groupId
+        self.groupColorToken = groupColorToken
         self.requiresCompletion = requiresCompletion
         self.completedAt = completedAt
         self.isRecurring = isRecurring
@@ -76,6 +94,9 @@ struct ScheduleEvent: Identifiable, Hashable, Sendable {
             notes: notes,
             startAt: startAt,
             endAt: endAt,
+            isAllDay: isAllDay,
+            groupId: groupId,
+            groupColorToken: groupColorToken,
             requiresCompletion: requiresCompletion,
             completedAt: completedAt,
             isRecurring: isRecurring
