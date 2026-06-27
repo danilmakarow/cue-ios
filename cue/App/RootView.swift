@@ -106,6 +106,17 @@ private struct MainTabs: View {
         // Keep the Liquid Glass tab bar fully expanded at all times — it must
         // never minimize/collapse while a tab's content scrolls.
         .tabBarMinimizeBehavior(.never)
+        // Haptics for the documented tab-bar interactions (motion contract §3.8):
+        // a light selection tick on every tab switch, and an impact on opening the
+        // New Event / Search action sheets. Keyed on the navigation state so the
+        // feedback fires exactly when the value flips.
+        .sensoryFeedback(.selection, trigger: navigation.selectedTab)
+        .sensoryFeedback(.impact, trigger: navigation.isPresentingNewEvent) { _, presenting in
+            presenting
+        }
+        .sensoryFeedback(.impact, trigger: navigation.isPresentingSearch) { _, presenting in
+            presenting
+        }
         .environment(store)
         .task { store.bind(notifications: notifications) }
         .sheet(isPresented: $navigation.isPresentingNewEvent) {

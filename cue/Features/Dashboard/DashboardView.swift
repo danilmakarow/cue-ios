@@ -192,7 +192,7 @@ struct DashboardView: View {
     private func recentList(completions: [TaskItem]) -> some View {
         let recent = Array(completions.prefix(8))
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text("dashboard.recent.section".localizedUppercase)
+            Text(String(localized: "dashboard.recent.section").localizedUppercase)
                 .cueText(.label)
                 .foregroundStyle(theme.textSecondary)
                 .padding(.leading, Spacing.xs)

@@ -55,6 +55,9 @@ final class AuthStore {
 
     private enum KeychainAccount {
         static let jwt = "accessToken"
+        /// JSON-encoded last-known `UserDTO`, kept alongside the JWT so a cold
+        /// launch that can't reach `/auth/me` can still hydrate a real profile.
+        static let cachedUser = "cachedUser"
     }
 
     private let keychain: KeychainStore
@@ -94,15 +97,21 @@ final class AuthStore {
 
         do {
             let user: UserDTO = try await api.get("/auth/me")
+            cacheUser(user)
             state = .authenticated(user)
         } catch let error as APIError where error.isUnauthorized {
             clearSession()
             state = .unauthenticated
         } catch {
             // Network hiccup at launch — keep the token, assume authenticated
-            // with a stub profile so the user isn't bounced to the login screen
-            // every time they open the app offline.
-            state = .unauthenticated
+            // with the last-known profile so the user isn't bounced to the login
+            // screen every time they open the app offline. Only an actual 401
+            // (handled above) should drop the session.
+            if let cached = cachedUser() {
+                state = .authenticated(cached)
+            } else {
+                state = .unauthenticated
+            }
         }
     }
 
@@ -136,6 +145,7 @@ final class AuthStore {
         do {
             let response: AuthResponse = try await api.post("/auth/apple", body: request)
             persistSession(token: response.accessToken)
+            cacheUser(response.user)
             state = .authenticated(response.user)
         } catch let error as APIError {
             errorMessage = AuthError.api(error).errorDescription
@@ -172,6 +182,7 @@ final class AuthStore {
                 body: EmptyBody()
             )
             persistSession(token: response.accessToken)
+            cacheUser(response.user)
             state = .authenticated(response.user)
         } catch let error as APIError {
             errorMessage = AuthError.api(error).errorDescription
@@ -190,10 +201,30 @@ final class AuthStore {
         AuthTokenBridge.shared.setToken(token)
     }
 
-    /// Drops any stored token from keychain and the API bridge.
+    /// Drops any stored token and cached profile from the keychain and the API bridge.
     private func clearSession() {
         keychain.delete(account: KeychainAccount.jwt)
+        keychain.delete(account: KeychainAccount.cachedUser)
         AuthTokenBridge.shared.setToken(nil)
+    }
+
+    /// Persists the last-known profile so an offline cold launch can hydrate a
+    /// real user instead of bouncing to the sign-in screen.
+    private func cacheUser(_ user: UserDTO) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(user),
+              let json = String(data: data, encoding: .utf8) else { return }
+        keychain.set(json, account: KeychainAccount.cachedUser)
+    }
+
+    /// Reads the last-known profile persisted by `cacheUser`, if any.
+    private func cachedUser() -> UserDTO? {
+        guard let json = keychain.get(account: KeychainAccount.cachedUser),
+              let data = json.data(using: .utf8) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try? decoder.decode(UserDTO.self, from: data)
     }
 
     /// Joins Apple's `PersonNameComponents` into a display name string, trimmed.

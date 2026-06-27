@@ -97,16 +97,17 @@ final class NewEventViewModel {
 
     // MARK: Public methods
 
-    /// Submits the form. Returns the created task on success (so the caller
-    /// can upsert it into SwiftData for immediate display), or nil on failure.
+    /// Submits the form for the given `calendarId` (resolved by the caller through
+    /// the shared ``CalendarStore`` so calendar resolution has a single owner).
+    /// Returns the created task on success (so the caller can route it through the
+    /// store for immediate display), or nil on failure.
     @MainActor
-    func submit() async -> TaskDTO? {
+    func submit(calendarId: String) async -> TaskDTO? {
         guard canSubmit else { return nil }
         isSubmitting = true
         defer { isSubmitting = false }
 
         do {
-            let calendarId = try await ensureDefaultCalendar()
             let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
             let reminderInputs = reminders.map(\.input)
             let request = CreateTaskRequest(
@@ -129,6 +130,13 @@ final class NewEventViewModel {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             return nil
         }
+    }
+
+    /// Surfaces a calendar-resolution failure (the caller couldn't resolve the
+    /// default calendar id through the store) on the same alert as a save failure.
+    @MainActor
+    func reportCalendarResolutionFailure() {
+        errorMessage = String(localized: "newEvent.error.calendarResolution")
     }
 
     /// Clears any error message currently surfaced to the UI.
@@ -163,19 +171,6 @@ final class NewEventViewModel {
     private func syncEndFromDuration() {
         guard let duration else { return }
         endAt = startAt.addingTimeInterval(duration.seconds)
-    }
-
-    /// Fetches existing calendars; creates a "Default" one if none exist; returns its id.
-    private func ensureDefaultCalendar() async throws -> String {
-        let calendars: [CalendarDTO] = try await api.get("/calendars")
-        if let firstCalendar = calendars.first {
-            return firstCalendar.id
-        }
-        let created: CalendarDTO = try await api.post(
-            "/calendars",
-            body: CreateCalendarRequest(name: "Default", color: nil, icon: nil)
-        )
-        return created.id
     }
 }
 

@@ -13,6 +13,7 @@ struct NewEventScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.theme) private var theme
+    @Environment(CalendarStore.self) private var store
     @State private var viewModel = NewEventViewModel()
     @State private var groups: [TaskGroupDTO] = []
     /// Drives the seal-press animation in the saving overlay (false → true on
@@ -204,10 +205,24 @@ struct NewEventScreen: View {
     private func saveButton(viewModel: NewEventViewModel) -> some View {
         Button {
             Task {
-                guard let created = await viewModel.submit() else { return }
+                // Resolve the calendar id through the single owner (the memoized,
+                // SwiftData-upserting `CalendarStore`) instead of the view model
+                // re-fetching /calendars — so concurrent create flows on a fresh
+                // account can't each POST a duplicate "Default" calendar.
+                guard let calendarId = try? await store.resolvedCalendarId(context: modelContext) else {
+                    viewModel.reportCalendarResolutionFailure()
+                    return
+                }
+                guard let created = await viewModel.submit(calendarId: calendarId) else { return }
                 commitTrigger += 1
-                TaskItem.upsert(from: created, in: modelContext)
-                try? modelContext.save()
+                // Route the new event through the shared store (not a direct
+                // `modelContext` upsert) so it bumps `CalendarStore.revision` and the
+                // UIKit calendar scopes refresh — mirroring how `TaskEditScreen`'s
+                // save resyncs via `invalidateAndResync`. The ±1-month fan-out also
+                // covers a start that lands near a month boundary. Detached so it
+                // outlives this view's dismissal, like `TaskDetailScreen.onSaved`.
+                let anchor = created.startAt ?? viewModel.startAt
+                Task { await store.invalidateAndResync(around: anchor, context: modelContext) }
                 // Let the commit motion read before dismissing.
                 try? await Task.sleep(for: .milliseconds(420))
                 dismiss()
@@ -243,8 +258,19 @@ struct NewEventScreen: View {
 }
 
 #Preview {
-    NavigationStack {
+    let sampleUser = UserDTO(
+        id: "usr_preview",
+        appleUserId: "apple_001",
+        email: "jane.appleseed@icloud.com",
+        displayName: "Jane Appleseed",
+        avatarBase64: nil,
+        timezone: "Europe/Berlin",
+        createdAt: .now,
+        updatedAt: .now
+    )
+    return NavigationStack {
         NewEventScreen()
     }
+    .environment(CalendarStore(user: sampleUser))
     .modelContainer(for: [EventCalendar.self, TaskItem.self, EventTaskGroup.self], inMemory: true)
 }

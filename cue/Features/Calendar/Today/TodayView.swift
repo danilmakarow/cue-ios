@@ -13,11 +13,14 @@ import SwiftUI
 /// brief — each a CUE — Clean card on the white page.
 ///
 /// **Data.** Today's occurrences are read from the already-synced `TaskItem` cache
-/// with `@Query` (the same windowed cache the calendar scopes serve from) and
-/// filtered to the reference day in memory — the cache is window-bounded, so the
-/// set is small. Completion toggles route through the shared ``CalendarStore`` (so
-/// the optimistic/SWR reconciliation is identical to the calendar). The morning
-/// brief loads once per day through ``MorningBriefStore`` and degrades gracefully.
+/// with a *day-windowed* `@Query` (the same windowed cache the calendar scopes
+/// serve from) — the predicate bounds the fetch to the reference day so SQLite
+/// returns one day's rows via an indexed range read rather than the whole table.
+/// Completion toggles route through the shared ``CalendarStore`` (so the
+/// optimistic/SWR reconciliation is identical to the calendar). The Today tab also
+/// drives its own day sync on appear so it populates independently of the Calendar
+/// tab being visited. The morning brief loads once per day through
+/// ``MorningBriefStore`` and degrades gracefully.
 struct TodayView: View {
     @Environment(\.theme) private var theme
     @Environment(\.modelContext) private var modelContext
@@ -26,15 +29,36 @@ struct TodayView: View {
 
     let user: UserDTO
 
-    /// All occurrence rows in the window-bounded cache; filtered to `today` below.
-    /// The predicate excludes occurrence-less rows (those can't sit on a day).
-    @Query(sort: \TaskItem.occurrenceStart) private var allOccurrences: [TaskItem]
+    /// The reference day's occurrence rows, fetched with a day-bounded predicate so
+    /// the read is an indexed range scan of a single day (mirroring
+    /// ``CalendarDataAdapter`` / ``CalendarStore/pruneOccurrences``). Occurrence-less
+    /// rows are coalesced to `.distantPast`, landing below the range, so they're
+    /// excluded. The order matches the post-filter sort below.
+    @Query private var allOccurrences: [TaskItem]
 
     @State private var brief = MorningBriefStore()
 
     /// The reference day, captured once on appear so a long-lived screen doesn't
     /// silently roll past midnight mid-session.
-    @State private var today = CalendarMath.startOfDay(.now)
+    @State private var today: Date
+
+    /// Captures the reference day once and seeds the day-windowed occurrence query
+    /// from its `[startOfDay, startOfNextDay)` bounds.
+    init(user: UserDTO) {
+        self.user = user
+        let dayStart = CalendarMath.startOfDay(.now)
+        let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
+        let dayEnd = Calendar.current.startOfDay(for: nextDay)
+        _today = State(initialValue: dayStart)
+        let sentinel = Date.distantPast
+        _allOccurrences = Query(
+            filter: #Predicate { task in
+                (task.occurrenceStart ?? sentinel) >= dayStart &&
+                (task.occurrenceStart ?? sentinel) < dayEnd
+            },
+            sort: \TaskItem.occurrenceStart
+        )
+    }
 
     var body: some View {
         ScrollView {
@@ -52,11 +76,11 @@ struct TodayView: View {
                     clearDay
                 } else {
                     agendaSection(
-                        title: "Up next",
+                        title: "today.section.upNext",
                         occurrences: morning(in: occurrences)
                     )
                     agendaSection(
-                        title: "This evening",
+                        title: "today.section.evening",
                         occurrences: evening(in: occurrences)
                     )
                 }
@@ -68,11 +92,13 @@ struct TodayView: View {
             .padding(.bottom, Spacing.xxl)
         }
         .background(theme.background.ignoresSafeArea())
-        .navigationTitle(Text(verbatim: "Today"))
+        .navigationTitle(Text("today.title"))
         .navigationBarTitleDisplayMode(.large)
         .task {
             store.bind(notifications: notifications)
-            brief.bind(notifications: notifications)
+            // Drive today's sync from the Today tab itself so it populates on a
+            // cold launch (the default tab) without first visiting the Calendar tab.
+            await store.ensureDaySynced(today, context: modelContext)
             await brief.load(for: today)
         }
     }
@@ -95,13 +121,13 @@ struct TodayView: View {
         }
     }
 
-    /// "Good morning, Jane" — the part-of-day greeting plus the user's first name
-    /// when known. Built by interpolation (not a `String(format:)` over a localized
-    /// pattern) so it stays correct regardless of the string-catalog state.
+    /// "Good morning, Jane" — the localized part-of-day greeting plus the user's
+    /// first name when known. The name is composed through a localized pattern so
+    /// the separator/order can vary per locale.
     private var greeting: String {
         let part = Self.partOfDay()
         guard let name = firstName else { return part }
-        return "\(part), \(name)"
+        return String(format: String(localized: "today.greeting.named"), part, name)
     }
 
     // MARK: - Next up hero
@@ -140,7 +166,9 @@ struct TodayView: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Next up: \(occurrence.title)")
+        .accessibilityLabel(
+            Text("today.hero.accessibility \(occurrence.title)")
+        )
     }
 
     // MARK: - Today's load
@@ -153,13 +181,13 @@ struct TodayView: View {
         let fraction = total == 0 ? 0 : Double(done) / Double(total)
 
         CueCard(padding: 0) {
-            Text(verbatim: "Today's load")
+            Text("today.load.title")
                 .cueText(.label)
                 .foregroundStyle(theme.textSecondary)
         } content: {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("\(total) \(total == 1 ? "thing" : "things")")
+                    Text("today.load.count \(total)")
                         .cueText(.code)
                         .foregroundStyle(theme.textPrimary)
                     Spacer()
@@ -179,9 +207,9 @@ struct TodayView: View {
                 .frame(height: 8)
 
                 HStack(spacing: Spacing.xs) {
-                    Text("\(done) done")
+                    Text("today.load.done \(done)")
                         .foregroundStyle(theme.success)
-                    Text("· \(remaining) to go")
+                    Text("today.load.remaining \(remaining)")
                         .foregroundStyle(theme.textSecondary)
                 }
                 .cueText(.code)
@@ -192,7 +220,7 @@ struct TodayView: View {
     // MARK: - Agenda sections
 
     @ViewBuilder
-    private func agendaSection(title: String, occurrences: [OccurrenceVM]) -> some View {
+    private func agendaSection(title: LocalizedStringKey, occurrences: [OccurrenceVM]) -> some View {
         if !occurrences.isEmpty {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 Text(title)
@@ -223,11 +251,11 @@ struct TodayView: View {
     private var morningBriefCard: some View {
         CueCard(padding: 0, depth: .valueCut) {
             HStack {
-                Text(verbatim: "Your morning brief")
+                Text("today.brief.title")
                     .cueText(.label)
                     .foregroundStyle(theme.textSecondary)
                 Spacer()
-                Text(verbatim: briefAuthor)
+                Text(briefAuthor)
                     .cueText(.label)
                     .foregroundStyle(theme.accentText)
             }
@@ -244,40 +272,51 @@ struct TodayView: View {
         case .idle, .loading:
             HStack(spacing: Spacing.sm) {
                 ProgressView()
-                Text(verbatim: "Reading your day…")
+                Text("today.brief.loading")
                     .cueText(.callout)
                     .foregroundStyle(theme.textSecondary)
             }
         case .failed:
             VStack(alignment: .leading, spacing: Spacing.md) {
-                Text(verbatim: "Couldn't reach your brief. We'll keep trying.")
+                Text("today.brief.failed")
                     .cueText(.body)
                     .foregroundStyle(theme.textSecondary)
                 Button {
                     Task { await brief.load(for: today, force: true) }
                 } label: {
-                    Text(verbatim: "Try again")
+                    Text("today.brief.retry")
                 }
                 .buttonStyle(.cue(.secondary))
             }
         case .loaded:
-            Text(verbatim: brief.brief ?? "A clear page today.")
+            briefText
                 .font(Typography.font(for: .headline))
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
+    /// The loaded brief body: the server-generated text rendered verbatim, or the
+    /// calm localized placeholder when the day yielded nothing usable.
+    @ViewBuilder
+    private var briefText: some View {
+        if let brief = brief.brief, !brief.isEmpty {
+            Text(verbatim: brief)
+        } else {
+            Text("today.brief.empty")
+        }
+    }
+
     /// The brief byline — the active persona's display, defaulting to "Jarvis".
-    private var briefAuthor: String { "Jarvis" }
+    private var briefAuthor: LocalizedStringKey { "today.brief.author" }
 
     // MARK: - Empty / clear day
 
     @ViewBuilder
     private var clearDay: some View {
         EmptyStateView(
-            title: "Nothing scheduled today",
-            message: "Enjoy the white space — or add something.",
+            title: String(localized: "today.empty.title"),
+            message: String(localized: "today.empty.message"),
             systemImage: "circle.dashed"
         )
         .frame(maxWidth: .infinity)
@@ -287,14 +326,12 @@ struct TodayView: View {
     // MARK: - Occurrence derivation
 
     /// Today's occurrences (mapped to ``OccurrenceVM`` with their group color),
-    /// ascending by start. Filtered from the window-bounded cache in memory.
+    /// ascending by start. The `@Query` already bounds rows to the reference day,
+    /// so this only maps the rows into view models.
     private var todaysOccurrences: [OccurrenceVM] {
         allOccurrences
             .compactMap { row -> OccurrenceVM? in
-                guard let start = row.occurrenceStart,
-                      CalendarMath.isSameDay(start, today),
-                      let base = row.asOccurrenceVM()
-                else { return nil }
+                guard let base = row.asOccurrenceVM() else { return nil }
                 return base.withGroupColorToken(row.groupColorToken)
             }
             .sorted { $0.startAt < $1.startAt }
@@ -344,12 +381,12 @@ struct TodayView: View {
         return "\(relative) · \(duration)"
     }
 
-    /// A qualitative load label keyed to the day's task count.
+    /// A qualitative, localized load label keyed to the day's task count.
     private func loadWeight(_ total: Int) -> String {
         switch total {
-        case 0: return "light"
-        case 1...4: return "moderate"
-        default: return "heavy"
+        case 0: return String(localized: "today.load.weight.light")
+        case 1...4: return String(localized: "today.load.weight.moderate")
+        default: return String(localized: "today.load.weight.heavy")
         }
     }
 
@@ -379,12 +416,12 @@ struct TodayView: View {
     /// The hour that splits "up next" from "this evening".
     private static let eveningHour = 18
 
-    /// Maps the current hour to a part-of-day word for the greeting.
+    /// Maps the current hour to a localized part-of-day greeting.
     private static func partOfDay() -> String {
         switch Calendar.current.component(.hour, from: .now) {
-        case 0..<12: return "Good morning"
-        case 12..<17: return "Good afternoon"
-        default: return "Good evening"
+        case 0..<12: return String(localized: "today.greeting.morning")
+        case 12..<17: return String(localized: "today.greeting.afternoon")
+        default: return String(localized: "today.greeting.evening")
         }
     }
 }

@@ -49,6 +49,7 @@ struct WaxSealShape: Shape {
 /// lives in `RootsCommitView` — this is no longer the completion stamp.
 struct WaxSeal: View {
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let isStamped: Bool
     private let size: CGFloat
@@ -76,12 +77,19 @@ struct WaxSeal: View {
                     .font(.system(size: size * 0.38, weight: .semibold))
                     .foregroundStyle(theme.onAccent)
             }
-            .scaleEffect(isStamped ? 1 : 0.4)
+            // Under Reduce Motion the stamp fades in at rest size — no scale-up or
+            // tilt — mirroring OliveCheck / RootsCommitView's opacity-only fallback.
+            .scaleEffect(reduceMotion ? 1 : (isStamped ? 1 : 0.4))
             .opacity(isStamped ? 1 : 0)
-            .rotationEffect(.degrees(isStamped ? 0 : -8))
+            .rotationEffect(.degrees(reduceMotion ? 0 : (isStamped ? 0 : -8)))
         }
         .frame(width: size, height: size)
-        .animation(.spring(response: 0.42, dampingFraction: 0.62), value: isStamped)
+        .animation(
+            reduceMotion
+                ? .easeOut(duration: 0.18)
+                : .spring(response: 0.42, dampingFraction: 0.62),
+            value: isStamped
+        )
         .accessibilityHidden(true)
     }
 }

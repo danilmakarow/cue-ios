@@ -15,8 +15,10 @@ import Observation
 /// Once a brief lands for a given local date it is cached for the session, so
 /// re-entering the Today tab doesn't re-hit the network for the same day.
 ///
-/// `@Observable @MainActor`, the shared `APIClient`, and a `bind(notifications:)`
-/// for surfacing failures — the same shape as the other feature stores.
+/// `@Observable @MainActor` over the shared `APIClient` — the same shape as the
+/// other feature stores. Unlike them it does *not* surface failures to the global
+/// notification queue: the brief is non-essential, so a miss degrades to a quiet
+/// inline placeholder + retry on the Today card rather than a global banner.
 @Observable
 @MainActor
 final class MorningBriefStore {
@@ -31,7 +33,6 @@ final class MorningBriefStore {
     // MARK: Private
 
     private let api: APIClient
-    private var notifications: NotificationStore?
 
     /// The local date (`YYYY-MM-DD`) the cached `brief` covers, so a day rollover
     /// invalidates the cache and re-fetches.
@@ -48,15 +49,8 @@ final class MorningBriefStore {
 
     // MARK: Init
 
-    init(api: APIClient = .shared, notifications: NotificationStore? = nil) {
+    init(api: APIClient = .shared) {
         self.api = api
-        self.notifications = notifications
-    }
-
-    /// Wires the global notification queue. Idempotent.
-    func bind(notifications: NotificationStore) {
-        guard self.notifications == nil else { return }
-        self.notifications = notifications
     }
 
     // MARK: - Read
@@ -77,9 +71,12 @@ final class MorningBriefStore {
             cachedDate = response.localDate
             phase = .loaded
         } catch {
+            // Non-fatal and *non-essential*: the brief degrades to a quiet inline
+            // placeholder + retry on the Today card (see `TodayView.briefBody`). We
+            // deliberately do NOT post a global error banner — a banner would be a
+            // second, louder surface for the same recoverable miss, contradicting
+            // the "quiet placeholder" intent.
             phase = .failed
-            // Non-fatal: the card degrades, but surface it so it isn't silent.
-            notifications?.postError(error, title: "Couldn't load your brief")
         }
     }
 
