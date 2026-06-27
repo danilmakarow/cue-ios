@@ -88,7 +88,7 @@ final class YearMiniMonthCell: UICollectionViewCell {
             model: model,
             todayKey: todayKey,
             dayColor: theme.textSecondary,
-            todayColor: theme.secondary,
+            todayColor: theme.success,
             font: theme.codeSmall
         )
         applyAccessibility(name: model.nameAbbreviated)
@@ -101,7 +101,7 @@ final class YearMiniMonthCell: UICollectionViewCell {
         applyNameStyle(theme: theme)
         gridView.restyle(
             dayColor: theme.textSecondary,
-            todayColor: theme.secondary,
+            todayColor: theme.success,
             font: theme.codeSmall
         )
     }
@@ -240,8 +240,8 @@ final class MiniMonthGridView: UIView {
 
 // MARK: - Year-title supplementary
 
-/// The per-section year title (e.g. "2026") drawn as a large Fraunces heading over
-/// a short accent underline — the UIKit port of the SwiftUI `YearPage` title block.
+/// The per-section year title (e.g. "2026") drawn as a large serif heading over
+/// a short clay accent underline — the UIKit port of the SwiftUI `YearPage` title block.
 /// Configured by the owning ``YearScopeViewController`` with the pre-formatted year
 /// string and theme.
 final class YearTitleHeaderView: UICollectionReusableView {
@@ -278,7 +278,7 @@ final class YearTitleHeaderView: UICollectionReusableView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// Sets the year heading text and theme (Fraunces `displayL` title over a
+    /// Sets the year heading text and theme (serif `displayL` title over a clay
     /// `secondary` underline capsule).
     func configure(title: String, theme: CalendarTheme) {
         self.theme = theme

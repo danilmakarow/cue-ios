@@ -12,7 +12,7 @@ import UIKit
 /// Each tile stacks a day number, a weekday letter, and a fixed-height bottom
 /// slot that shows — in priority order — a short month label (for days far from
 /// today), a small task-count badge, or the today dot. The selected state only
-/// recolors text (the espresso fill is drawn by the strip's indicator), so the
+/// recolors text (the selection fill is drawn by the strip's indicator), so the
 /// number/weekday read correctly once the indicator slides under the tile.
 final class WeekDayTileCell: UICollectionViewCell {
 
@@ -108,7 +108,7 @@ final class WeekDayTileCell: UICollectionViewCell {
     // MARK: - Configuration
 
     /// Binds the tile to a date + state, styling with `theme`. Selection only
-    /// recolors text — the espresso fill is drawn by the strip's sliding
+    /// recolors text — the selection fill is drawn by the strip's sliding
     /// indicator behind this tile. `count` is the day's task-occurrence total
     /// (nil or 0 hides the badge).
     func configure(
@@ -164,10 +164,10 @@ final class WeekDayTileCell: UICollectionViewCell {
         }
 
         if let count, count > 0 {
-            // The per-day count is a neutral ledger badge — espresso ink on a
-            // sunken chip — so terracotta stays reserved for the TODAY dot and is
-            // never splashed across every day with tasks. On the selected (espresso)
-            // tile it inverts to cream-on-cream-wash for contrast.
+            // The per-day count is a neutral ledger badge — secondary ink on a
+            // sunken gray chip — so the accent stays reserved for the TODAY dot and
+            // is never splashed across every day with tasks. On the selected tile it
+            // inverts to onAccent-on-wash for contrast.
             countBadge.isHidden = false
             countBadge.text = count < 100 ? " \(count) " : " ••• "
             countBadge.font = theme.codeSmall
@@ -180,9 +180,10 @@ final class WeekDayTileCell: UICollectionViewCell {
         }
 
         if isToday {
-            // TODAY's one-hot terracotta dot (or cream on the selected espresso tile).
+            // TODAY's olive (`success`) marker dot — the CUE — Clean today accent —
+            // or onAccent on the selected (filled) tile.
             todayDot.isHidden = false
-            todayDot.backgroundColor = isSelected ? theme.onAccent : theme.secondary
+            todayDot.backgroundColor = isSelected ? theme.onAccent : theme.success
         }
     }
 }

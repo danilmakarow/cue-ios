@@ -174,19 +174,19 @@ final class MonthDayGridCell: UICollectionViewCell {
 
     private func applyDayHighlight(isToday: Bool, isSelected: Bool, theme: CalendarTheme) {
         if isToday {
-            // TODAY is the calendar's one rationed hot moment: a clean filled
-            // terracotta (`secondary`) chip with cream (`onAccent`) on it (AA,
-            // ~4.6:1) — no border (the fill carries it). It reads unmistakably more
-            // prominent than, and a different hue from, the bordered SELECTED chip,
-            // so terracotta stays the TODAY hero and is never splashed on every
-            // selected cell.
-            numberBackground.backgroundColor = theme.secondary
+            // TODAY is the calendar's semantic accent moment: a clean filled olive
+            // (`success`) chip with white (`onAccent`) on it — no border (the fill
+            // carries it). Per the CUE — Clean selection rule, today/done = OLIVE.
+            // It reads unmistakably more prominent than, and a different hue from,
+            // the neutral-gray bordered SELECTED chip, so the accent stays the TODAY
+            // hero and is never splashed on every selected cell.
+            numberBackground.backgroundColor = theme.success
             numberBackground.layer.borderWidth = 0
             numberLabel.textColor = theme.onAccent
         } else if isSelected {
-            // SELECTED is a quiet sunken chip ringed by the functional border, so it
-            // is findable on white without spending the terracotta accent. Today,
-            // when also selected, keeps its terracotta fill above (today wins).
+            // SELECTED is a quiet neutral sunken-gray chip ringed by the functional
+            // border, so it is findable on white without spending a semantic accent.
+            // Today, when also selected, keeps its olive fill above (today wins).
             numberBackground.backgroundColor = theme.surfaceSunken
             numberBackground.layer.borderWidth = 1
             numberBackground.layer.borderColor = theme.border.cgColor

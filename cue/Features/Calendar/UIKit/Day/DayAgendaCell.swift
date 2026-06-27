@@ -5,11 +5,11 @@
 
 import UIKit
 
-/// The `.list`-mode agenda row — the UIKit port of `CueEventCard`: a Kraft & Ink
-/// paper sheet with an espresso spine, a Fraunces title (strikethrough when
-/// done), a monospaced "ledger" time range, optional notes, and — for tasks —
-/// the wax-seal completion toggle. Letterpress depth (1pt border + a hard 1pt
-/// warm value-cut) rather than a soft float, matching `Depth.letterpress`.
+/// The `.list`-mode agenda row — the UIKit port of `CueEventCard`: a clean white
+/// card with a clay spine, a serif title (strikethrough when done), a monospaced
+/// "ledger" time range, optional notes, and — for tasks — the olive completion
+/// check. CUE — Clean resting depth (1pt hairline border + a soft floating
+/// shadow), matching `Depth.letterpress`.
 ///
 /// The cell stays *dumb*: it renders an ``OccurrenceVM`` and reports `onToggle` /
 /// `onSelect` through closures the owning view controller sets.
@@ -19,7 +19,7 @@ final class DayAgendaCell: UICollectionViewCell {
 
     // MARK: - Callbacks
 
-    /// Fired when the wax seal is tapped — routed to the store's completion toggle.
+    /// Fired when the done-check is tapped — routed to the store's completion toggle.
     var onToggle: ((OccurrenceVM) -> Void)?
     /// Fired when the card body is tapped — open task detail.
     var onSelect: ((OccurrenceVM) -> Void)?
@@ -53,13 +53,12 @@ final class DayAgendaCell: UICollectionViewCell {
     /// Builds the static hierarchy once; content + theme applied per-bind.
     private func setUp() {
         card.translatesAutoresizingMaskIntoConstraints = false
-        card.layer.cornerRadius = Radius.small
+        card.layer.cornerRadius = Radius.card
         card.layer.cornerCurve = .continuous
         card.layer.borderWidth = 1
-        // Hard, blur-free value-cut (radius 0, y:1) — the letterpress signature.
-        card.layer.shadowRadius = 0
-        card.layer.shadowOffset = CGSize(width: 0, height: 1)
-        card.layer.shadowOpacity = 1
+        // CUE — Clean resting card: a soft floating shadow lifts the card off the
+        // white page (the old blur-0 "letterpress value-cut" is retired). Params
+        // are filled per-theme in `applyTheme` from the `restShadow*` tokens.
         contentView.addSubview(card)
 
         spine.translatesAutoresizingMaskIntoConstraints = false
@@ -167,11 +166,15 @@ final class DayAgendaCell: UICollectionViewCell {
         guard let theme, let event else { return }
         card.backgroundColor = theme.surface
         card.layer.borderColor = theme.border.cgColor
-        card.layer.shadowColor = theme.textPrimary.withAlphaComponent(0.06).cgColor
+        // CUE — Clean resting card: a soft floating shadow (color textPrimary,
+        // baked opacity in `restShadowOpacity`), not the old hard value-cut.
+        card.layer.shadowColor = theme.textPrimary.cgColor
+        card.layer.shadowRadius = theme.restShadowRadius
+        card.layer.shadowOffset = theme.restShadowOffset
+        card.layer.shadowOpacity = theme.restShadowOpacity
         // The spine carries the row's state: olive (`success`) once the task is
-        // sealed-done — a positive earthy "completed" mark — and espresso
-        // (structural) while it's still open. Keeps olive presence in the agenda
-        // without spending the rationed terracotta, which stays the seal's alone.
+        // done — a positive earthy "completed" mark — and clay (`primary`,
+        // structural/brand) while it's still open.
         spine.backgroundColor = event.isCompleted ? theme.success : theme.primary
 
         let titleAttributes: [NSAttributedString.Key: Any] = [
@@ -189,16 +192,17 @@ final class DayAgendaCell: UICollectionViewCell {
         applySeal()
     }
 
-    /// Renders the wax-seal toggle: a filled clay seal with a cream check when
-    /// stamped, an empty bordered "seal-well" when not. A flat UIKit stand-in for
-    /// the SwiftUI ``WaxSeal`` shape, keeping the same color roles + check glyph.
+    /// Renders the completion toggle: a filled olive circle with a white check
+    /// when done (the CUE — Clean `OliveCheck` done-marker), an empty bordered
+    /// well when not. A flat UIKit stand-in for the SwiftUI done marker, keeping
+    /// the same color roles + check glyph (done = OLIVE `success`, never clay).
     private func applySeal() {
         guard let theme, let event else { return }
         sealButton.layer.cornerRadius = 17
         sealButton.layer.borderWidth = event.isCompleted ? 0 : 1.5
         sealButton.layer.borderColor = theme.border.cgColor
         if event.isCompleted {
-            sealButton.backgroundColor = theme.secondary
+            sealButton.backgroundColor = theme.success
             sealButton.tintColor = theme.onAccent
             sealButton.setImage(
                 UIImage(systemName: "checkmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)),

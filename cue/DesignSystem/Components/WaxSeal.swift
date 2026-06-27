@@ -2,10 +2,12 @@
 //  WaxSeal.swift
 //  cue
 //
-//  Kraft & Ink's signature confirm mark — an irregular, hand-pressed clay seal.
-//  Deliberately NOT a clean circle: the jittered edge is what reads as human and
-//  not machine-stamped. Reserved for the app's two commit moments (completing a
-//  task, saving a new event).
+//  An irregular, hand-pressed clay seal — deliberately NOT a clean circle; the
+//  jittered edge is what reads as human and not machine-stamped. Its role has
+//  NARROWED to a brand / save mark. It is no longer the task-done marker (that is
+//  now `OliveCheck` — an olive circle + white check) and the spring-stamp commit
+//  motion has moved to `RootsCommitView` (organic roots growing under a check
+//  mask). This view keeps the blob shape for brand and save surfaces.
 //
 
 import SwiftUI
@@ -40,8 +42,11 @@ struct WaxSealShape: Shape {
     }
 }
 
-/// The wax-seal visual. When `isStamped`, a clay seal presses in with a single
-/// spring; otherwise an empty dashed "seal-well" awaits the commitment.
+/// The wax-seal visual — a clay (`secondary`) blob with a white (`onAccent`)
+/// glyph, used as a brand / save mark. When `isStamped`, the seal presses in with
+/// a single spring; otherwise an empty dashed "seal-well" awaits. NOTE: the app's
+/// task-done marker is now `OliveCheck`, and the commit/save celebration motion
+/// lives in `RootsCommitView` — this is no longer the completion stamp.
 struct WaxSeal: View {
     @Environment(\.theme) private var theme
 
@@ -79,4 +84,17 @@ struct WaxSeal: View {
         .animation(.spring(response: 0.42, dampingFraction: 0.62), value: isStamped)
         .accessibilityHidden(true)
     }
+}
+
+// MARK: - Preview
+
+#Preview("WaxSeal") {
+    HStack(spacing: Spacing.xxl) {
+        WaxSeal(isStamped: false)
+        WaxSeal(isStamped: true)
+    }
+    .padding(Spacing.xxl)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(Color(hex: 0xFFFFFF))
+    .environment(\.theme, AppPalette.kraftInk.colors)
 }

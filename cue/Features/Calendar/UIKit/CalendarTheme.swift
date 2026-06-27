@@ -68,11 +68,29 @@ struct CalendarTheme: Equatable {
     let spacingMD: CGFloat = 12
     let spacingLG: CGFloat = 16
     let spacingXL: CGFloat = 20
-    let radiusSmall: CGFloat = 6
-    let radiusMedium: CGFloat = 8
-    let radiusLarge: CGFloat = 12
+    let radiusSmall: CGFloat = 10
+    let radiusMedium: CGFloat = 12
+    let radiusCard: CGFloat = 12
+    let radiusLarge: CGFloat = 14
     let hourHeight: CGFloat = 36
     let timelineTopPadding: CGFloat = 10
+
+    // MARK: - Soft floating shadow (CUE — Clean)
+
+    /// CUE — Clean depth params, mirroring the SwiftUI `Depth` token. A surface
+    /// lifts off the white page with a gentle shadow plus a hairline border — the
+    /// old Kraft blur-0 "letterpress value-cut" is retired.
+    ///
+    /// `CALayer` paints a single shadow, so the resting card uses the soft
+    /// `restShadow*` pair and a floating/elevated surface uses the heavier
+    /// `floatShadow*` pair. Opacity is baked into `shadowOpacity`; color the layer's
+    /// `shadowColor` with `textPrimary` (already opaque) to match the SwiftUI token.
+    let restShadowRadius: CGFloat = 2
+    let restShadowOffset = CGSize(width: 0, height: 1)
+    let restShadowOpacity: Float = 0.05
+    let floatShadowRadius: CGFloat = 7
+    let floatShadowOffset = CGSize(width: 0, height: 3)
+    let floatShadowOpacity: Float = 0.05
 
     // MARK: - Init
 
@@ -101,11 +119,11 @@ struct CalendarTheme: Equatable {
         danger = UIColor(colors.danger)
         info = UIColor(colors.info)
 
-        // Display / heading voices — Fraunces serif (falls back to the system
-        // serif until the font registers), mirroring Typography's sizes,
-        // weights and `relativeTo:` text styles. Body/label/caption — Public Sans
-        // (bundled; falls back to SF Pro). Code — JetBrains Mono (bundled; falls
-        // back to SF Mono). All scaled for `traits` via `UIFontMetrics`.
+        // Display / heading voices — the bundled serif face (falls back to the
+        // system serif until the font registers), mirroring Typography's sizes,
+        // weights and `relativeTo:` text styles. Body/label/caption — the native
+        // system sans (SF Pro). Code — JetBrains Mono (bundled; falls back to
+        // SF Mono). All scaled for `traits` via `UIFontMetrics`.
         displayL = Self.serif(34, weight: .semibold, relativeTo: .largeTitle, traits: traits)
         displayM = Self.serif(27, weight: .semibold, relativeTo: .title1, traits: traits)
         titleL = Self.serif(22, weight: .medium, relativeTo: .title2, traits: traits)
@@ -122,9 +140,9 @@ struct CalendarTheme: Equatable {
 
     // MARK: - Font builders
 
-    /// A Fraunces serif `UIFont` at `size`/`weight`, scaled for Dynamic Type
-    /// relative to `style`. Falls back to the system serif design when the
-    /// bundled face isn't registered, matching the SwiftUI token's behavior.
+    /// A serif `UIFont` at `size`/`weight`, scaled for Dynamic Type relative to
+    /// `style`. Falls back to the system serif design when the bundled face isn't
+    /// registered, matching the SwiftUI token's behavior.
     private static func serif(
         _ size: CGFloat,
         weight: UIFont.Weight,
@@ -132,8 +150,8 @@ struct CalendarTheme: Equatable {
         traits: UITraitCollection
     ) -> UIFont {
         let base: UIFont
-        if let fraunces = UIFont(name: Typography.serifFamily, size: size) {
-            base = Self.applying(weight: weight, to: fraunces, size: size)
+        if let serifFace = UIFont(name: Typography.serifFamily, size: size) {
+            base = Self.applying(weight: weight, to: serifFace, size: size)
         } else {
             base = Self.designed(.serif, size: size, weight: weight)
         }
@@ -186,7 +204,7 @@ struct CalendarTheme: Equatable {
     }
 
     /// Applies a weight trait to a named (non-system) font without changing its
-    /// family, so the bundled Fraunces honors the role's weight where possible.
+    /// family, so the bundled serif honors the role's weight where possible.
     private static func applying(weight: UIFont.Weight, to font: UIFont, size: CGFloat) -> UIFont {
         let descriptor = font.fontDescriptor.addingAttributes([
             .traits: [UIFontDescriptor.TraitKey.weight: weight],

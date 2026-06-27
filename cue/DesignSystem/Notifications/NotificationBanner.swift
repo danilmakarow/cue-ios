@@ -28,6 +28,8 @@ struct NotificationBanner: View {
     /// Called when the user taps the close button.
     let onDismiss: () -> Void
 
+    // Banner corner radius. The States kit error specimen draws the banner at a
+    // 12pt radius (`Radius.medium`), softer than the floating ceiling.
     private let radius: CGFloat = Radius.medium
 
     var body: some View {
@@ -91,7 +93,8 @@ struct NotificationBanner: View {
             .accessibilityHidden(true)
     }
 
-    /// Title, optional collapsed message, and the revealed detail block.
+    /// Title, optional collapsed message, the revealed mono detail block, and the
+    /// "Show more / Show less" disclosure on expandable banners.
     private var content: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
             Text(notification.title)
@@ -106,33 +109,54 @@ struct NotificationBanner: View {
             }
 
             if isExpanded, let detail = notification.detail {
-                Divider()
-                    .padding(.vertical, Spacing.xxs)
-
-                Text(detail)
-                    .cueText(.code)
-                    .foregroundStyle(theme.textSecondary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                detailBlock(detail)
             }
 
             if notification.isExpandable {
-                expandAffordance
+                disclosureButton
             }
         }
     }
 
-    /// Small "Show more / Show less" cue shown on expandable banners. Uses the
-    /// clay accent-text (AA-safe) — one of the few sanctioned clay text uses.
-    private var expandAffordance: some View {
+    /// The HTTP / diagnostic detail line, revealed when expanded. Rendered in
+    /// JetBrains Mono inside a sunken, hairline-bordered box per the States kit
+    /// error specimen — selectable so the user can copy the payload.
+    private func detailBlock(_ detail: String) -> some View {
+        Text(detail)
+            .cueText(.code)
+            .foregroundStyle(theme.textPrimary)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, Spacing.sm)
+            .padding(.horizontal, Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+                    .fill(theme.surfaceSunken)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+                    .strokeBorder(theme.separator, lineWidth: 1)
+            )
+            .padding(.top, Spacing.xs)
+    }
+
+    /// Tappable "Show more / Show less" disclosure shown on expandable banners.
+    /// A real button (not a decorative cue) per the States kit error specimen:
+    /// the chevron rotates 0↔180° as the detail reveals. Uses the clay
+    /// accent-text (AA-safe) — one of the few sanctioned clay text uses.
+    private var disclosureButton: some View {
         let disclosureLabel: LocalizedStringKey = isExpanded ? "notification.showLess" : "notification.showDetails"
-        return HStack(spacing: Spacing.xxs) {
-            Text(disclosureLabel)
-            Image(systemName: "chevron.down")
-                .rotationEffect(.degrees(isExpanded ? 180 : 0))
+        return Button(action: toggleExpansion) {
+            HStack(spacing: Spacing.xs) {
+                Text(disclosureLabel)
+                Image(systemName: "chevron.down")
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+            }
+            .cueText(.caption)
+            .foregroundStyle(theme.accentText)
+            .contentShape(.rect)
         }
-        .cueText(.caption)
-        .foregroundStyle(theme.accentText)
+        .buttonStyle(.plain)
         .padding(.top, Spacing.xxs)
         .accessibilityHidden(true)
     }
@@ -153,8 +177,15 @@ struct NotificationBanner: View {
     // MARK: - Interaction
 
     /// Toggles expansion when the banner is expandable; otherwise the body tap
-    /// is inert (close button handles dismissal).
+    /// is inert (close button handles dismissal). The whole-body tap and the
+    /// disclosure button both route through `toggleExpansion`.
     private func handleBodyTap() {
+        toggleExpansion()
+    }
+
+    /// Animates the detail disclosure open/closed via the store-owned callback.
+    /// Guarded so a non-expandable banner ignores the gesture entirely.
+    private func toggleExpansion() {
         guard notification.isExpandable else { return }
         withAnimation(.snappy) {
             onToggleExpand()
@@ -197,6 +228,16 @@ struct NotificationBanner: View {
             )
             NotificationBanner(
                 notification: .warning("Working offline", message: "Changes will sync when you reconnect."),
+                isExpanded: false,
+                onToggleExpand: {},
+                onDismiss: {}
+            )
+            NotificationBanner(
+                notification: .error(
+                    "Couldn't save event",
+                    message: "The server rejected the request.",
+                    detail: "HTTP 422\n\n{\n  \"statusCode\": 422,\n  \"message\": [\"title should not be empty\"],\n  \"error\": \"Unprocessable Entity\"\n}"
+                ),
                 isExpanded: false,
                 onToggleExpand: {},
                 onDismiss: {}

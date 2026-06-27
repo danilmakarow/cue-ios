@@ -6,7 +6,11 @@
 import SwiftUI
 
 /// Reusable full-page error state, built on `ContentUnavailableView` with a
-/// retry action. Use this when an *entire screen* failed to load its primary
+/// retry action.
+///
+/// The title renders in the serif `.titleM` role and the retry control uses the
+/// `.cue(.secondary)` button style — a quiet, bordered "Try again" rather than a
+/// hot fill, matching the States kit "Error · full page" specimen. Use this when an *entire screen* failed to load its primary
 /// content (e.g. the first fetch of a tab threw) and the user has nothing else
 /// to look at — as opposed to a transient failure during an interaction, which
 /// should post a `NotificationStore` banner instead.
@@ -14,6 +18,8 @@ import SwiftUI
 /// See `docs/specs/notifications-and-states.md` for the full
 /// loading / error / empty decision matrix.
 struct ErrorStateView: View {
+    @Environment(\.theme) private var theme
+
     /// Short headline, e.g. "Couldn't load tasks".
     let title: String
 
@@ -45,13 +51,27 @@ struct ErrorStateView: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label(title, systemImage: systemImage)
+            VStack(spacing: Spacing.md) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 44, weight: .light))
+                    .foregroundStyle(theme.textSecondary)
+                    .accessibilityHidden(true)
+
+                Text(title)
+                    .cueText(.titleM)
+                    .foregroundStyle(theme.textPrimary)
+            }
         } description: {
             Text(message)
+                .cueText(.callout)
+                .foregroundStyle(theme.textSecondary)
         } actions: {
             if let retry {
                 Button("common.retry", action: retry)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.cue(.secondary))
+                    // Keep the bordered retry compact (hug its label) rather than
+                    // stretching edge-to-edge, matching the specimen's pill.
+                    .fixedSize()
             }
         }
     }
@@ -76,6 +96,7 @@ extension ErrorStateView {
 
 #Preview("With retry") {
     ErrorStateView.networkFailure(retry: {})
+        .environment(\.theme, AppPalette.kraftInk.colors)
 }
 
 #Preview("No retry") {
@@ -84,4 +105,5 @@ extension ErrorStateView {
         message: "This account has no completed tasks in the selected range.",
         systemImage: "chart.bar.xaxis"
     )
+    .environment(\.theme, AppPalette.kraftInk.colors)
 }

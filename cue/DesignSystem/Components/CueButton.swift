@@ -10,24 +10,25 @@ import SwiftUI
 
 /// Visual variants for `CueButtonStyle`.
 enum CueButtonVariant {
-    /// Espresso fill, cream label — the structural affirmative action (links,
+    /// Clay fill, white label — the structural affirmative action (links,
     /// confirm, "Save changes"). The everyday primary.
     case primary
-    /// Terracotta (seal) fill, cream label — the ONE rationed hot CTA: the
-    /// commit moment a screen is built around (create event, finish). Use at most
-    /// once per screen; everything else stays espresso/secondary so the clay reads
-    /// as the hero, never as a colour splash.
+    /// Clay fill, white label — the ONE rationed hot CTA: the commit moment a
+    /// screen is built around (create event, finish). Visually identical to
+    /// `primary` (both resolve to clay now); the distinction is CONTEXT, not hue —
+    /// reserve `decisive` for the single hero CTA per screen so it reads as the
+    /// commit, with everything else staying secondary/ghost around it.
     case decisive
-    /// Transparent + 1px functional border, espresso label — secondary actions.
+    /// Transparent + 1px functional border, clay label — secondary actions.
     case secondary
-    /// Brick fill, cream label — destructive actions (delete, disconnect).
+    /// Brick fill, white label — destructive actions (delete, disconnect).
     case destructive
     /// Clay accent-text, no fill — inline/tertiary actions.
     case ghost
 }
 
-/// Kraft & Ink button style. Crisp 6pt "cut paper" radius, a 1pt letterpress
-/// depress on press (the label sinks 1pt into the page — no gradient, no glow),
+/// CUE — Clean button style. Soft 10pt `Radius.small` corner, a 1pt downward
+/// press nudge paired with a one-step-darker fill (no scale, no glow),
 /// 160ms ease-out. Disabled buttons dim to 50%.
 struct CueButtonStyle: ButtonStyle {
     @Environment(\.theme) private var theme
@@ -47,8 +48,8 @@ struct CueButtonStyle: ButtonStyle {
             .overlay(border)
             .clipShape(RoundedRectangle(cornerRadius: Radius.small, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: Radius.small, style: .continuous))
-            // Letterpress depress: a 1pt downward nudge instead of a scale/shadow,
-            // so the control reads as pressed *into* the paper, not floating.
+            // Press signature: a 1pt downward nudge instead of a scale/shadow,
+            // paired with the darker fill below, so the control reads as pressed in.
             .offset(y: pressed ? 1 : 0)
             .opacity(opacity(pressed: pressed))
             .animation(.easeOut(duration: 0.16), value: pressed)
@@ -69,11 +70,9 @@ struct CueButtonStyle: ButtonStyle {
         case .primary:
             shape.fill(pressed ? theme.primaryPressed : theme.primary)
         case .decisive:
-            // Terracotta seal fill. Press deepens toward the primary-pressed
-            // espresso via a multiply overlay rather than a separate token, so the
-            // depress reads as ink soaking in (no new colour introduced).
-            shape.fill(theme.secondary)
-                .overlay(shape.fill(theme.primaryPressed).opacity(pressed ? 0.22 : 0))
+            // Same clay fill as primary — the distinction is context (the one hero
+            // CTA), not hue. Press steps one shade darker to `primaryPressed`.
+            shape.fill(pressed ? theme.primaryPressed : theme.secondary)
         case .destructive:
             shape.fill(theme.danger).opacity(pressed ? 0.85 : 1)
         case .secondary:
@@ -99,7 +98,7 @@ struct CueButtonStyle: ButtonStyle {
 }
 
 extension ButtonStyle where Self == CueButtonStyle {
-    /// The Kraft & Ink button style in the given variant.
+    /// The CUE — Clean button style in the given variant.
     static func cue(_ variant: CueButtonVariant) -> CueButtonStyle {
         CueButtonStyle(variant: variant)
     }

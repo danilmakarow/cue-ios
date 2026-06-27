@@ -7,7 +7,7 @@ import UIKit
 
 /// One full-width page in the horizontal day pager. Renders a single day in the
 /// store's current ``CalendarViewMode`` — a vertically-scrolling hour timeline
-/// (`.timeline`) or an agenda list of paper cards (`.list`) — under a Fraunces
+/// (`.timeline`) or an agenda list of clean cards (`.list`) — under a serif
 /// section heading with a clay rule, matching `TimelineDayPage` / `ListDayPage`.
 ///
 /// The cell is *dumb*: the owning ``DayScopeViewController`` binds it with the

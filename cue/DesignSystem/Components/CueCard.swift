@@ -8,9 +8,9 @@
 
 import SwiftUI
 
-/// A themed surface card. Defaults to the `surface` fill, a 10pt "cut sheet"
-/// radius, and `.letterpress` depth (a 1px functional border + a hard warm
-/// value-cut, no soft float). An optional `header` renders a `surfaceSunken`
+/// A themed surface card. Defaults to the white `surface` fill, a 12pt
+/// `Radius.card` corner, and `.letterpress` depth (a 1px functional border + a
+/// soft resting shadow). An optional `header` renders a `surfaceSunken` gray
 /// strip across the top (a recessed title band) clipped to the card's radius.
 struct CueCard<Header: View, Content: View>: View {
     @Environment(\.theme) private var theme
@@ -25,7 +25,7 @@ struct CueCard<Header: View, Content: View>: View {
     /// A card with an optional recessed header strip.
     /// - Parameters:
     ///   - padding: inner padding of the content region (default `Spacing.lg`).
-    ///   - radius: corner radius (default `Radius.card`, 10pt).
+    ///   - radius: corner radius (default `Radius.card`, 12pt).
     ///   - depth: depth treatment (default `.letterpress`).
     ///   - background: override the `surface` fill when needed.
     ///   - header: optional sunken title strip rendered above the content.
@@ -101,7 +101,7 @@ extension CueCard where Header == EmptyView {
 #Preview("CueCard") {
     VStack(spacing: Spacing.xl) {
         CueCard {
-            Text("A plain letterpress card — 10pt cut edge, 1px border, a hard warm value-cut beneath.")
+            Text("A plain card — white surface, 12pt corner, a 1px border and a soft resting shadow.")
                 .cueText(.body)
         }
         CueCard {

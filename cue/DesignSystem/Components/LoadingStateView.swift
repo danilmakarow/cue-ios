@@ -93,8 +93,9 @@ private struct LoadingOverlayModifier: ViewModifier {
             .overlay {
                 if isLoading {
                     ZStack {
-                        // Warm-ink scrim (theme.textPrimary) rather than pure
-                        // black — sits more naturally over the Kraft & Ink page.
+                        // Soft ink scrim (theme.textPrimary at 8%) rather than
+                        // pure black — sits more naturally over the page, per the
+                        // States kit "Loading · overlay" specimen.
                         theme.textPrimary.opacity(0.08)
                             .ignoresSafeArea()
                         LoadingStateView(label: label)

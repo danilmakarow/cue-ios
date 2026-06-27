@@ -3,17 +3,17 @@
 //  cue
 //
 //  One selectable chip, unifying the previously-duplicated duration / weekday /
-//  option chips. Kraft & Ink shape: a crisp 4pt "rubber-stamp" rectangle — a
-//  word in a filled or empty box — NOT a pill, and never a pill-with-a-dot.
+//  option chips. CUE — Clean shape: a soft 8pt `Radius.chip` rectangle whose
+//  selection is carried by a clay WASH, not a solid fill — never a pill-with-a-dot.
 //
 
 import SwiftUI
 
-/// A selectable stamp chip. Selection is carried by *fill + ink*, not a separate
-/// indicator dot: unselected reads as an empty stamp (surface fill + 1px
-/// functional border + muted ink); selected reads as a pressed stamp (espresso
-/// fill + cream ink, no border). Espresso — not the rationed clay — is the
-/// selected fill, so the chip never competes with the wax seal or a decisive CTA.
+/// A selectable chip. Selection is carried by *fill + ink*, not a separate
+/// indicator dot: unselected reads as a neutral gray chip (`surfaceSunken` fill +
+/// 1px functional border + muted `textSecondary` ink); selected flips to a clay
+/// WASH (`accentSoft` background + `accentText` ink + NO border). The wash, rather
+/// than a solid clay fill, keeps the chip from competing with a decisive CTA.
 struct CueChip: View {
     @Environment(\.theme) private var theme
 
@@ -47,13 +47,13 @@ struct CueChip: View {
                 Text(title)
             }
             .cueText(.label)
-            .foregroundStyle(isSelected ? theme.onAccent : theme.textSecondary)
+            .foregroundStyle(isSelected ? theme.accentText : theme.textSecondary)
             .padding(.vertical, Spacing.sm)
             .padding(.horizontal, Spacing.md)
-            .background(shape.fill(isSelected ? theme.primary : theme.surface))
+            .background(shape.fill(isSelected ? theme.accentSoft : theme.surfaceSunken))
             .overlay(
-                // Empty stamp shows its functional edge; the filled stamp drops it
-                // so the espresso block reads clean.
+                // Neutral chip shows its functional edge; the selected clay wash
+                // drops the border so the accent reads clean.
                 shape.strokeBorder(isSelected ? Color.clear : theme.border, lineWidth: 1)
             )
             .contentShape(shape)

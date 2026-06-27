@@ -6,10 +6,10 @@
 import UIKit
 
 /// A single event block on the day timeline — the UIKit port of
-/// `DayScheduleView.eventCard`: an espresso (`theme.primary`) rounded block with
-/// a cream title, optional strikethrough when completed, a faded look once done,
-/// and — for tasks — a compact cream completion toggle (the timeline's terse
-/// stand-in for the list mode's wax seal).
+/// `DayScheduleView.eventCard`: a clay (`theme.primary`) rounded block with a
+/// white (`onAccent`) title, optional strikethrough when completed, a faded look
+/// once done, and — for tasks — a compact white completion toggle (the timeline's
+/// terse stand-in for the list mode's olive done-check).
 ///
 /// The cell stays *dumb*: it renders an ``OccurrenceVM`` and reports two intents
 /// (`onToggle`, `onSelect`) through closures the owning view controller sets. It

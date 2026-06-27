@@ -7,13 +7,15 @@ import SwiftUI
 
 // MARK: - BrandMark
 
-/// The Cue brand mark: a clay wax seal with a cream Fraunces "C" monogram — the
-/// same seal the app stamps onto a completed task, so the logo and the core
-/// "make it stick" gesture are one idea. Rendered from the shared `WaxSealShape`
-/// so it scales crisply at any size and stays identical to the in-app seals.
+/// The Cue brand mark: a clay wax seal with a cream IBM Plex Serif "C" monogram.
+/// It shares the `WaxSealShape` blob with the in-app `WaxSeal` save mark, so the
+/// logo and the app's "make it stick" voice are one idea — and it scales crisply
+/// at any size. (The seal is no longer the task-done marker; completion now uses
+/// `OliveCheck` and the commit motion lives in `RootsCommitView`.)
 ///
 /// Brand colors are intentionally fixed (a logo is constant across themes), so
-/// this is the one sanctioned place for brand color literals.
+/// this is the one sanctioned place for brand color literals. The mark reads on
+/// the white app canvas: the clay fill and darker rim carry their own contrast.
 ///
 /// ```swift
 /// BrandMark(size: 96)                                  // clay seal + cream C
@@ -61,8 +63,9 @@ struct BrandMark: View {
         .accessibilityHidden(true)
     }
 
-    /// The Fraunces "C" at the seal's center — ties the serif brand voice into
-    /// the mark itself.
+    /// The IBM Plex Serif "C" at the seal's center — ties the serif brand voice
+    /// into the mark itself. Tracks `Typography.serifFamily`, so a future face
+    /// swap flows here automatically.
     private func monogram(_ color: Color) -> some View {
         Text(verbatim: "C")
             .font(.custom(Typography.serifFamily, size: size * 0.46).weight(.semibold))
@@ -86,7 +89,7 @@ struct BrandMark: View {
 }
 
 #Preview("On surface") {
-    // Kraft & Ink on white — the brand seal sits on the white app canvas now.
+    // The brand seal sits on the white app canvas.
     BrandMark(size: 200)
         .padding(40)
         .background(Color(hex: 0xFFFFFF))

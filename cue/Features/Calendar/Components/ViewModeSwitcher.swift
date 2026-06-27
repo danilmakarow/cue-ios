@@ -30,12 +30,16 @@ struct ViewModeSwitcher: View {
             withAnimation(.snappy) { mode = option }
         } label: {
             Image(systemName: option.systemImage)
+                // A mode picker is a NEUTRAL selection: a gray track (`surfaceSunken`)
+                // with the active segment a raised surface pill carrying clay
+                // (`primary`) ink — "clay ink on a pill", per the CUE — Clean
+                // selection rule — not a solid clay fill.
                 .font(.body.weight(.semibold))
-                .foregroundStyle(isSelected ? theme.onAccent : theme.textSecondary)
+                .foregroundStyle(isSelected ? theme.primary : theme.textSecondary)
                 .frame(width: 56, height: 30)
                 .background {
                     if isSelected {
-                        Capsule().fill(theme.primary)
+                        Capsule().fill(theme.surface)
                     }
                 }
                 .contentShape(.capsule)
