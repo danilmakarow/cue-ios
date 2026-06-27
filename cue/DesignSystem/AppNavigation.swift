@@ -72,6 +72,13 @@ final class AppNavigation {
     /// onto a single tab's navigation stack — so it's reachable from any tab.
     var isPresentingNewEvent = false
 
+    /// Drives the global "Search" sheet. Mirrors `isPresentingNewEvent`: search
+    /// is a cross-cutting, tab-agnostic surface, so it lives in a modal reachable
+    /// from anywhere. The Calendar nav-bar search button flips this to `true`;
+    /// `RootView` hosts the `SearchView` sheet off it. Calendar (or any future
+    /// host) only sets the flag — it never builds the sheet.
+    var isPresentingSearch = false
+
     /// Transient linking nonce parked by an incoming Telegram deep link. Non-nil
     /// drives the global "Connect Telegram?" sheet in `RootView`. A code that
     /// arrives while signed out stays parked here until sign-in flips

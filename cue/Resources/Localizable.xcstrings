@@ -1,6 +1,28 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "account.placeholder.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your profile and account controls live here."
+          }
+        }
+      }
+    },
+    "account.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account"
+          }
+        }
+      }
+    },
     "api.error.decoding": {
       "comment": "Error shown when the server response could not be parsed. Parameter is the underlying decoding error.",
       "extractionState": "manual",
@@ -231,6 +253,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Щось пішло не так (код %lld)."
+          }
+        }
+      }
+    },
+    "assistant.persona.placeholder.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shape how the assistant talks to you."
+          }
+        }
+      }
+    },
+    "assistant.persona.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assistant Persona"
           }
         }
       }
@@ -2611,6 +2655,50 @@
         }
       }
     },
+    "reports.notifications.placeholder.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daily report and reminder settings live here."
+          }
+        }
+      }
+    },
+    "reports.notifications.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications & Report"
+          }
+        }
+      }
+    },
+    "search.placeholder.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find tasks and events across your calendars."
+          }
+        }
+      }
+    },
+    "search.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search"
+          }
+        }
+      }
+    },
     "settings.appearance.palette": {
       "comment": "Label for the color-theme (palette) picker in Settings",
       "extractionState": "manual",
@@ -2643,6 +2731,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Оформлення"
+          }
+        }
+      }
+    },
+    "settings.assistant": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Assistant"
           }
         }
       }
@@ -2751,6 +2850,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Управління"
+          }
+        }
+      }
+    },
+    "settings.notificationsReport": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications & report"
           }
         }
       }

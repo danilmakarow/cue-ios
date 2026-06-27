@@ -26,7 +26,11 @@ struct SettingsView: View {
 
             if case .authenticated(let user) = authStore.state {
                 Section {
-                    UserProfileRow(user: user)
+                    NavigationLink {
+                        AccountView()
+                    } label: {
+                        UserProfileRow(user: user)
+                    }
                 }
             }
 
@@ -78,6 +82,22 @@ struct SettingsView: View {
                         GroupsScreen()
                     } label: {
                         Label("settings.groups", systemImage: "folder.fill")
+                            .cueText(.body)
+                            .foregroundStyle(theme.textPrimary)
+                    }
+
+                    NavigationLink {
+                        PersonaEditorView()
+                    } label: {
+                        Label("settings.assistant", systemImage: "sparkles")
+                            .cueText(.body)
+                            .foregroundStyle(theme.textPrimary)
+                    }
+
+                    NavigationLink {
+                        NotificationsReportView()
+                    } label: {
+                        Label("settings.notificationsReport", systemImage: "bell.badge")
                             .cueText(.body)
                             .foregroundStyle(theme.textPrimary)
                     }

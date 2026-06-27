@@ -96,6 +96,15 @@ private struct MainTabs: View {
                 NewEventScreen()
             }
         }
+        // Global "Search" sheet — mirrors the New Event sheet. Driven by
+        // `AppNavigation.isPresentingSearch`, which the Calendar nav-bar search
+        // button flips. Hosted here (not in the Calendar tab) so search is
+        // reachable from any tab; the Calendar team only sets the flag.
+        .sheet(isPresented: $navigation.isPresentingSearch) {
+            NavigationStack {
+                SearchView()
+            }
+        }
         // "Connect Telegram?" confirmation, driven by a deep-linked code parked
         // on `AppNavigation`. Presented as a sheet (mirrors the New Event sheet)
         // only while authenticated — this view only mounts in that state — so a
