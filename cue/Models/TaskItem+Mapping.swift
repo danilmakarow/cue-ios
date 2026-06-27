@@ -31,11 +31,18 @@ extension TaskItem {
             isAllDay: dto.isAllDay,
             timezone: dto.timezone,
             requiresCompletion: dto.requiresCompletion,
+            color: dto.color,
+            icon: dto.icon,
             completedAt: dto.completedAt,
-            isRecurring: dto.recurrenceRuleId != nil,
+            isRecurring: dto.recurrence != nil || dto.recurrenceRuleId != nil,
             isException: false
         )
-        return upsert(from: occurrence, in: context)
+        let task = upsert(from: occurrence, in: context)
+        // Reminders ride only on the series `TaskDTO` (the `OccurrenceDTO`
+        // calendar-read shape omits them), so they're applied here, not in the
+        // shared occurrence path.
+        task.reminders = dto.reminders.map(TaskReminder.init(from:))
+        return task
     }
 
     /// Inserts (or updates in place) the occurrence matching the composite key
@@ -67,6 +74,11 @@ extension TaskItem {
         task.isRecurring = dto.isRecurring
         task.isException = dto.isException
         task.groupId = dto.groupId
+        task.colorToken = dto.color
+        task.groupColorToken = dto.groupColorHex
+        task.icon = dto.icon
+        // `reminders` ride only on the series `TaskDTO`, not `OccurrenceDTO`, so
+        // they're left untouched here and applied by the `TaskDTO` upsert path.
         // `createdAt`/`updatedAt` are not on OccurrenceDTO — leave what's already stored.
 
         let calendarId = dto.calendarId

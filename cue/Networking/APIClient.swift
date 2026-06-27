@@ -21,6 +21,13 @@ enum APIError: LocalizedError {
     case transport(String)
     case http(status: Int, body: String)
     case decoding(String)
+    /// The typed `422 { code: "INVALID_LINK_CODE", message }` from
+    /// `POST /assistant/link` (M3): the redeemed nonce is unknown, expired, or
+    /// already burned. A DISTINCT case (not a generic `.http(422, …)`) so the
+    /// Telegram Connect flow can branch a PERMANENT "bad code" state (do not
+    /// retry) versus a transient network/server failure. Carries the server's
+    /// human-readable `message`.
+    case linkCodeInvalid(message: String)
 
     // MARK: User-facing message
 
@@ -38,6 +45,8 @@ enum APIError: LocalizedError {
             return Self.genericMessage(for: status)
         case .decoding:
             return String(localized: "api.userError.decoding")
+        case .linkCodeInvalid(let message):
+            return message
         }
     }
 
@@ -55,6 +64,8 @@ enum APIError: LocalizedError {
             return String(format: String(localized: "api.error.httpStatusWithBody"), status, body)
         case .decoding(let message):
             return String(format: String(localized: "api.error.decoding"), message)
+        case .linkCodeInvalid(let message):
+            return String(format: String(localized: "api.error.httpStatusWithBody"), 422, message)
         }
     }
 
@@ -67,6 +78,16 @@ enum APIError: LocalizedError {
     /// Convenience for call sites that only care about "session expired / invalid".
     var isUnauthorized: Bool {
         if case .http(let status, _) = self, status == 401 {
+            return true
+        }
+        return false
+    }
+
+    /// True when this is the typed `INVALID_LINK_CODE` rejection — a permanently
+    /// bad linking nonce. The Telegram Connect flow branches on this to show a
+    /// "this code is no longer valid" state instead of offering a retry.
+    var isInvalidLinkCode: Bool {
+        if case .linkCodeInvalid = self {
             return true
         }
         return false
@@ -112,6 +133,31 @@ private struct ServerErrorBody: Decodable {
         guard
             let data = rawBody.data(using: .utf8),
             let decoded = try? JSONDecoder().decode(ServerErrorBody.self, from: data)
+        else {
+            return nil
+        }
+        self = decoded
+    }
+}
+
+/// The typed `POST /assistant/link` 422 body (`{ code, message }`, M3). Decoded
+/// only to recognize the `INVALID_LINK_CODE` discriminator so `perform` can raise
+/// the distinct `APIError.linkCodeInvalid` case the Telegram Connect flow branches
+/// on. A non-matching body falls through to the generic `.http` error.
+private struct LinkErrorBody: Decodable {
+    /// Stable machine-readable discriminator the iOS client switches on. The only
+    /// value the contract defines today (M3).
+    static let invalidLinkCode = "INVALID_LINK_CODE"
+
+    let code: String
+    let message: String?
+
+    /// Decodes from a raw JSON body string; nil when the body isn't the typed
+    /// `{ code, message }` link-error envelope.
+    init?(rawBody: String) {
+        guard
+            let data = rawBody.data(using: .utf8),
+            let decoded = try? JSONDecoder().decode(LinkErrorBody.self, from: data)
         else {
             return nil
         }
@@ -248,6 +294,15 @@ struct APIClient: Sendable {
 
         guard (200..<300).contains(httpResponse.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
+            // Surface the typed 422 INVALID_LINK_CODE as a distinct, matchable
+            // case so the Telegram Connect flow can branch bad-code vs transient.
+            if httpResponse.statusCode == 422,
+               let linkError = LinkErrorBody(rawBody: body),
+               linkError.code == LinkErrorBody.invalidLinkCode {
+                throw APIError.linkCodeInvalid(
+                    message: linkError.message ?? String(localized: "telegram.error.invalidCode")
+                )
+            }
             throw APIError.http(status: httpResponse.statusCode, body: body)
         }
 

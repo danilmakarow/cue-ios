@@ -6,6 +6,27 @@
 import Foundation
 import SwiftData
 
+/// A per-task reminder persisted INLINE on a ``TaskItem`` — the on-device mirror
+/// of the wire ``ReminderDTO``. Stored as an embedded `Codable` value (SwiftData
+/// serializes the array as a blob on the row), NOT a separate `@Model`, because
+/// reminders have no independent identity or query needs: they're a small fixed
+/// set the client re-syncs wholesale with the parent task, exactly like the rest
+/// of the re-syncable cache. `offsetMinutes` is relative to the task start
+/// (negative fires before, positive after).
+struct TaskReminder: Codable, Sendable, Hashable {
+    /// Backend `NotificationRule` id, kept so the client can correlate on re-sync.
+    var id: String
+    var offsetMinutes: Int
+    var channel: NotificationChannel
+
+    /// Builds an inline reminder from its wire shape.
+    init(from dto: ReminderDTO) {
+        self.id = dto.id
+        self.offsetMinutes = dto.offsetMinutes
+        self.channel = dto.channel
+    }
+}
+
 /// On-device calendar occurrence. The persisted unit is the **occurrence**, not
 /// the series, because a recurring task expands to many calendar cells that each
 /// need independent completion state.
@@ -56,6 +77,22 @@ final class TaskItem {
     /// Optional group membership id.
     var groupId: String?
 
+    /// EFFECTIVE color for this occurrence (task ?? group ?? nil): a `TaskColor`
+    /// preset name (e.g. "BLUE") or a `#RRGGBB` hex. Resolve via
+    /// `TaskColorResolver` — NOT always a hex.
+    var colorToken: String?
+    /// The owning group's color (preset name or `#RRGGBB` hex); nil when ungrouped
+    /// or unloaded. Carried so day rails / month dots render the real group color
+    /// even when the task has its own `colorToken` override.
+    var groupColorToken: String?
+    /// Per-task icon (SF Symbol name); nil when iconless.
+    var icon: String?
+    /// Per-task reminders, persisted inline (see ``TaskReminder``). Empty when the
+    /// task has none. Only populated from the series `TaskDTO` upsert path — the
+    /// `OccurrenceDTO` calendar-read shape does not carry reminders, so that path
+    /// leaves the stored set untouched.
+    var reminders: [TaskReminder]
+
     var createdAt: Date
     var updatedAt: Date
 
@@ -76,6 +113,10 @@ final class TaskItem {
         isRecurring: Bool = false,
         isException: Bool = false,
         groupId: String? = nil,
+        colorToken: String? = nil,
+        groupColorToken: String? = nil,
+        icon: String? = nil,
+        reminders: [TaskReminder] = [],
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -93,6 +134,10 @@ final class TaskItem {
         self.isRecurring = isRecurring
         self.isException = isException
         self.groupId = groupId
+        self.colorToken = colorToken
+        self.groupColorToken = groupColorToken
+        self.icon = icon
+        self.reminders = reminders
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

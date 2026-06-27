@@ -14,9 +14,15 @@ final class EventTaskGroup {
     @Attribute(.unique) var id: String
     var calendarId: String
     var name: String
+    /// Group color: a `TaskColor` preset name (e.g. "BLUE") or a `#RRGGBB` hex.
+    /// Resolve via `TaskColorResolver` — despite the legacy property name, this is
+    /// NOT always a hex.
     var colorHex: String?
     var icon: String?
     var sortOrder: Int
+    /// Group default completion requirement inherited by tasks (task-wins); nil
+    /// when unset. Previously dropped client-side (M5).
+    var requiresCompletion: Bool?
     /// Backend id of the group's default recurrence rule (nil when none).
     var defaultRecurrenceRuleId: String?
     var createdAt: Date
@@ -29,6 +35,7 @@ final class EventTaskGroup {
         colorHex: String? = nil,
         icon: String? = nil,
         sortOrder: Int = 0,
+        requiresCompletion: Bool? = nil,
         defaultRecurrenceRuleId: String? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now
@@ -39,6 +46,7 @@ final class EventTaskGroup {
         self.colorHex = colorHex
         self.icon = icon
         self.sortOrder = sortOrder
+        self.requiresCompletion = requiresCompletion
         self.defaultRecurrenceRuleId = defaultRecurrenceRuleId
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -65,6 +73,7 @@ extension EventTaskGroup {
         group.colorHex = dto.color
         group.icon = dto.icon
         group.sortOrder = dto.sortOrder
+        group.requiresCompletion = dto.requiresCompletion
         group.defaultRecurrenceRuleId = dto.defaultRecurrenceRuleId
         group.createdAt = dto.createdAt
         group.updatedAt = dto.updatedAt

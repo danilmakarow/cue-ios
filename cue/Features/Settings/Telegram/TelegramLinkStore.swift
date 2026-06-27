@@ -118,7 +118,14 @@ final class TelegramLinkStore {
             ))
             return true
         } catch {
-            notifications?.postError(error, title: String(localized: "telegram.error.linkFailed"))
+            // Branch the typed INVALID_LINK_CODE (permanently bad nonce) from a
+            // transient failure: the former is a "this code is no longer valid"
+            // state the user fixes by getting a fresh code, not by retrying.
+            if let apiError = error as? APIError, apiError.isInvalidLinkCode {
+                notifications?.postError(error, title: String(localized: "telegram.error.invalidCode"))
+            } else {
+                notifications?.postError(error, title: String(localized: "telegram.error.linkFailed"))
+            }
             return false
         }
     }

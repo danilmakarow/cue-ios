@@ -77,6 +77,23 @@ nonisolated enum RecurrenceEndType: String, Codable, CaseIterable, Sendable {
     case count = "COUNT"
 }
 
+/// MONTHLY working-day (Mon–Fri) anchor for a recurrence rule (S3). Mirrors the
+/// backend `MonthlyAnchorMode` exactly. Pins a single occurrence to the first /
+/// last / day-before-last working day of the month, independent of a fixed
+/// day-of-month or nth-weekday selector.
+///
+/// Honored only for `.monthly` frequency; mutually exclusive with `byMonthDay`,
+/// `bySetPos`, and `byWeekday` (see the cross-field rule on
+/// ``RecurrenceRuleInput``).
+nonisolated enum MonthlyAnchorMode: String, Codable, CaseIterable, Sendable {
+    /// First Mon–Fri on/after the 1st of the month.
+    case firstWorkday = "FIRST_WORKDAY"
+    /// Last Mon–Fri on/before the last day of the month.
+    case lastWorkday = "LAST_WORKDAY"
+    /// The working day immediately before ``lastWorkday`` (second-to-last workday).
+    case dayBeforeLastWorkday = "DAY_BEFORE_LAST_WORKDAY"
+}
+
 /// Server representation of a recurrence rule — embedded in `TaskDTO.recurrence`
 /// and `TaskGroupDTO.recurrence`.
 struct RecurrenceRuleDTO: Codable, Sendable, Hashable {
@@ -88,6 +105,13 @@ struct RecurrenceRuleDTO: Codable, Sendable, Hashable {
     let byWeekday: [Int]?
     let byMonthDay: [Int]?
     let byMonth: [Int]?
+    /// MONTHLY nth-weekday ordinals (RFC-5545 BYSETPOS): 1…4 = first…fourth,
+    /// -1 = last. Combined with `byWeekday` to express "first Monday" / "last
+    /// Friday"; nil means no ordinal restriction. Honored only for `.monthly`.
+    let bySetPos: [Int]?
+    /// MONTHLY working-day anchor (first / last / day-before-last Mon–Fri); nil
+    /// means no working-day anchor. Honored only for `.monthly`.
+    let monthlyAnchor: MonthlyAnchorMode?
     let endType: RecurrenceEndType
     /// "YYYY-MM-DD" — present only when `endType == .untilDate`.
     let endDate: String?
@@ -97,6 +121,12 @@ struct RecurrenceRuleDTO: Codable, Sendable, Hashable {
 
 /// Request body that creates or replaces a recurrence rule (same as
 /// `RecurrenceRuleDTO` minus `id`). Sent inside create/update task & group bodies.
+///
+/// Cross-field rules the editor must enforce before sending (the backend
+/// validates them too):
+/// - `bySetPos` requires a non-empty `byWeekday` and `.monthly` frequency.
+/// - `monthlyAnchor` is mutually exclusive with `byMonthDay` / `bySetPos` /
+///   `byWeekday` and is `.monthly`-only.
 ///
 /// `nonisolated` so its synthesized `Codable` conformance is available off the
 /// main actor — required because it's the `Value` of `FieldUpdate<Value>`, whose
@@ -108,11 +138,52 @@ nonisolated struct RecurrenceRuleInput: Codable, Sendable, Hashable {
     let byWeekday: [Int]?
     let byMonthDay: [Int]?
     let byMonth: [Int]?
+    /// MONTHLY nth-weekday ordinals (1…4 = first…fourth, -1 = last); combine with
+    /// `byWeekday`. Defaulted so existing call sites stay source-compatible.
+    var bySetPos: [Int]? = nil
+    /// MONTHLY working-day anchor. Defaulted so existing call sites stay
+    /// source-compatible.
+    var monthlyAnchor: MonthlyAnchorMode? = nil
     let endType: RecurrenceEndType
     /// "YYYY-MM-DD" — required when `endType == .untilDate`.
     let endDate: String?
     /// Required when `endType == .count`.
     let count: Int?
+}
+
+// MARK: - Reminders
+
+/// Delivery channel for a per-task reminder. Mirrors the backend
+/// `NotificationChannel` exactly.
+///
+/// `nonisolated` so its synthesized `Codable` conformance is reachable off the
+/// main actor — it rides inside the request bodies the `nonisolated` `APIClient`
+/// encodes (via ``ReminderInput``).
+nonisolated enum NotificationChannel: String, Codable, CaseIterable, Sendable {
+    case push = "PUSH"
+    case telegram = "TELEGRAM"
+}
+
+/// Server representation of a per-task reminder, embedded in `TaskDTO.reminders`.
+/// Carries the persisted rule id so the client can correlate, plus the offset +
+/// channel. `offsetMinutes` is relative to the task start: negative fires before,
+/// positive after.
+struct ReminderDTO: Codable, Sendable, Hashable {
+    let id: String
+    let offsetMinutes: Int
+    let channel: NotificationChannel
+}
+
+/// A single per-task reminder on a create/update body — the offset (minutes from
+/// the task start; negative before, positive after) plus the delivery channel.
+/// No `id`: the backend assigns one and returns it on ``ReminderDTO``.
+///
+/// `nonisolated` so its synthesized `Codable` conformance is reachable off the
+/// main actor — it is the element type of the `[ReminderInput]` request fields
+/// the `nonisolated` `APIClient` encodes (and the `Value` of a `FieldUpdate`).
+nonisolated struct ReminderInput: Codable, Sendable, Hashable {
+    let offsetMinutes: Int
+    let channel: NotificationChannel
 }
 
 // MARK: - Task (event)
@@ -131,13 +202,51 @@ struct TaskDTO: Codable, Identifiable, Sendable, Hashable {
     let isAllDay: Bool
     let timezone: String
     let requiresCompletion: Bool
+    /// Per-task color: a `TaskColor` preset name (e.g. "BLUE") or a `#RRGGBB`
+    /// hex; nil inherits the group color. Resolve via ``TaskColorResolver``.
+    let color: String?
+    /// Per-task icon (SF Symbol name); nil leaves the task iconless.
+    let icon: String?
     let completedAt: Date?
     let recurrenceRuleId: String?
     /// Full embedded rule, present when the task has a recurrence.
     let recurrence: RecurrenceRuleDTO?
+    /// The task's own per-task reminders (offset + channel), earliest first.
+    /// Decodes an absent key as an empty array.
+    let reminders: [ReminderDTO]
     let notificationStrategyId: String?
     let createdAt: Date
     let updatedAt: Date
+
+    private enum CodingKeys: String, CodingKey {
+        case id, calendarId, groupId, title, notes, startAt, endAt, isAllDay
+        case timezone, requiresCompletion, color, icon, completedAt
+        case recurrenceRuleId, recurrence, reminders, notificationStrategyId
+        case createdAt, updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        calendarId = try container.decode(String.self, forKey: .calendarId)
+        groupId = try container.decodeIfPresent(String.self, forKey: .groupId)
+        title = try container.decode(String.self, forKey: .title)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        startAt = try container.decodeIfPresent(Date.self, forKey: .startAt)
+        endAt = try container.decodeIfPresent(Date.self, forKey: .endAt)
+        isAllDay = try container.decode(Bool.self, forKey: .isAllDay)
+        timezone = try container.decode(String.self, forKey: .timezone)
+        requiresCompletion = try container.decode(Bool.self, forKey: .requiresCompletion)
+        color = try container.decodeIfPresent(String.self, forKey: .color)
+        icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
+        recurrenceRuleId = try container.decodeIfPresent(String.self, forKey: .recurrenceRuleId)
+        recurrence = try container.decodeIfPresent(RecurrenceRuleDTO.self, forKey: .recurrence)
+        reminders = try container.decodeIfPresent([ReminderDTO].self, forKey: .reminders) ?? []
+        notificationStrategyId = try container.decodeIfPresent(String.self, forKey: .notificationStrategyId)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
 }
 
 /// A single expanded occurrence of a (possibly recurring) task.
@@ -150,6 +259,13 @@ struct OccurrenceDTO: Codable, Sendable {
     let taskId: String
     let calendarId: String
     let groupId: String?
+    /// The owning group's color — a `TaskColor` preset name (e.g. "BLUE") or a
+    /// `#RRGGBB` hex; nil when ungrouped or the group relation wasn't loaded.
+    /// Carried alongside `groupId` so day rails / month dots can render the real
+    /// group color even when the task has its own `color` override. Resolve via
+    /// ``TaskColorResolver`` — NOT always a hex. Defaulted so the
+    /// `TaskDTO`-derived synthesis in `TaskItem+Mapping` stays source-compatible.
+    var groupColorHex: String? = nil
     /// Stable instance key together with `taskId`. ISO string or nil for one-off tasks.
     let originalStart: Date?
     /// Effective start (after applying any override). ISO string or nil.
@@ -161,10 +277,85 @@ struct OccurrenceDTO: Codable, Sendable {
     let isAllDay: Bool
     let timezone: String
     let requiresCompletion: Bool
+    /// EFFECTIVE color (task ?? group ?? nil): a `TaskColor` preset name or a
+    /// `#RRGGBB` hex. Resolve via ``TaskColorResolver``. Defaulted so the
+    /// `TaskDTO`-derived synthesis in `TaskItem+Mapping` stays source-compatible.
+    var color: String? = nil
+    /// Per-task icon (SF Symbol name); nil leaves the occurrence iconless.
+    /// Defaulted so the `TaskDTO`-derived synthesis stays source-compatible.
+    var icon: String? = nil
     /// Per-instance completion timestamp.
     let completedAt: Date?
     let isRecurring: Bool
     let isException: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case taskId, calendarId, groupId, groupColorHex, originalStart
+        case occurrenceStart, occurrenceEnd, title, notes, isAllDay, timezone
+        case requiresCompletion, color, icon, completedAt, isRecurring, isException
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        taskId = try container.decode(String.self, forKey: .taskId)
+        calendarId = try container.decode(String.self, forKey: .calendarId)
+        groupId = try container.decodeIfPresent(String.self, forKey: .groupId)
+        groupColorHex = try container.decodeIfPresent(String.self, forKey: .groupColorHex)
+        originalStart = try container.decodeIfPresent(Date.self, forKey: .originalStart)
+        occurrenceStart = try container.decodeIfPresent(Date.self, forKey: .occurrenceStart)
+        occurrenceEnd = try container.decodeIfPresent(Date.self, forKey: .occurrenceEnd)
+        title = try container.decode(String.self, forKey: .title)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        isAllDay = try container.decode(Bool.self, forKey: .isAllDay)
+        timezone = try container.decode(String.self, forKey: .timezone)
+        requiresCompletion = try container.decode(Bool.self, forKey: .requiresCompletion)
+        color = try container.decodeIfPresent(String.self, forKey: .color)
+        icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
+        isRecurring = try container.decode(Bool.self, forKey: .isRecurring)
+        isException = try container.decode(Bool.self, forKey: .isException)
+    }
+
+    /// Memberwise initializer retained so callers (e.g. `TaskItem+Mapping`'s
+    /// `TaskDTO`-derived synthesis) can build an occurrence directly. The custom
+    /// `init(from:)` shadows the synthesized one, so it's restated here.
+    init(
+        taskId: String,
+        calendarId: String,
+        groupId: String?,
+        groupColorHex: String? = nil,
+        originalStart: Date?,
+        occurrenceStart: Date?,
+        occurrenceEnd: Date?,
+        title: String,
+        notes: String?,
+        isAllDay: Bool,
+        timezone: String,
+        requiresCompletion: Bool,
+        color: String? = nil,
+        icon: String? = nil,
+        completedAt: Date?,
+        isRecurring: Bool,
+        isException: Bool
+    ) {
+        self.taskId = taskId
+        self.calendarId = calendarId
+        self.groupId = groupId
+        self.groupColorHex = groupColorHex
+        self.originalStart = originalStart
+        self.occurrenceStart = occurrenceStart
+        self.occurrenceEnd = occurrenceEnd
+        self.title = title
+        self.notes = notes
+        self.isAllDay = isAllDay
+        self.timezone = timezone
+        self.requiresCompletion = requiresCompletion
+        self.color = color
+        self.icon = icon
+        self.completedAt = completedAt
+        self.isRecurring = isRecurring
+        self.isException = isException
+    }
 }
 
 /// Request payload for `POST /tasks`.
@@ -179,6 +370,13 @@ struct CreateTaskRequest: Codable, Sendable {
     let isAllDay: Bool
     let timezone: String
     let requiresCompletion: Bool
+    /// Optional per-task icon (SF Symbol name); nil/omitted leaves it iconless.
+    /// Defaulted so existing call sites stay source-compatible.
+    var icon: String? = nil
+    /// Optional per-task reminders (offset + channel) persisted at creation time;
+    /// nil/omitted creates none. Defaulted so existing call sites stay
+    /// source-compatible.
+    var reminders: [ReminderInput]? = nil
     /// Optional recurrence rule to attach at creation time.
     let recurrence: RecurrenceRuleInput?
 }
@@ -196,10 +394,20 @@ struct UpdateTaskRequest: Encodable, Sendable {
     var isAllDay: Bool?
     var requiresCompletion: Bool?
     var groupId: String?
+    /// Per-task icon. A ``FieldUpdate`` so the edit screen can distinguish "leave
+    /// the icon alone" (`.unchanged`) from "remove it" (`.clear` → explicit JSON
+    /// `null`) versus "set it" (`.set`).
+    var icon: FieldUpdate<String> = .unchanged
+    /// Per-task reminders. NOT a tri-state: this field is "replace the whole set"
+    /// — `nil` omits the key (leave untouched), an empty array clears all
+    /// reminders, a populated array replaces them. (The backend has no
+    /// explicit-null semantics for this field, so a plain optional models it.)
+    var reminders: [ReminderInput]?
     var recurrence: FieldUpdate<RecurrenceRuleInput> = .unchanged
 
     private enum CodingKeys: String, CodingKey {
-        case title, notes, startAt, endAt, isAllDay, requiresCompletion, groupId, recurrence
+        case title, notes, startAt, endAt, isAllDay, requiresCompletion, groupId
+        case icon, reminders, recurrence
     }
 
     func encode(to encoder: Encoder) throws {
@@ -211,6 +419,8 @@ struct UpdateTaskRequest: Encodable, Sendable {
         try container.encodeIfPresent(isAllDay, forKey: .isAllDay)
         try container.encodeIfPresent(requiresCompletion, forKey: .requiresCompletion)
         try container.encodeIfPresent(groupId, forKey: .groupId)
+        try icon.encode(into: &container, forKey: .icon)
+        try container.encodeIfPresent(reminders, forKey: .reminders)
         try recurrence.encode(into: &container, forKey: .recurrence)
     }
 }
@@ -251,6 +461,35 @@ struct SkipResponse: Codable, Sendable {
 /// date string to that day's occurrence total; zero-count days are omitted.
 struct DailyCountsResponse: Codable, Sendable {
     let counts: [String: Int]
+}
+
+// MARK: - Task search
+
+/// A single task search hit, returned by `GET /tasks/search` (M1). Carries the
+/// matched series row's identity and its anchor date/time plus the owning group's
+/// id + color, so the search screen can render the row with its real group color
+/// and navigate to its date — even for a recurring series, where `startAt` is the
+/// anchor occurrence.
+struct TaskSearchResultDTO: Codable, Identifiable, Sendable, Hashable {
+    /// Series / anchor id (== `TaskDTO.id`).
+    let taskId: String
+    let calendarId: String
+    let groupId: String?
+    /// The owning group's color — a `TaskColor` preset name (e.g. "BLUE") or a
+    /// `#RRGGBB` hex; nil when ungrouped. Resolve via ``TaskColorResolver`` —
+    /// NOT always a hex.
+    let groupColorHex: String?
+    let title: String
+    let notes: String?
+    let startAt: Date?
+    let endAt: Date?
+    let isAllDay: Bool
+    let timezone: String
+    /// True when the matched task is a recurring series (`startAt` is its anchor).
+    let isRecurring: Bool
+
+    /// `Identifiable` via the series id, so a `List`/`ForEach` of hits is stable.
+    var id: String { taskId }
 }
 
 // MARK: - Delta sync (Phase 3)
@@ -307,12 +546,37 @@ struct TaskGroupDTO: Codable, Identifiable, Sendable, Hashable {
     let color: String?
     let icon: String?
     let sortOrder: Int
+    /// Group default completion requirement inherited by tasks (task-wins); nil
+    /// means unset. Decodes an absent key as nil.
+    let requiresCompletion: Bool?
     let defaultRecurrenceRuleId: String?
     /// Full embedded group-level default recurrence rule.
     let recurrence: RecurrenceRuleDTO?
     let defaultNotificationStrategyId: String?
     let createdAt: Date
     let updatedAt: Date
+
+    private enum CodingKeys: String, CodingKey {
+        case id, calendarId, name, color, icon, sortOrder, requiresCompletion
+        case defaultRecurrenceRuleId, recurrence, defaultNotificationStrategyId
+        case createdAt, updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        calendarId = try container.decode(String.self, forKey: .calendarId)
+        name = try container.decode(String.self, forKey: .name)
+        color = try container.decodeIfPresent(String.self, forKey: .color)
+        icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        sortOrder = try container.decode(Int.self, forKey: .sortOrder)
+        requiresCompletion = try container.decodeIfPresent(Bool.self, forKey: .requiresCompletion)
+        defaultRecurrenceRuleId = try container.decodeIfPresent(String.self, forKey: .defaultRecurrenceRuleId)
+        recurrence = try container.decodeIfPresent(RecurrenceRuleDTO.self, forKey: .recurrence)
+        defaultNotificationStrategyId = try container.decodeIfPresent(String.self, forKey: .defaultNotificationStrategyId)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
 }
 
 /// Request payload for `POST /task-groups`.
@@ -322,6 +586,9 @@ struct CreateTaskGroupRequest: Codable, Sendable {
     let color: String?
     let icon: String?
     let sortOrder: Int?
+    /// Group default completion requirement inherited by tasks (task-wins).
+    /// Defaulted so existing call sites stay source-compatible.
+    var requiresCompletion: Bool? = nil
     /// Optional default recurrence rule for all tasks in the group.
     let recurrence: RecurrenceRuleInput?
 }
@@ -335,10 +602,14 @@ struct UpdateTaskGroupRequest: Encodable, Sendable {
     var color: String?
     var icon: String?
     var sortOrder: Int?
+    /// Group default completion requirement. A ``FieldUpdate`` so the editor can
+    /// clear it (`.clear` → explicit JSON `null`, the group then inherits the
+    /// default) versus leaving it untouched (`.unchanged` → key omitted).
+    var requiresCompletion: FieldUpdate<Bool> = .unchanged
     var recurrence: FieldUpdate<RecurrenceRuleInput> = .unchanged
 
     private enum CodingKeys: String, CodingKey {
-        case name, color, icon, sortOrder, recurrence
+        case name, color, icon, sortOrder, requiresCompletion, recurrence
     }
 
     func encode(to encoder: Encoder) throws {
@@ -347,8 +618,16 @@ struct UpdateTaskGroupRequest: Encodable, Sendable {
         try container.encodeIfPresent(color, forKey: .color)
         try container.encodeIfPresent(icon, forKey: .icon)
         try container.encodeIfPresent(sortOrder, forKey: .sortOrder)
+        try requiresCompletion.encode(into: &container, forKey: .requiresCompletion)
         try recurrence.encode(into: &container, forKey: .recurrence)
     }
+}
+
+/// Request payload for `POST /task-groups/reorder` (M5). `groupIds` is the
+/// complete, ordered list of group ids whose position changed; the server assigns
+/// each row a `sortOrder` equal to its array index, transactionally.
+struct ReorderTaskGroupsRequest: Codable, Sendable {
+    let groupIds: [String]
 }
 
 /// Legacy completion-toggle request kept for `UpdateTaskCompletionRequest`
@@ -382,4 +661,170 @@ struct TelegramLinkStatusDTO: Codable, Sendable, Equatable {
     let linked: Bool
     let telegramUsername: String?
     let linkedAt: String?
+}
+
+// MARK: - Assistant parse (quick-create)
+
+/// Request payload for `POST /assistant/parse` (D4) — one line of natural
+/// language the quick-create well sends to be turned into a structured task
+/// draft WITHOUT creating anything.
+struct ParseTaskRequest: Codable, Sendable {
+    let text: String
+}
+
+/// Response from `POST /assistant/parse` (D4) — the structured task DRAFT the
+/// assistant extracted from one line of natural language. A draft only: no task
+/// is created. The quick-create well pre-fills its fields from this and lets the
+/// user confirm/edit before a real `POST /tasks`.
+///
+/// `start` is an ISO-8601 datetime resolved in the user's timezone (absent for a
+/// timeless todo). It is decoded as a `String?` rather than a `Date` to avoid
+/// coupling to the shared decoder's `.iso8601` (no-fractional-seconds) strategy,
+/// which would fail the whole decode on a fractional-seconds timestamp; parse it
+/// leniently at the call site. `durationMinutes`, `recurrence`, and `groupId` are
+/// present only when the text implied them.
+struct TaskDraftDTO: Codable, Sendable {
+    let title: String
+    /// ISO-8601 start datetime resolved in the user timezone, or nil for a
+    /// timeless todo. Display-only string (see type doc).
+    let start: String?
+    let durationMinutes: Int?
+    /// Recurrence rule, present only when the text stated a repeat.
+    let recurrence: RecurrenceRuleInput?
+    /// Id of an EXISTING group the draft was matched to, nil when none applied.
+    let groupId: String?
+}
+
+// MARK: - User account & settings
+
+/// Response from `GET`/`PATCH /users/me/settings` (D8). The signed-in user's
+/// mutable account settings the Settings screen reads and round-trips. `timezone`
+/// is the IANA zone every time-of-day-local computation resolves against;
+/// `displayName` / `avatarBase64` are editable post sign-in; `morningBriefEnabled`
+/// / `eveningRecapEnabled` are the cross-device notification opt-ins.
+struct UserSettingsDTO: Codable, Sendable, Equatable {
+    let timezone: String
+    let displayName: String?
+    /// Base64-encoded profile picture (no data-URL prefix); nil when unset.
+    let avatarBase64: String?
+    let morningBriefEnabled: Bool
+    let eveningRecapEnabled: Bool
+}
+
+/// Request payload for `PATCH /users/me/settings` (D8). Every field is optional —
+/// send only what changed; omitted keys leave the stored value unchanged.
+/// `displayName` is trimmed + non-empty server-side; `avatarBase64` is a bare
+/// base64 image (no data-URL prefix).
+struct UpdateUserSettingsRequest: Codable, Sendable {
+    var timezone: String? = nil
+    var displayName: String? = nil
+    var avatarBase64: String? = nil
+    var morningBriefEnabled: Bool? = nil
+    var eveningRecapEnabled: Bool? = nil
+}
+
+// MARK: - Device (APNs)
+
+/// Supported push-token platform. Mirrors the backend `DevicePlatform` exactly.
+/// Lowercase raw values match the wire contract (`"ios"`, not `"IOS"`).
+nonisolated enum DevicePlatform: String, Codable, CaseIterable, Sendable {
+    case ios
+    case ipados
+    case macos
+}
+
+/// Server representation of a registered device, returned by
+/// `POST /users/me/devices` (S2). Omits the owning user (implicit from the authed
+/// caller). `token` is the opaque APNs device token.
+struct DeviceDTO: Codable, Identifiable, Sendable, Hashable {
+    let id: String
+    let token: String
+    let platform: DevicePlatform
+    let lastSeenAt: Date?
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+/// Request payload for `POST /users/me/devices` (S2) — registers (upserts) an
+/// APNs device token for the current user. Idempotent server-side.
+struct RegisterDeviceRequest: Codable, Sendable {
+    let token: String
+    let platform: DevicePlatform
+}
+
+// MARK: - Daily report settings & brief
+
+/// Response from `GET`/`PATCH /users/me/report-settings` (ADR 0046). The Settings
+/// screen reads this to render the report toggle, time picker, and channel.
+/// `reportTimeLocal` is a 24-hour `HH:mm` wall-clock string in the user timezone.
+struct ReportSettingsDTO: Codable, Sendable, Equatable {
+    let enabled: Bool
+    /// Local wall-clock send time as `HH:mm` (24-hour), in the user timezone.
+    let reportTimeLocal: String
+    /// Preferred delivery channel. NOTE: push delivery is deferred — a `.push`
+    /// value persists but Telegram delivers today regardless.
+    let channel: NotificationChannel
+}
+
+/// Request payload for `PATCH /users/me/report-settings` (ADR 0046). Both fields
+/// optional — send only what changed. `reportTimeLocal` must be a 24-hour `HH:mm`.
+struct UpdateReportSettingsRequest: Codable, Sendable {
+    var enabled: Bool? = nil
+    var reportTimeLocal: String? = nil
+    var channel: NotificationChannel? = nil
+}
+
+/// Response from `GET /users/me/daily-brief` (D2). The generated morning-brief
+/// text the today card renders, plus the resolved local date it covers. `brief`
+/// is nil when generation produced nothing usable for the day.
+struct DailyBriefDTO: Codable, Sendable, Equatable {
+    let brief: String?
+    /// The local date (`YYYY-MM-DD`, in the user timezone) the brief covers.
+    let localDate: String
+}
+
+// MARK: - AI persona
+
+/// Provenance of the active persona. Mirrors the backend `PersonaPromptSource`
+/// exactly (lowercase wire values).
+nonisolated enum PersonaPromptSource: String, Codable, CaseIterable, Sendable {
+    case preset
+    case custom
+}
+
+/// Response from `GET`/`PATCH`/`DELETE /users/me/persona-settings` (Story 18 /
+/// ADR 0014). The active persona the assistant adopts: the user's own custom text
+/// when set, else the seeded "Jarvis" preset. `source` tells the screen which it
+/// is; `presetName` is the preset's display name when applicable.
+struct PersonaSettingsDTO: Codable, Sendable, Equatable {
+    /// The active persona instruction text the assistant adopts.
+    let promptText: String
+    let source: PersonaPromptSource
+    /// Display name when the active persona is a preset, else nil.
+    let presetName: String?
+}
+
+/// Request payload for `PATCH /users/me/persona-settings` — sets the user's
+/// custom persona text (validated non-empty + length-bounded server-side).
+struct UpdatePersonaSettingsRequest: Codable, Sendable {
+    let promptText: String
+}
+
+/// Response from `GET /users/me/persona-presets` (D9) — one curated persona
+/// preset the persona screen lists as a pickable starting point. `id` addresses
+/// the row; `presetName` is the display label; `promptText` is the full persona
+/// instruction text previewed in the editor.
+struct PersonaPresetDTO: Codable, Identifiable, Sendable, Hashable {
+    let id: String
+    let presetName: String
+    let promptText: String
+}
+
+// MARK: - Shared OK envelope
+
+/// Response from endpoints that reply `200 { ok: true }` (e.g.
+/// `DELETE /users/me`, `DELETE /users/me/devices/:token`). A decodable body the
+/// client can confirm rather than a bare 204.
+struct OkResponse: Codable, Sendable {
+    let ok: Bool
 }
