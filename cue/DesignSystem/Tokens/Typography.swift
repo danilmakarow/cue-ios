@@ -5,20 +5,19 @@
 //  Semantic type system — one of the four design-token axes. See
 //  docs/specs/design-tokens.md.
 //
-//  Three voices, each with one job (Kraft & Ink):
-//    • Display / headings — Fraunces (bundled serif). The human, "set by a
-//      typesetter" voice. Falls back to the system serif until the font loads.
-//    • Body / labels      — Public Sans (bundled humanist sans — explicitly NOT
-//      Inter/system). Plain-spoken, legible. Per-glyph fallback to the system
-//      font covers Cyrillic (Public Sans ships latin-only), so `uk` text still
-//      renders; Latin reads in Public Sans.
+//  Three voices, each with one job (CUE — Clean):
+//    • Display / headings — IBM Plex Serif (bundled). The editorial, upright slab
+//      serif. Titles >= 17px ONLY; never body/labels. Falls back to the system
+//      serif until the font loads.
+//    • Body / labels      — the native system sans (SF Pro / -apple-system), via
+//      SwiftUI's Dynamic-Type text styles. Full Unicode incl. Cyrillic for `uk`.
+//      (Replaces the bundled Public Sans, which was latin-only.)
 //    • Code / receipts    — JetBrains Mono (bundled). IDs, dates, amounts,
-//      stamps, eyebrow micro-labels — the "recorded by the system" voice. Full
-//      Cyrillic coverage.
+//      stamps, eyebrow micro-labels — the "recorded by the system" voice.
 //
-//  Swapping a face later is a one-file edit: change `Typography.serifFamily`,
-//  `bodyFamily`, or `monoFamily` (or a single role below). All three families
-//  are bundled in cue/Resources/Fonts and registered in Config/Info.plist.
+//  Swapping the serif/mono face later is a one-line edit (`serifFamily` /
+//  `monoFamily`). Both are bundled in cue/Resources/Fonts and registered in
+//  Config/Info.plist. Body uses the system font (no bundle needed).
 //
 
 import SwiftUI
@@ -37,39 +36,36 @@ enum TextRole {
     case titleL
     /// Card / row title — serif.
     case titleM
-    /// Emphasised lead line — serif, reading size.
+    /// Emphasised lead line — serif, reading size (17pt — the serif floor).
     case headline
-    /// Default body copy — SF Pro.
+    /// Default body copy — system sans (16pt).
     case body
-    /// Emphasised body — SF Pro, medium.
+    /// Emphasised body — system sans, semibold (16pt). Button labels.
     case bodyEmphasis
-    /// Supporting copy — SF Pro, slightly smaller.
+    /// Supporting copy — system sans (15pt).
     case callout
-    /// Field labels / eyebrows — SF Pro, medium, tight.
+    /// Field labels / eyebrows — system sans, medium (13pt).
     case label
-    /// Captions, footnotes — SF Pro, small.
+    /// Captions, footnotes — system sans (12pt).
     case caption
-    /// The receipt voice — monospaced IDs, dates, amounts, stamps.
+    /// The receipt voice — monospaced IDs, dates, amounts, stamps (13pt).
     case code
-    /// Small monospaced detail (micro-labels).
+    /// Small monospaced detail (micro-labels, 11pt).
     case codeSmall
 }
 
 enum Typography {
     /// The bundled display family. One place to swap the serif face.
     /// Resolves to the system serif until the font registers (graceful).
-    static let serifFamily = "Fraunces"
-
-    /// The bundled body family — Public Sans (humanist sans, NOT Inter/system).
-    /// Per-glyph fallback to the system font handles glyphs Public Sans lacks
-    /// (e.g. Cyrillic for `uk`), so missing glyphs never blank out.
-    static let bodyFamily = "Public Sans"
+    static let serifFamily = "IBM Plex Serif"
 
     /// The bundled monospace family — JetBrains Mono (receipts / IDs / dates /
     /// eyebrow micro-labels). Full Cyrillic coverage.
     static let monoFamily = "JetBrains Mono"
 
-    /// The resolved `Font` for a role, scaled by Dynamic Type via `relativeTo`.
+    /// The resolved `Font` for a role, scaled by Dynamic Type. Serif/mono roles
+    /// scale via `.custom(_:size:relativeTo:)`; body roles use the native system
+    /// text styles (which carry exact ramp sizes and scale automatically).
     static func font(for role: TextRole) -> Font {
         switch role {
         case .displayL:
@@ -83,15 +79,15 @@ enum Typography {
         case .headline:
             return serif(17, relativeTo: .headline).weight(.medium)
         case .body:
-            return body(16, relativeTo: .body).weight(.regular)
+            return .system(.callout).weight(.regular)        // 16pt
         case .bodyEmphasis:
-            return body(16, relativeTo: .body).weight(.semibold)
+            return .system(.callout).weight(.semibold)       // 16pt
         case .callout:
-            return body(15, relativeTo: .callout).weight(.regular)
+            return .system(.subheadline).weight(.regular)    // 15pt
         case .label:
-            return body(13, relativeTo: .footnote).weight(.medium)
+            return .system(.footnote).weight(.medium)        // 13pt
         case .caption:
-            return body(12, relativeTo: .caption).weight(.regular)
+            return .system(.caption).weight(.regular)        // 12pt
         case .code:
             return mono(13, relativeTo: .footnote).weight(.regular)
         case .codeSmall:
@@ -111,16 +107,10 @@ enum Typography {
         }
     }
 
-    /// A Fraunces font at `size`, scaling with Dynamic Type relative to `style`.
-    /// Falls back to the system serif when the custom font is unavailable.
+    /// An IBM Plex Serif font at `size`, scaling with Dynamic Type relative to
+    /// `style`. Falls back to the system serif when the custom font is unavailable.
     private static func serif(_ size: CGFloat, relativeTo style: Font.TextStyle) -> Font {
         .custom(serifFamily, size: size, relativeTo: style)
-    }
-
-    /// A Public Sans body font at `size`, scaling with Dynamic Type relative to
-    /// `style`. Per-glyph fallback to the system font covers any missing glyphs.
-    private static func body(_ size: CGFloat, relativeTo style: Font.TextStyle) -> Font {
-        .custom(bodyFamily, size: size, relativeTo: style)
     }
 
     /// A JetBrains Mono font at `size`, scaling with Dynamic Type relative to

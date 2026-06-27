@@ -8,10 +8,11 @@
 
 import SwiftUI
 
-/// The app's corner-radius scale. Kraft & Ink favours crisp "cut paper" edges
-/// (no 16–20pt squircle bubbles): chips at 4pt, buttons/fields at 6pt, cards at
-/// 10pt. The depth comes from a 1px border + value-step, not a big radius —
-/// capsules are reserved for genuinely segmented toggles, never for chips.
+/// The app's corner-radius scale. CUE — Clean uses SOFT corners (the old Kraft
+/// "cut paper" 4–10pt is retired): chips at 8pt, buttons/fields at 10pt, cards at
+/// 12pt, a 14pt floating ceiling, and 16pt for the FAB. Depth comes from a soft
+/// floating shadow (see `Depth`), not a big radius — capsules are still reserved
+/// for genuinely segmented toggles.
 ///
 /// React analogy: `theme.radii` tokens consumed instead of magic `border-radius`
 /// values scattered across components.
@@ -20,17 +21,16 @@ enum Radius {
     static let none: CGFloat = 0
     /// 2pt — barely-rounded micro-controls.
     static let tight: CGFloat = 2
-    /// 4pt — chips: word + filled/empty shape, a hard "rubber-stamp" corner
-    /// (never a pill). One step tighter than buttons so chips read as marks, not
-    /// controls.
-    static let chip: CGFloat = 4
-    /// 6pt — the default "cut paper" radius for buttons, fields, overlays.
-    static let small: CGFloat = 6
-    /// 8pt — slightly softer containers (icon tiles, grouped rows).
-    static let medium: CGFloat = 8
-    /// 10pt — cards. Roomier than a button but still a crisp cut sheet (not a
-    /// 16–20pt bubble), letting the 1px border + value-step do the lifting.
-    static let card: CGFloat = 10
-    /// 12pt — large surfaces (sheets, prominent cards).
-    static let large: CGFloat = 12
+    /// 8pt — chips and small selectable pills (soft, not a hard cut).
+    static let chip: CGFloat = 8
+    /// 10pt — the default radius for buttons, fields, and overlays.
+    static let small: CGFloat = 10
+    /// 12pt — icon tiles, grouped rows, inset containers.
+    static let medium: CGFloat = 12
+    /// 12pt — cards / tiles.
+    static let card: CGFloat = 12
+    /// 14pt — the floating-element ceiling (prominent sheets / elevated cards).
+    static let large: CGFloat = 14
+    /// 16pt — the FAB and large floating affordances.
+    static let xlarge: CGFloat = 16
 }

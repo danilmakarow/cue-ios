@@ -5,22 +5,22 @@
 //  The single source of truth for Cue's color system.
 //
 //  ─────────────────────────────────────────────────────────────────────────
-//  "Kraft & Ink on white" — espresso ink on a clean white page
+//  "CUE — Clean" — ink on a white page, clay + olive accents (Claude-desktop look)
 //  ─────────────────────────────────────────────────────────────────────────
-//      #FFFFFF  PAGE     pure white canvas    →  the page behind everything
-//      #FAF6EF  SHEET    faint warm paper     →  cards, panels (lift by value + 1px edge)
-//      #FEFCF8  RISER    near-white sheet     →  top sheets / elevated surfaces
-//      #F1EADF  TRAY     muted recessed tan   →  header strips, table zebra
-//      #5A3A24  ESPRESSO warm brown ink       →  the hero / primary / tint
-//      #2E211A  INK      near-black warm       →  text and headings
-//      #BE4A28  CLAY     warmed terracotta    →  the ONE rationed accent / TODAY seal
-//      #466234  OLIVE / #A8331F BRICK / #C9A24B BRASS — earthy status colors
+//      #FFFFFF  PAGE     pure white canvas    →  app background AND cards (white)
+//      #F7F6F4  GROUPED  faint grouped canvas →  area behind grouped white cards
+//      #F0EEEB  FILL     neutral gray fill    →  inputs, search bars, tracks, selected pills
+//      #BE4A28  CLAY     terracotta           →  primary / brand / now-line / decisive CTA
+//      #466234  OLIVE    earthy green         →  today / done / ON / positive
+//      #1F1E1C  INK      warm near-black       →  text, headings, structural info
+//      #A8331F BRICK (destructive) · #C9A24B BRASS (pending — ink on it)
 //
-//  This is a deliberate variation of the canonical Kraft & Ink spec: its canvas
-//  was kraft tan #F2E8D8; here the canvas is WHITE and the paper warmth is
-//  carried by the INK and ACCENTS instead. The surface ramp is retuned because
-//  "lighter than the canvas" inverts on white — surfaces now lift by faint
-//  warmth + a 1px functional edge (letterpress), not by going lighter.
+//  Migrated FROM "Kraft & Ink" (espresso/warm-paper/letterpress, one rationed
+//  clay seal). Now: pure-white surfaces, SOFT floating shadows (see Depth), and
+//  GENEROUS balanced clay+olive accents. Selection rule: neutral selection = GRAY
+//  fill; semantic emphasis = accent (today/done/ON = olive, brand/now = clay).
+//  NOTE: the `kraftInk` palette symbol name is retained to avoid ripple; its
+//  VALUES are now Clean (rename to `clean` is a deferred Phase-5 cleanup).
 //
 //  The rest of the app never references hex or raw palette colors — it speaks in
 //  *roles* (`theme.background`, `theme.primary`, …) read from the environment.
@@ -119,19 +119,30 @@ enum TravelerColor {
 ///   brass-fill / brick / espresso). `warning` is a fill only — brass-as-text fails.
 struct ThemeColors: Sendable, Equatable {
     let background: Color
+    /// Faint grouped-list canvas behind white cards (`#F7F6F4`).
+    let surfaceGrouped: Color
     let surface: Color
     let surfaceElevated: Color
+    /// Neutral gray fill — inputs, search bars, segmented tracks, header strips (`#F0EEEB`).
     let surfaceSunken: Color
+    /// Neutral selected / hover row fill (`#ECE9E6`). Distinct from accent selection.
+    let fillSelected: Color
     let primary: Color
     let primaryPressed: Color
     let secondary: Color
     let accentText: Color
+    /// Light clay wash — selected chips, today-accent backgrounds (`#FBEEE7`).
+    let accentSoft: Color
     let onAccent: Color
     let textPrimary: Color
     let textSecondary: Color
+    /// Muted/placeholder/weekday-letter text (`#9C9893`).
+    let textTertiary: Color
     let separator: Color
     let border: Color
     let success: Color
+    /// Light olive wash — positive/today-accent backgrounds (`#E9EFE2`).
+    let successSoft: Color
     let warning: Color
     let danger: Color
     let info: Color
@@ -149,8 +160,9 @@ struct ThemeColors: Sendable, Equatable {
 ///
 /// Stored as a raw string so it round-trips through `UserDefaults`.
 enum AppPalette: String, CaseIterable, Identifiable, Sendable {
-    /// Kraft & Ink — warm kraft-paper workspace, espresso ink, one rationed clay
-    /// wax-seal accent. The sole identity.
+    /// CUE — Clean — white workspace, warm-ink text, generous clay + olive
+    /// accents, soft floating elevation. The sole identity. (Symbol name
+    /// `kraftInk` retained to avoid ripple; rename to `clean` is a Phase-5 cleanup.)
     case kraftInk
 
     var id: String { rawValue }
@@ -173,7 +185,7 @@ enum AppPalette: String, CaseIterable, Identifiable, Sendable {
     var swatch: (canvas: Color, primary: Color, secondary: Color) {
         switch self {
         case .kraftInk:
-            return (Color(hex: 0xFFFFFF), Color(hex: 0x5A3A24), Color(hex: 0xBE4A28))
+            return (Color(hex: 0xFFFFFF), Color(hex: 0xBE4A28), Color(hex: 0x466234))
         }
     }
 
@@ -186,58 +198,51 @@ enum AppPalette: String, CaseIterable, Identifiable, Sendable {
 
     // MARK: Resolved tables
 
-    /// Kraft & Ink on white — espresso ink on a clean white page. Single static
+    /// CUE — Clean: ink on a white page, clay + olive accents. Single static
     /// colors (dark deferred; the app pins `.light`). When dark ships, swap each
     /// to `Color(light:dark:)`.
     ///
-    /// Surface ramp (retuned for a white canvas — you cannot go lighter than
-    /// white, so surfaces lift by faint warmth + a 1px functional edge, not by
-    /// going lighter): white `#FFFFFF` page → `surface` `#FAF6EF` (faint warm
-    /// paper) → `surfaceElevated` `#FEFCF8` (near-white top sheet) →
-    /// `surfaceSunken` `#F1EADF` (muted recessed tan, descendant of the old kraft).
+    /// Surfaces are pure white `#FFFFFF` (background AND cards); the grouped-list
+    /// canvas behind cards is `surfaceGrouped` `#F7F6F4`; `surfaceSunken` `#F0EEEB`
+    /// is the neutral gray component fill (inputs, tracks, selected pills). Depth
+    /// comes from SOFT floating shadows (see `Depth`), not a value-step + border.
     ///
-    /// Accessibility (measured, sRGB / WCAG 2.1 — re-verified on the white canvas
-    /// and on every surface tone; lowest figure per role shown is on `sunken`):
-    /// - ink `#2E211A` text: white 15.57:1, surface 14.45, elevated 15.20, sunken 13.03 — AAA.
-    /// - muted `#6E5C4C` text: white 6.37:1, surface 5.91, elevated 6.21, sunken 5.33 — AA.
-    /// - espresso `#5A3A24` (primary/info) text: white 10.17:1, sunken 8.51 — AAA.
-    /// - clay-as-text `accentText` `#A53D22`: white 6.38:1, sunken 5.34 — AA. (The
-    ///   seal fill `secondary` `#BE4A28` is ~3.6:1 on white — FILL ONLY, never text.)
-    /// - success olive `#466234` text: white 6.87:1, sunken 5.75 — AA.
-    /// - danger brick `#A8331F` text: white 6.65:1, sunken 5.56 — AA.
-    /// - cream `onAccent` `#FBF5EA` on fills: on primary 9.37:1, on primaryPressed
-    ///   12.32, on seal `#BE4A28` 4.61 (AA), on success 6.33, on danger 6.13.
-    /// - `border` `#8C7142` functional edge: 4.61:1 on white, 3.86 on sunken
-    ///   (clears the 3:1 non-text minimum on every surface).
-    /// - `separator` `#D0BA98` is decorative ornament only: ~1.88:1 on white,
-    ///   ~1.58 on sunken — faintly visible, intentionally below the functional
-    ///   `border` so it never reads as an edge. (Bumped darker from the spec's
-    ///   `#D8C4A6`, which nearly vanished on white at ~1.70:1.)
-    /// - brass `warning` `#C9A24B` is a FILL only: ink `#2E211A` on it ≈ 6.49:1;
-    ///   cream on it ≈ 2.21:1 — so place INK (never cream, never text-as-brass) on it.
+    /// Accessibility (sRGB / WCAG 2.1, on white `#FFFFFF`):
+    /// - ink `#1F1E1C` text ≈ 16.1:1 (AAA); secondary `#6B6864` ≈ 5.5:1 (AA);
+    ///   tertiary `#9C9893` ≈ 2.9:1 (placeholder/decorative only, not body text).
+    /// - clay-as-text `accentText` `#A53D22` ≈ 5.7:1 (AA). The clay FILL `primary`/
+    ///   `secondary` `#BE4A28` ≈ 3.6:1 — FILL ONLY, never text. `onAccent` is white.
+    /// - olive `success` `#466234` text ≈ 6.9:1 (AA); brick `danger` `#A8331F`
+    ///   ≈ 6.6:1 (AA). Brass `warning` `#C9A24B` is a FILL — place dark INK on it.
+    /// - `border` `#E6E3E0` functional edge and `separator` `#EFEDEA` decorative
+    ///   hairline are intentionally light, leaning on the soft shadow for depth.
     ///
-    /// More-accent discipline: the rationed terracotta `secondary` is the
-    /// calendar's one-hot moment — the TODAY / now marker. Olive `success` carries
-    /// completed/agreed states, brass `warning` carries pending/draft-like states,
-    /// espresso `primary` stays structural. Color presence, not a rainbow.
+    /// Accent discipline (now generous, not rationed): clay `primary` = brand /
+    /// now-line / decisive CTA; olive `success` = today / done / ON / positive;
+    /// neutral GRAY (`surfaceSunken`/`fillSelected`) = non-semantic selection.
     private static let kraftInkColors = ThemeColors(
         background: Color(hex: 0xFFFFFF),
-        surface: Color(hex: 0xFAF6EF),
-        surfaceElevated: Color(hex: 0xFEFCF8),
-        surfaceSunken: Color(hex: 0xF1EADF),
-        primary: Color(hex: 0x5A3A24),
-        primaryPressed: Color(hex: 0x43291A),
+        surfaceGrouped: Color(hex: 0xF7F6F4),
+        surface: Color(hex: 0xFFFFFF),
+        surfaceElevated: Color(hex: 0xFFFFFF),
+        surfaceSunken: Color(hex: 0xF0EEEB),
+        fillSelected: Color(hex: 0xECE9E6),
+        primary: Color(hex: 0xBE4A28),
+        primaryPressed: Color(hex: 0xA53D22),
         secondary: Color(hex: 0xBE4A28),
         accentText: Color(hex: 0xA53D22),
-        onAccent: Color(hex: 0xFBF5EA),
-        textPrimary: Color(hex: 0x2E211A),
-        textSecondary: Color(hex: 0x6E5C4C),
-        separator: Color(hex: 0xD0BA98),
-        border: Color(hex: 0x8C7142),
+        accentSoft: Color(hex: 0xFBEEE7),
+        onAccent: Color(hex: 0xFFFFFF),
+        textPrimary: Color(hex: 0x1F1E1C),
+        textSecondary: Color(hex: 0x6B6864),
+        textTertiary: Color(hex: 0x9C9893),
+        separator: Color(hex: 0xEFEDEA),
+        border: Color(hex: 0xE6E3E0),
         success: Color(hex: 0x466234),
+        successSoft: Color(hex: 0xE9EFE2),
         warning: Color(hex: 0xC9A24B),
         danger: Color(hex: 0xA8331F),
-        info: Color(hex: 0x5A3A24)
+        info: Color(hex: 0x1F1E1C)
     )
 }
 

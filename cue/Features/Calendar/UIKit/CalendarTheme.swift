@@ -140,21 +140,16 @@ struct CalendarTheme: Equatable {
         return Self.scaled(base, relativeTo: style, traits: traits)
     }
 
-    /// The bundled Public Sans body `UIFont` at `size`/`weight`, scaled for
-    /// Dynamic Type relative to `style`. Falls back to SF Pro when the bundled
-    /// face isn't registered, matching the SwiftUI body token's behavior.
+    /// The native system-sans body `UIFont` at `size`/`weight`, scaled for
+    /// Dynamic Type relative to `style`. Matches the SwiftUI body token, which
+    /// now uses the system font (SF Pro) rather than a bundled face.
     private static func bodyFont(
         _ size: CGFloat,
         weight: UIFont.Weight,
         relativeTo style: UIFont.TextStyle,
         traits: UITraitCollection
     ) -> UIFont {
-        let base: UIFont
-        if let publicSans = UIFont(name: Typography.bodyFamily, size: size) {
-            base = Self.applying(weight: weight, to: publicSans, size: size)
-        } else {
-            base = UIFont.systemFont(ofSize: size, weight: weight)
-        }
+        let base = UIFont.systemFont(ofSize: size, weight: weight)
         return Self.scaled(base, relativeTo: style, traits: traits)
     }
 

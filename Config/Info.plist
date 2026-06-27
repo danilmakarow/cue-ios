@@ -69,12 +69,9 @@
 	</array>
 	<key>UIAppFonts</key>
 	<array>
-		<string>Fraunces-Regular.ttf</string>
-		<string>Fraunces-Medium.ttf</string>
-		<string>Fraunces-SemiBold.ttf</string>
-		<string>PublicSans-Regular.ttf</string>
-		<string>PublicSans-Medium.ttf</string>
-		<string>PublicSans-SemiBold.ttf</string>
+		<string>IBMPlexSerif-Regular.ttf</string>
+		<string>IBMPlexSerif-Medium.ttf</string>
+		<string>IBMPlexSerif-SemiBold.ttf</string>
 		<string>JetBrainsMono-Regular.ttf</string>
 		<string>JetBrainsMono-Medium.ttf</string>
 	</array>
