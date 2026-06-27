@@ -265,6 +265,7 @@ struct SearchView: View {
             .padding(.top, Spacing.lg)
             .padding(.bottom, Spacing.xxl)
         }
+        .refreshable { await refreshSearch() }
     }
 
     @ViewBuilder
@@ -331,6 +332,15 @@ struct SearchView: View {
     private func runSearch(force: Bool = false) {
         if force { store.reset() }
         store.search(query: query, groupId: selectedGroupId)
+    }
+
+    /// Pull-to-refresh: re-runs the current query (bypassing the debounce) and
+    /// awaits the result so the system spinner stays up until it resolves. A blank
+    /// query has nothing to refresh, so it's a no-op.
+    private func refreshSearch() async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await store.refresh(query: query, groupId: selectedGroupId)
     }
 
     // MARK: - Recents persistence

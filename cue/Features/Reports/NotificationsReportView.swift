@@ -219,16 +219,25 @@ struct NotificationsReportView: View {
     // MARK: - Timezone footnote
 
     private var timezoneFootnote: some View {
-        (
-            Text("reports.timezone.prefix")
-                .font(Typography.font(for: .caption))
-            + Text(store.timezoneIdentifier)
-                .font(Typography.font(for: .code))
-            + Text(verbatim: ".")
-                .font(Typography.font(for: .caption))
-        )
-        .foregroundStyle(theme.textSecondary)
-        .fixedSize(horizontal: false, vertical: true)
+        Text(timezoneFootnoteText)
+            .foregroundStyle(theme.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// The timezone footnote as a single `AttributedString` — a caption-font prefix,
+    /// the zone identifier in the monospaced code font, and a trailing period —
+    /// replacing the deprecated `Text + Text` concatenation (iOS 26).
+    private var timezoneFootnoteText: AttributedString {
+        var prefix = AttributedString(String(localized: "reports.timezone.prefix"))
+        prefix.font = Typography.font(for: .caption)
+
+        var identifier = AttributedString(store.timezoneIdentifier)
+        identifier.font = Typography.font(for: .code)
+
+        var period = AttributedString(".")
+        period.font = Typography.font(for: .caption)
+
+        return prefix + identifier + period
     }
 
     // MARK: - Brief / recap opt-ins

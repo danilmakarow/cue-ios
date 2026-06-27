@@ -175,15 +175,16 @@ private struct AccountContent: View {
                 }
             }
 
+            // Read the main-actor `avatarImage` HERE (in the MainActor view body)
+            // rather than inside the PhotosPicker's `Sendable` label closure, which
+            // can't capture a main-actor-isolated property.
+            let photoActionTitle = store.avatarImage == nil
+                ? String(localized: "account.photo.add")
+                : String(localized: "account.photo.change")
             PhotosPicker(selection: $photoItem, matching: .images) {
-                Label(
-                    store.avatarImage == nil
-                        ? String(localized: "account.photo.add")
-                        : String(localized: "account.photo.change"),
-                    systemImage: "camera"
-                )
-                .cueText(.bodyEmphasis)
-                .foregroundStyle(theme.accentText)
+                Label(photoActionTitle, systemImage: "camera")
+                    .cueText(.bodyEmphasis)
+                    .foregroundStyle(theme.accentText)
             }
             .buttonStyle(.plain)
         }

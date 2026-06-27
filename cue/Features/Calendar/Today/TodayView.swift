@@ -94,6 +94,11 @@ struct TodayView: View {
         .background(theme.background.ignoresSafeArea())
         .navigationTitle(Text("today.title"))
         .navigationBarTitleDisplayMode(.large)
+        .refreshable {
+            // Pull-to-refresh: re-sync today's occurrences and reload the brief.
+            await store.invalidateAndResync(around: today, context: modelContext)
+            await brief.load(for: today, force: true)
+        }
         .task {
             store.bind(notifications: notifications)
             // Drive today's sync from the Today tab itself so it populates on a

@@ -124,6 +124,8 @@ struct OnboardingView: View {
             }
         }
         .animation(.easeInOut(duration: 0.28), value: step)
+        // A light selection tick as the carousel advances between pages.
+        .sensoryFeedback(.selection, trigger: step)
         .onAppear(perform: persistImmediatelyIfTerminal)
     }
 

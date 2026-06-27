@@ -57,6 +57,11 @@ struct DashboardView: View {
         .background(theme.background.ignoresSafeArea())
         .navigationTitle("dashboard.title")
         .navigationBarTitleDisplayMode(.large)
+        .refreshable {
+            // Pull-to-refresh: re-fetch the scheduled-occurrence denominator for the
+            // active window (the completed `@Query` reacts to SwiftData on its own).
+            await refreshDenominator()
+        }
         .task(id: range) {
             counts.bind(notifications: notifications)
             await refreshDenominator()

@@ -86,6 +86,23 @@ final class SearchStore {
         }
     }
 
+    /// Re-runs `query` (narrowed to `groupId`) immediately, bypassing the debounce,
+    /// and awaits the result. Used by pull-to-refresh so the system spinner stays up
+    /// until the request resolves. An empty (trimmed) query short-circuits to `.idle`.
+    func refresh(query: String, groupId: String?) async {
+        searchTask?.cancel()
+        searchTask = nil
+
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            phase = .idle
+            return
+        }
+
+        phase = .loading
+        await run(query: trimmed, groupId: groupId)
+    }
+
     /// Clears any pending/in-flight search and returns to the idle (recent) state.
     func reset() {
         searchTask?.cancel()

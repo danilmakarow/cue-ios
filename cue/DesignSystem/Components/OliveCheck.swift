@@ -58,6 +58,9 @@ struct OliveCheck: View {
                 : .spring(response: 0.32, dampingFraction: 0.58),
             value: isDone
         )
+        // Tactile confirmation only when a task is marked DONE (not on un-marking).
+        // Independent of Reduce Motion; honors the system's haptic settings.
+        .sensoryFeedback(.success, trigger: isDone) { _, newValue in newValue }
         .accessibilityHidden(true)
     }
 }

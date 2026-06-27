@@ -48,6 +48,7 @@ struct GroupsScreen: View {
         .scrollContentBackground(.hidden)
         .background(theme.background.ignoresSafeArea())
         .navigationTitle("groups.title")
+        .refreshable { await loadGroups() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

@@ -3,6 +3,7 @@
 //  cue
 //
 
+import SwiftData
 import SwiftUI
 
 /// Modal sheet for creating or editing a task group. Handles
@@ -14,6 +15,8 @@ struct GroupEditSheet: View {
 
     @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Environment(CalendarStore.self) private var calendarStore
 
     @State private var name: String = ""
     @State private var colorHex: String? = nil
@@ -280,8 +283,11 @@ struct GroupEditSheet: View {
                     )
                     dto = try await api.patch("/task-groups/\(existing.id)", body: body)
                 } else {
-                    // Need a calendarId. Fetch from /calendars.
-                    let calendarId = try await fetchDefaultCalendarId()
+                    // Need a calendarId. Resolve it through the single owner (the
+                    // memoized, SwiftData-upserting `CalendarStore`) instead of
+                    // re-fetching/POSTing `/calendars` here — so a fresh account
+                    // can't race a SECOND "Default" calendar into existence.
+                    let calendarId = try await calendarStore.resolvedCalendarId(context: modelContext)
                     let body = CreateTaskGroupRequest(
                         calendarId: calendarId,
                         name: name.trimmingCharacters(in: .whitespaces),
@@ -300,16 +306,6 @@ struct GroupEditSheet: View {
             }
             isSubmitting = false
         }
-    }
-
-    private func fetchDefaultCalendarId() async throws -> String {
-        let calendars: [CalendarDTO] = try await api.get("/calendars")
-        if let first = calendars.first { return first.id }
-        let created: CalendarDTO = try await api.post(
-            "/calendars",
-            body: CreateCalendarRequest(name: "Default", color: nil, icon: nil)
-        )
-        return created.id
     }
 
     /// Tri-state for the group's `requiresCompletion` field on update: unchanged
