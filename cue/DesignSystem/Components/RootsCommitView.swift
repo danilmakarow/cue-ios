@@ -76,8 +76,10 @@ struct RootsCommitView: View {
     /// Drives the whole run [0, 1]. Animated with the expo-out curve on appear and
     /// on every `trigger` change.
     @State private var progress: CGFloat = 0
-    /// Springy whole-view reveal scale, animated independently for the overshoot.
-    @State private var revealScale: CGFloat = 0
+    /// Monotonic play counter. Bumped on every `play()` (appear + each `trigger`
+    /// change) so it can drive both the keyframe reveal and the haptic — neither
+    /// of which can key off `trigger` alone, since that misses the initial mount.
+    @State private var playCount: Int = 0
 
     /// Total grow duration, shared by the trim, flood and reveal.
     private let duration: Double = 0.78
@@ -95,15 +97,38 @@ struct RootsCommitView: View {
             if reduceMotion {
                 reducedField
             } else {
+                // Controlled springy reveal: a keyframe ramp that peaks at exactly
+                // 1.045 then settles to 1.0 — no uncontrolled spring overshoot.
+                // Keyed on `playCount` so it restarts from frame 0 on every play.
                 rootsField
-                    .scaleEffect(revealScale)
+                    .keyframeAnimator(initialValue: revealStart, trigger: playCount) { content, scale in
+                        content.scaleEffect(scale)
+                    } keyframes: { _ in
+                        revealKeyframes
+                    }
             }
         }
         .aspectRatio(1, contentMode: .fit)
         .accessibilityHidden(true)
-        .sensoryFeedback(.success, trigger: trigger)
+        // Fire the haptic on every play (appear + each trigger change), not only
+        // on `trigger` changes — which would skip the initial mount.
+        .sensoryFeedback(.success, trigger: playCount)
         .onAppear { play() }
         .onChange(of: trigger) { _, _ in play() }
+    }
+
+    /// The reveal scale's resting/start value. The keyframe run begins here and
+    /// ends here (1.0); the overshoot to 1.045 happens in between.
+    private var revealStart: CGFloat { reduceMotion ? 1 : 0 }
+
+    /// Keyframe track for the springy reveal: grow 0 → 1.045 across the grow
+    /// duration, then ease the 4.5% overshoot back down to a settled 1.0.
+    @KeyframeTrackContentBuilder<CGFloat>
+    private var revealKeyframes: some KeyframeTrackContent<CGFloat> {
+        // Grow to the controlled peak over the ~0.78s grow timing (expo-out feel).
+        CubicKeyframe(1.045, duration: duration)
+        // Settle the overshoot back to rest.
+        SpringKeyframe(1.0, duration: 0.22, spring: .snappy)
     }
 
     // MARK: Sub-views
@@ -182,25 +207,21 @@ struct RootsCommitView: View {
 
     // MARK: Driving the run
 
-    /// Resets to frame 0 and animates the run with the expo-out curve, plus the
-    /// springy reveal overshoot.
+    /// Resets to frame 0 and animates the run with the expo-out curve. Bumping
+    /// `playCount` restarts the keyframe reveal and fires the haptic; the trim +
+    /// flood ride `progress`. Works on appear and on every `trigger` change.
     private func play() {
+        playCount += 1
+
         guard !reduceMotion else {
             progress = 0
-            revealScale = 1
             withAnimation(.easeOut(duration: duration)) { progress = 1 }
             return
         }
 
         progress = 0
-        revealScale = 0
-
         withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: duration)) {
             progress = 1
-        }
-        // Springy reveal: overshoot to ~1.045 then settle to 1.
-        withAnimation(.spring(response: 0.46, dampingFraction: 0.6)) {
-            revealScale = 1
         }
     }
 }

@@ -36,10 +36,7 @@ struct NotificationBanner: View {
         HStack(alignment: .top, spacing: Spacing.md) {
             severityRail
 
-            Image(systemName: notification.severity.systemImage)
-                .font(.title3)
-                .foregroundStyle(severityColor)
-                .accessibilityHidden(true)
+            severityIcon
 
             content
 
@@ -57,16 +54,23 @@ struct NotificationBanner: View {
         // The banner stays intentionally Liquid Glass (chrome), per the depth
         // system's `.glass` treatment — distinct from the letterpress cards.
         .glassEffect(.regular, in: .rect(cornerRadius: radius))
+        // Neutral hairline edge — severity is carried by the rail + icon stamp,
+        // not by tinting the frame (matches CueBanner's `--glass-border`).
         .overlay(
             RoundedRectangle(cornerRadius: radius)
-                .strokeBorder(severityColor.opacity(0.3), lineWidth: 1)
+                .strokeBorder(theme.separator, lineWidth: 1)
         )
         .contentShape(.rect(cornerRadius: radius))
         .onTapGesture(perform: handleBodyTap)
+        // Combine the message body into one element so the title, message and
+        // expand affordance read as a single banner — but expose dismissal as a
+        // first-class named action so VoiceOver keeps an independent "Dismiss"
+        // (it would otherwise be flattened away by `.combine`).
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(accessibilityHint)
         .accessibilityAddTraits(notification.isExpandable ? .isButton : [])
+        .accessibilityAction(named: Text("notification.dismiss"), onDismiss)
     }
 
     // MARK: - Color
@@ -83,6 +87,18 @@ struct NotificationBanner: View {
     }
 
     // MARK: - Subviews
+
+    /// The filled severity-colored 22pt stamp circle with the severity glyph
+    /// centered inside. White ink on the fill, except `warning` (brass), which
+    /// uses dark `textPrimary` ink for contrast — matching the CueBanner spec.
+    private var severityIcon: some View {
+        Image(systemName: notification.severity.systemImage)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(notification.severity == .warning ? theme.textPrimary : theme.onAccent)
+            .frame(width: 22, height: 22)
+            .background(Circle().fill(severityColor))
+            .accessibilityHidden(true)
+    }
 
     /// The vertical severity-colored rail on the leading edge.
     private var severityRail: some View {
@@ -161,7 +177,10 @@ struct NotificationBanner: View {
         .accessibilityHidden(true)
     }
 
-    /// Trailing dismiss control.
+    /// Trailing dismiss control. Visually present, but hidden from VoiceOver: the
+    /// banner combines its body into one element, so dismissal is surfaced via the
+    /// root's `.accessibilityAction(named: "Dismiss")` rather than as a stray
+    /// flattened button inside the combined label.
     private var closeButton: some View {
         Button(action: onDismiss) {
             Image(systemName: "xmark")
@@ -171,7 +190,7 @@ struct NotificationBanner: View {
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("notification.dismiss")
+        .accessibilityHidden(true)
     }
 
     // MARK: - Interaction

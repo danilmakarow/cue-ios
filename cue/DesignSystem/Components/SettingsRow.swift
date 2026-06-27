@@ -17,7 +17,8 @@ enum SettingsRowTrailing {
     case navigation
     /// A read-only mono value (IDs, dates, counts) in the receipt voice.
     case value(String)
-    /// A binary control bound to `isOn`. Renders an olive (ON) system toggle.
+    /// A binary control bound to `isOn`. Renders the kit's bespoke `CueToggle`
+    /// (olive ON track), so the row matches every other switch in the app.
     case toggle(Binding<Bool>)
     /// A status stamp.
     case badge(text: String, tone: CueBadgeTone)
@@ -102,9 +103,10 @@ struct SettingsRow: View {
                 .foregroundStyle(theme.textSecondary)
                 .lineLimit(1)
         case let .toggle(isOn):
-            Toggle("", isOn: isOn)
-                .labelsHidden()
-                .tint(theme.success)
+            // The kit's own switch, not a native `Toggle`, so the olive track
+            // and 160ms knob slide stay consistent. The row label names it for
+            // VoiceOver since the switch itself is visually label-less here.
+            CueToggle(isOn: isOn, accessibilityLabel: label)
         case let .badge(text, tone):
             CueBadge(text, tone: tone)
         case .plain:

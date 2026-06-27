@@ -6,9 +6,11 @@
 //  docs/specs/design-tokens.md.
 //
 //  Three voices, each with one job (CUE — Clean):
-//    • Display / headings — IBM Plex Serif (bundled). The editorial, upright slab
-//      serif. Titles >= 17px ONLY; never body/labels. Falls back to the system
-//      serif until the font loads.
+//    • Display — IBM Plex Serif (bundled). The editorial, upright slab serif.
+//      LARGE-SCREEN TITLES ONLY (display-L / display-M — app name, big screen
+//      titles / page H1); never section headers, row labels, or body. Section /
+//      card / row titles (title-L, title-M, headline) render in the system sans.
+//      Falls back to the system serif until the font loads.
 //    • Body / labels      — the native system sans (SF Pro / -apple-system), via
 //      SwiftUI's Dynamic-Type text styles. Full Unicode incl. Cyrillic for `uk`.
 //      (Replaces the bundled Public Sans, which was latin-only.)
@@ -32,11 +34,11 @@ enum TextRole {
     case displayL
     /// Secondary hero — large serif.
     case displayM
-    /// Section title — serif.
+    /// Section title — system sans (22pt). Serif is reserved for display roles.
     case titleL
-    /// Card / row title — serif.
+    /// Card / row title — system sans (18pt). Serif is reserved for display roles.
     case titleM
-    /// Emphasised lead line — serif, reading size (17pt — the serif floor).
+    /// Emphasised lead line — system sans, reading size (17pt).
     case headline
     /// Default body copy — system sans (16pt).
     case body
@@ -73,11 +75,11 @@ enum Typography {
         case .displayM:
             return serif(27, relativeTo: .title).weight(.semibold)
         case .titleL:
-            return serif(22, relativeTo: .title2).weight(.medium)
+            return .system(.title2).weight(.medium)          // 22pt sans
         case .titleM:
-            return serif(18, relativeTo: .title3).weight(.medium)
+            return .system(.title3).weight(.medium)          // 18pt sans
         case .headline:
-            return serif(17, relativeTo: .headline).weight(.medium)
+            return .system(.headline).weight(.medium)        // 17pt sans
         case .body:
             return .system(.callout).weight(.regular)        // 16pt
         case .bodyEmphasis:

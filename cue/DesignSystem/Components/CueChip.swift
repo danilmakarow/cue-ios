@@ -34,10 +34,6 @@ struct CueChip: View {
         self.action = action
     }
 
-    private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
-    }
-
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.xs) {
@@ -46,20 +42,46 @@ struct CueChip: View {
                 }
                 Text(title)
             }
+        }
+        .buttonStyle(CueChipStyle(isSelected: isSelected))
+        .animation(.easeOut(duration: 0.16), value: isSelected)
+    }
+}
+
+/// The chip's press + selection treatment, factored into a `ButtonStyle` so a
+/// press picks up the same signature as `CueButtonStyle`: a 1pt downward nudge
+/// paired with a one-step-darker fill, on a 160ms ease-out. Selection swaps the
+/// resting fill/ink/border (neutral gray → clay wash); the press darkens
+/// whichever resting fill is showing.
+private struct CueChipStyle: ButtonStyle {
+    @Environment(\.theme) private var theme
+
+    let isSelected: Bool
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        let pressed = configuration.isPressed
+        return configuration.label
             .cueText(.label)
             .foregroundStyle(isSelected ? theme.accentText : theme.textSecondary)
-            .padding(.vertical, Spacing.sm)
-            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.xs + 2)
+            .padding(.horizontal, Spacing.sm + 2)
             .background(shape.fill(isSelected ? theme.accentSoft : theme.surfaceSunken))
+            // One-step fill darken on press — a subtle scrim over whichever resting
+            // fill is showing, mirroring CueButtonStyle's darker-pressed fill.
+            .overlay(shape.fill(Color.black.opacity(pressed ? 0.05 : 0)))
             .overlay(
                 // Neutral chip shows its functional edge; the selected clay wash
                 // drops the border so the accent reads clean.
                 shape.strokeBorder(isSelected ? Color.clear : theme.border, lineWidth: 1)
             )
             .contentShape(shape)
-        }
-        .buttonStyle(.plain)
-        .animation(.easeOut(duration: 0.16), value: isSelected)
+            // Press signature: a 1pt downward nudge, matching CueButtonStyle.
+            .offset(y: pressed ? 1 : 0)
+            .animation(.easeOut(duration: 0.16), value: pressed)
     }
 }
 
