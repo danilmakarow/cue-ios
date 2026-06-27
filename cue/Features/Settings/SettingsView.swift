@@ -8,14 +8,15 @@ import UIKit
 
 /// Settings tab — profile summary, appearance, and sign-out.
 struct SettingsView: View {
-    @Environment(ThemeSettings.self) private var theme
+    @Environment(\.theme) private var theme
+    @Environment(ThemeSettings.self) private var themeSettings
     @Environment(LanguageSettings.self) private var language
     @Environment(AuthStore.self) private var authStore
     @Environment(TelegramLinkStore.self) private var telegramLink
     @Environment(NotificationStore.self) private var notifications
 
     var body: some View {
-        @Bindable var theme = theme
+        @Bindable var themeSettings = themeSettings
         @Bindable var language = language
 
         Form {
@@ -29,42 +30,64 @@ struct SettingsView: View {
                 }
             }
 
-            Section("settings.appearance.title") {
-                Picker("settings.theme", selection: $theme.appearance) {
+            Section {
+                Picker(selection: $themeSettings.appearance) {
                     ForEach(AppearanceMode.allCases) { mode in
                         Text(mode.titleKey).tag(mode)
                     }
+                } label: {
+                    Text("settings.theme")
+                        .cueText(.body)
+                        .foregroundStyle(theme.textPrimary)
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
+                // Kraft & Ink is the sole palette; the multi-option picker is
+                // gone. A static read-only row keeps the section meaningful.
+                LabeledContent {
+                    Text(AppPalette.kraftInk.titleKey)
+                        .cueText(.body)
+                        .foregroundStyle(theme.textSecondary)
+                } label: {
                     Text("settings.appearance.palette")
-                    PalettePicker(selection: $theme.palette)
+                        .cueText(.body)
+                        .foregroundStyle(theme.textPrimary)
                 }
-                .padding(.vertical, 4)
+            } header: {
+                sectionHeader("settings.appearance.title")
             }
 
             Section {
-                Picker("settings.language", selection: $language.selected) {
+                Picker(selection: $language.selected) {
                     ForEach(AppLanguage.allCases) { option in
                         option.label.tag(option)
                     }
+                } label: {
+                    Text("settings.language")
+                        .cueText(.body)
+                        .foregroundStyle(theme.textPrimary)
                 }
             } footer: {
                 Text("settings.language.footer")
+                    .cueText(.caption)
+                    .foregroundStyle(theme.textSecondary)
             }
 
             if case .authenticated = authStore.state {
-                Section("settings.manage.title") {
+                Section {
                     NavigationLink {
                         GroupsScreen()
                     } label: {
                         Label("settings.groups", systemImage: "folder.fill")
+                            .cueText(.body)
+                            .foregroundStyle(theme.textPrimary)
                     }
+                } header: {
+                    sectionHeader("settings.manage.title")
                 }
             }
 
             if case .authenticated = authStore.state {
-                Section("settings.integrations.title") {
+                Section {
                     NavigationLink {
                         ConnectTelegramView()
                     } label: {
@@ -72,8 +95,12 @@ struct SettingsView: View {
                             telegramStatusLabel
                         } label: {
                             Label("telegram.title", systemImage: "paperplane.fill")
+                                .cueText(.body)
+                                .foregroundStyle(theme.textPrimary)
                         }
                     }
+                } header: {
+                    sectionHeader("settings.integrations.title")
                 }
             }
 
@@ -86,18 +113,30 @@ struct SettingsView: View {
                         HStack {
                             Spacer()
                             Text("settings.signOut")
-                                .fontWeight(.semibold)
+                                .cueText(.bodyEmphasis)
+                                .foregroundStyle(theme.danger)
                             Spacer()
                         }
                     }
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(theme.background.ignoresSafeArea())
         .navigationTitle("settings.title")
         .task {
             telegramLink.bind(notifications: notifications)
             await telegramLink.refreshStatus()
         }
+    }
+
+    /// A Fraunces section header rendered in the serif label voice, with system
+    /// uppercasing suppressed so it reads as a typeset heading.
+    private func sectionHeader(_ key: LocalizedStringKey) -> some View {
+        Text(key)
+            .cueText(.label)
+            .textCase(nil)
+            .foregroundStyle(theme.textSecondary)
     }
 
     /// Trailing status indicator for the Telegram integration row: the linked
@@ -108,12 +147,15 @@ struct SettingsView: View {
         switch telegramLink.status {
         case .unknown, .loading:
             ProgressView()
+                .tint(theme.primary)
         case .connected(let username, _):
             Text(connectedLabel(for: username))
-                .foregroundStyle(.secondary)
+                .cueText(.code)
+                .foregroundStyle(theme.textSecondary)
         case .notConnected, .failed:
             Text("telegram.status.notConnected")
-                .foregroundStyle(.secondary)
+                .cueText(.callout)
+                .foregroundStyle(theme.textSecondary)
         }
     }
 
@@ -131,28 +173,31 @@ struct SettingsView: View {
 
 /// Avatar + name + email row rendered at the top of Settings.
 private struct UserProfileRow: View {
+    @Environment(\.theme) private var theme
+
     let user: UserDTO
 
     var body: some View {
-        HStack(spacing: 14) {
-            avatar
-                .frame(width: 56, height: 56)
+        HStack(spacing: Spacing.lg) {
+            CueAvatar(image: decodedAvatar)
+                .accessibilityLabel(avatarAccessibilityLabel)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(displayName)
-                    .font(.headline)
+                    .cueText(.titleM)
+                    .foregroundStyle(theme.textPrimary)
                     .lineLimit(1)
                 if let email = user.email, !email.isEmpty {
                     Text(email)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .cueText(.callout)
+                        .foregroundStyle(theme.textSecondary)
                         .lineLimit(1)
                 }
             }
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.xs)
     }
 
     private var displayName: String {
@@ -163,30 +208,11 @@ private struct UserProfileRow: View {
         return String(localized: "settings.profile.signedIn")
     }
 
-    @ViewBuilder
-    private var avatar: some View {
-        if let image = decodedAvatar {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .clipShape(.circle)
-                .overlay {
-                    Circle().strokeBorder(.tint, lineWidth: 1.5)
-                }
-                .accessibilityLabel("settings.profile.avatar.accessibility")
-        } else {
-            Circle()
-                .fill(.secondary.opacity(0.15))
-                .overlay {
-                    Image(systemName: "person.fill")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
-                .overlay {
-                    Circle().strokeBorder(.tint, lineWidth: 1.5)
-                }
-                .accessibilityLabel("settings.profile.avatarDefault.accessibility")
-        }
+    /// Accessibility label matching whichever avatar variant `CueAvatar` renders.
+    private var avatarAccessibilityLabel: LocalizedStringKey {
+        decodedAvatar == nil
+            ? "settings.profile.avatarDefault.accessibility"
+            : "settings.profile.avatar.accessibility"
     }
 
     private var decodedAvatar: UIImage? {
@@ -196,87 +222,6 @@ private struct UserProfileRow: View {
             return nil
         }
         return image
-    }
-}
-
-// MARK: - Palette picker
-
-/// Two selectable color options, each shown as a labelled row with a small
-/// swatch preview (canvas + primary + secondary). Replaces the old free
-/// accent-color picker — the user now chooses one of two cohesive palettes
-/// rather than an arbitrary hue.
-private struct PalettePicker: View {
-    @Binding var selection: AppPalette
-
-    var body: some View {
-        VStack(spacing: 10) {
-            ForEach(AppPalette.allCases) { palette in
-                row(for: palette)
-            }
-        }
-    }
-
-    private func row(for palette: AppPalette) -> some View {
-        let isSelected = selection == palette
-        return Button {
-            selection = palette
-        } label: {
-            HStack(spacing: 14) {
-                PaletteSwatch(palette: palette)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(palette.titleKey)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                    Text(palette.subtitleKey)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                    .symbolRenderingMode(.hierarchical)
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 1.5)
-            )
-            .contentShape(.rect(cornerRadius: 12))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(palette.titleKey)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-}
-
-/// The three overlapping representative colors of a palette option.
-private struct PaletteSwatch: View {
-    let palette: AppPalette
-
-    var body: some View {
-        let swatch = palette.swatch
-        return ZStack {
-            circle(swatch.canvas).offset(x: -12)
-            circle(swatch.secondary)
-            circle(swatch.primary).offset(x: 12)
-        }
-        .frame(width: 56, height: 32)
-    }
-
-    private func circle(_ color: Color) -> some View {
-        Circle()
-            .fill(color)
-            .frame(width: 28, height: 28)
-            .overlay(Circle().strokeBorder(.background, lineWidth: 2))
     }
 }
 

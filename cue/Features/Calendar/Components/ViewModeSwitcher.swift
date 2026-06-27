@@ -8,6 +8,7 @@ import SwiftUI
 /// Pill-style segmented toggle that switches between the two Calendar
 /// view modes. Purely presentational — holds no state of its own.
 struct ViewModeSwitcher: View {
+    @Environment(\.theme) private var theme
     @Binding var mode: CalendarViewMode
 
     var body: some View {
@@ -18,7 +19,7 @@ struct ViewModeSwitcher: View {
         }
         .padding(4)
         .background {
-            Capsule().fill(Color.secondary.opacity(0.15))
+            Capsule().fill(theme.surfaceSunken)
         }
         .accessibilityElement(children: .contain)
     }
@@ -30,13 +31,11 @@ struct ViewModeSwitcher: View {
         } label: {
             Image(systemName: option.systemImage)
                 .font(.body.weight(.semibold))
-                .foregroundStyle(
-                    isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary)
-                )
+                .foregroundStyle(isSelected ? theme.onAccent : theme.textSecondary)
                 .frame(width: 56, height: 30)
                 .background {
                     if isSelected {
-                        Capsule().fill(.tint)
+                        Capsule().fill(theme.primary)
                     }
                 }
                 .contentShape(.capsule)
@@ -49,5 +48,5 @@ struct ViewModeSwitcher: View {
 
 #Preview {
     @Previewable @State var mode: CalendarViewMode = .timeline
-    return ViewModeSwitcher(mode: $mode).padding().tint(.blue)
+    return ViewModeSwitcher(mode: $mode).padding()
 }

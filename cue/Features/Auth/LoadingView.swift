@@ -6,30 +6,27 @@
 import SwiftUI
 
 /// Initial splash shown while `AuthStore.bootstrap()` validates any persisted
-/// session. Intentionally quiet — the app logo and a subtle progress ring.
+/// session. Intentionally quiet — the clay seal on flat kraft, the wordmark in
+/// Fraunces, and a subtle progress ring.
 struct LoadingView: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [theme.primary.opacity(0.25), theme.background],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            theme.background
+                .ignoresSafeArea()
 
-            VStack(spacing: 20) {
-                BrandMark(size: 72)
+            VStack(spacing: Spacing.xl) {
+                BrandMark(size: 96)
 
-                Text("Cue")
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                Text(verbatim: "Cue")
+                    .font(.custom(Typography.serifFamily, size: 46, relativeTo: .largeTitle).weight(.semibold))
+                    .foregroundStyle(theme.textPrimary)
 
                 ProgressView()
                     .controlSize(.regular)
-                    .tint(.accentColor)
-                    .padding(.top, 8)
+                    .tint(theme.primary)
+                    .padding(.top, Spacing.sm)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("loading.accessibility")

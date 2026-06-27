@@ -8,7 +8,7 @@ import SwiftUI
 import UIKit
 
 /// Sign-in screen. Currently a single Sign in with Apple button — the product's
-/// only authentication path.
+/// only authentication path. Kraft canvas, clay seal mark, Fraunces wordmark.
 struct AuthView: View {
     @Environment(AuthStore.self) private var authStore
     @Environment(\.colorScheme) private var colorScheme
@@ -22,14 +22,10 @@ struct AuthView: View {
         @Bindable var authStore = authStore
 
         ZStack {
-            LinearGradient(
-                colors: [theme.primary.opacity(0.25), theme.background],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            theme.background
+                .ignoresSafeArea()
 
-            VStack(spacing: 24) {
+            VStack(spacing: Spacing.xxl) {
                 Spacer()
 
                 header
@@ -41,16 +37,16 @@ struct AuthView: View {
                 disclaimer
 
                 if authStore.isAuthenticating {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.sm) {
                         ProgressView().controlSize(.small)
                         Text("auth.signingIn")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .cueText(.caption)
+                            .foregroundStyle(theme.textSecondary)
                     }
                 }
             }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 48)
+            .padding(.horizontal, Spacing.xxxl)
+            .padding(.bottom, Spacing.huge)
         }
         .alert(
             "auth.alert.signInFailed.title",
@@ -81,15 +77,16 @@ struct AuthView: View {
     // MARK: - Sections
 
     private var header: some View {
-        VStack(spacing: 14) {
-            BrandMark(size: 72)
+        VStack(spacing: Spacing.lg) {
+            BrandMark(size: 96)
 
-            Text("Cue")
-                .font(.system(size: 44, weight: .bold, design: .rounded))
+            Text(verbatim: "Cue")
+                .font(.custom(Typography.serifFamily, size: 50, relativeTo: .largeTitle).weight(.semibold))
+                .foregroundStyle(theme.textPrimary)
 
             Text("auth.tagline")
-                .font(.title3)
-                .foregroundStyle(.secondary)
+                .cueText(.callout)
+                .foregroundStyle(theme.textSecondary)
                 .multilineTextAlignment(.center)
         }
     }
@@ -102,14 +99,14 @@ struct AuthView: View {
         }
         .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
         .frame(height: 52)
-        .clipShape(.rect(cornerRadius: 14))
+        .clipShape(.rect(cornerRadius: Radius.medium))
         .disabled(authStore.isAuthenticating)
     }
 
     private var disclaimer: some View {
         Text("auth.disclaimer")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+            .cueText(.caption)
+            .foregroundStyle(theme.textSecondary)
             .multilineTextAlignment(.center)
     }
 

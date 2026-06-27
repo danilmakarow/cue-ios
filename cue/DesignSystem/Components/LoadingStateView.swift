@@ -22,6 +22,8 @@ import SwiftUI
 /// container. Use as the body of a screen/section whose primary content is
 /// still loading and there's nothing else to show yet.
 struct LoadingStateView: View {
+    @Environment(\.theme) private var theme
+
     /// Optional caption under the spinner, e.g. "Loading your tasks…".
     let label: String?
 
@@ -34,11 +36,12 @@ struct LoadingStateView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.large)
+                .tint(theme.primary)
 
             if let label {
                 Text(label)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .cueText(.callout)
+                    .foregroundStyle(theme.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -52,6 +55,8 @@ struct LoadingStateView: View {
 /// Compact horizontal spinner + label, sized for a list footer or a section
 /// header while additional content streams in (pagination, background sync).
 struct InlineLoadingRow: View {
+    @Environment(\.theme) private var theme
+
     /// Caption beside the spinner.
     let label: String
 
@@ -64,9 +69,10 @@ struct InlineLoadingRow: View {
         HStack(spacing: 8) {
             ProgressView()
                 .controlSize(.small)
+                .tint(theme.primary)
             Text(label)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .cueText(.caption)
+                .foregroundStyle(theme.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.vertical, 8)
@@ -78,6 +84,7 @@ struct InlineLoadingRow: View {
 // MARK: - Loading overlay
 
 private struct LoadingOverlayModifier: ViewModifier {
+    @Environment(\.theme) private var theme
     let isLoading: Bool
     let label: String?
 
@@ -86,7 +93,9 @@ private struct LoadingOverlayModifier: ViewModifier {
             .overlay {
                 if isLoading {
                     ZStack {
-                        Color.black.opacity(0.08)
+                        // Warm-ink scrim (theme.textPrimary) rather than pure
+                        // black — sits more naturally over the Kraft & Ink page.
+                        theme.textPrimary.opacity(0.08)
                             .ignoresSafeArea()
                         LoadingStateView(label: label)
                             .padding(24)

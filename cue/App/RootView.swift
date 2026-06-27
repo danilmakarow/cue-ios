@@ -64,7 +64,7 @@ private struct MainTabs: View {
 
         TabView(selection: tabSelection) {
             Tab(AppTab.calendar.titleKey, systemImage: AppTab.calendar.systemImage, value: AppTab.calendar) {
-                CalendarRootView(user: user)
+                CalendarHostView(user: user)
             }
             Tab(AppTab.dashboard.titleKey, systemImage: AppTab.dashboard.systemImage, value: AppTab.dashboard) {
                 NavigationStack {

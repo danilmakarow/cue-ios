@@ -22,6 +22,8 @@ struct cueApp: App {
             EventCalendar.self,
             TaskItem.self,
             EventTaskGroup.self,
+            WindowSyncMeta.self,
+            SyncCursorState.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -75,9 +77,11 @@ struct cueApp: App {
                 // surfaces — this shows through during transitions and behind
                 // any non-opaque content.
                 .background(themeSettings.palette.colors.background.ignoresSafeArea())
-                // Drive both the SwiftUI environment color scheme AND the
-                // asset-catalog appearance resolution from the user's choice.
-                .preferredColorScheme(themeSettings.appearance.colorScheme)
+                // Kraft & Ink is light-only for now: pin the light appearance
+                // app-wide regardless of the OS/user setting. Dark is deferred —
+                // when it ships, restore `themeSettings.appearance.colorScheme`
+                // and give the palette a designed dark table.
+                .preferredColorScheme(.light)
                 // The palette's hero color becomes the app-wide tint, so every
                 // `.accentColor` / `.tint` call site follows the chosen option.
                 .tint(themeSettings.palette.colors.primary)

@@ -10,6 +10,7 @@ import SwiftUI
 /// Reachable from `SettingsView`. Shows that a group's recurrence applies to all
 /// its tasks by inheritance (unless a task has its own rule).
 struct GroupsScreen: View {
+    @Environment(\.theme) private var theme
     @Environment(\.modelContext) private var modelContext
     @Environment(NotificationStore.self) private var notifications
     @Query(sort: \EventTaskGroup.sortOrder) private var localGroups: [EventTaskGroup]
@@ -32,6 +33,7 @@ struct GroupsScreen: View {
                     GroupRow(group: group) {
                         editingGroup = remoteDTOs.first(where: { $0.id == group.id })
                     }
+                    .listRowBackground(theme.surface)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             deleteGroup(group)
@@ -42,6 +44,8 @@ struct GroupsScreen: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(theme.background.ignoresSafeArea())
         .navigationTitle("groups.title")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -77,6 +81,7 @@ struct GroupsScreen: View {
         .overlay {
             if isLoading {
                 ProgressView()
+                    .tint(theme.primary)
             }
         }
         .task { await loadGroups() }
@@ -116,36 +121,46 @@ struct GroupsScreen: View {
 // MARK: - GroupRow
 
 private struct GroupRow: View {
+    @Environment(\.theme) private var theme
+
     let group: EventTaskGroup
     let onEdit: () -> Void
 
     var body: some View {
         Button(action: onEdit) {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.md) {
                 groupIcon
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
                     Text(group.name)
-                        .font(.headline)
+                        .cueText(.titleM)
+                        .foregroundStyle(theme.textPrimary)
                     if group.defaultRecurrenceRuleId != nil {
                         Label("groups.row.hasRecurrence", systemImage: "repeat")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .cueText(.caption)
+                            .foregroundStyle(theme.textSecondary)
                     }
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
-                    .foregroundStyle(.tertiary)
-                    .font(.caption)
+                    .cueText(.caption)
+                    .foregroundStyle(theme.textSecondary)
             }
         }
-        .foregroundStyle(.primary)
+        .buttonStyle(.plain)
     }
 
+    /// Tokenized icon tile: a sheet-fill paper square with a functional border.
+    /// The persisted group color (read from `group.colorHex` via `Color(hex:)`)
+    /// tints the glyph; absent a color it falls back to espresso ink.
     private var groupIcon: some View {
-        let color = group.colorHex.flatMap { Color(hex: $0) } ?? .accentColor
+        let color = group.colorHex.flatMap { Color(hex: $0) } ?? theme.primary
         return ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(color.opacity(0.15))
+            RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
+                .fill(theme.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
+                        .strokeBorder(theme.border, lineWidth: 1)
+                )
                 .frame(width: 36, height: 36)
             Image(systemName: group.icon ?? "folder.fill")
                 .foregroundStyle(color)

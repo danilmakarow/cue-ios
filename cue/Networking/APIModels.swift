@@ -247,6 +247,56 @@ struct SkipResponse: Codable, Sendable {
     let ok: Bool
 }
 
+/// Response from `GET /tasks/daily-counts`. `counts` maps a local `YYYY-MM-DD`
+/// date string to that day's occurrence total; zero-count days are omitted.
+struct DailyCountsResponse: Codable, Sendable {
+    let counts: [String: Int]
+}
+
+// MARK: - Delta sync (Phase 3)
+
+/// A changed `TaskOccurrenceException` row, returned by `GET /tasks/changes`.
+///
+/// The delta only needs `originalStartAt` (the stable instance key) to decide
+/// which month window to invalidate so the next per-window sync re-pulls and
+/// re-expands the affected occurrence.
+///
+/// `originalStartAt` is decoded as a `String` (not a `Date`) on purpose: the
+/// exception key carries millisecond precision, but the shared `APIClient`
+/// decoder uses the no-fractional-seconds `.iso8601` strategy, so a `Date` here
+/// could fail the whole-response decode on a fractional-seconds timestamp. The
+/// raw string is parsed leniently at the call site via
+/// `CalendarStore.isoFractional`.
+struct TaskOccurrenceExceptionDTO: Codable, Sendable {
+    let id: String
+    /// Parent series id (== `TaskDTO.id`).
+    let taskId: String
+    /// Stable instance key — the original (pre-override) start, ISO-8601 string.
+    let originalStartAt: String
+}
+
+/// Response from `GET /tasks/changes?calendarId=&since=<cursor>`.
+///
+/// Precise change-detection delta: everything that changed for the calendar since
+/// the client's last `serverTime` cursor.
+///
+/// - `tasks` — changed task *series* (`updatedAt > since`), each with its full
+///   embedded `recurrence` rule when present. The client does NOT expand the rule
+///   itself; it invalidates the overlapping window memos so the next `GET /tasks`
+///   re-pulls and re-expands.
+/// - `deleted` — series ids soft-deleted since `since` (visible via the backend's
+///   `withDeleted` query); the client tombstone-deletes all local rows for each.
+/// - `exceptions` — changed occurrence exceptions; each invalidates the month
+///   window containing its `originalStartAt`.
+/// - `serverTime` — the server-clock timestamp that becomes the next opaque
+///   cursor. Stored verbatim; never parsed by the client.
+struct ChangesResponse: Codable, Sendable {
+    let tasks: [TaskDTO]
+    let deleted: [String]
+    let exceptions: [TaskOccurrenceExceptionDTO]
+    let serverTime: String
+}
+
 // MARK: - Task Group
 
 /// Server representation of a task group.

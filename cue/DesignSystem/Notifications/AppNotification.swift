@@ -29,15 +29,10 @@ enum NotificationSeverity: Sendable, Hashable, CaseIterable {
         }
     }
 
-    /// Accent color for the icon and the leading severity rail.
-    var tint: Color {
-        switch self {
-        case .info: return .blue
-        case .success: return .green
-        case .warning: return .orange
-        case .error: return .red
-        }
-    }
+    // Severity color is intentionally NOT defined here. This type is `Sendable`
+    // and may be built off the main actor, so it can't read the active palette
+    // from `@Environment(\.theme)`. `NotificationBanner` maps severity onto the
+    // theme's functional roles (info/success/warning/danger) at render time.
 
     /// Spoken prefix so VoiceOver users hear the severity before the message.
     var accessibilityPrefix: String {

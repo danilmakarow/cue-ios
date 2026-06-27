@@ -15,6 +15,7 @@ import SwiftUI
 struct TaskDetailScreen: View {
     let event: ScheduleEvent
 
+    @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(CalendarStore.self) private var store
@@ -33,7 +34,7 @@ struct TaskDetailScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: Spacing.xl) {
                 headerSection
                 timeSection
                 if let notes = event.notes?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -48,10 +49,11 @@ struct TaskDetailScreen: View {
                 }
                 actionsSection
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 40)
+            .padding(.horizontal, Spacing.xl)
+            .padding(.top, Spacing.lg)
+            .padding(.bottom, Spacing.huge)
         }
+        .background(theme.background.ignoresSafeArea())
         .navigationTitle(String(localized: "taskDetail.title"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -109,63 +111,67 @@ struct TaskDetailScreen: View {
     // MARK: - Sections
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             Text(event.title)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.primary)
+                .cueText(.titleL)
+                .foregroundStyle(theme.textPrimary)
+            Capsule()
+                .fill(theme.secondary)
+                .frame(width: 44, height: 2)
             if event.isRecurring {
                 Label("taskDetail.recurring.badge", systemImage: "repeat")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .cueText(.caption)
+                    .foregroundStyle(theme.textSecondary)
             }
         }
     }
 
     private var timeSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             Label {
                 Text(formattedDateRange)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .cueText(.code)
+                    .foregroundStyle(theme.textSecondary)
             } icon: {
                 Image(systemName: "clock")
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(theme.primary)
             }
         }
     }
 
     private func notesSection(notes: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             Label {
                 Text(notes)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .cueText(.body)
+                    .foregroundStyle(theme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             } icon: {
                 Image(systemName: "note.text")
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(theme.primary)
             }
         }
     }
 
     private var recurrenceSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             Label {
                 if let rule = seriesDTO?.recurrence {
                     Text(rule.humanSummary)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .cueText(.callout)
+                        .foregroundStyle(theme.textSecondary)
                 } else if isLoadingDetail {
                     ProgressView()
                         .controlSize(.small)
+                        .tint(theme.primary)
                 } else {
                     Text("taskDetail.recurrence.unknown")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .cueText(.callout)
+                        .foregroundStyle(theme.textSecondary)
                 }
             } icon: {
                 Image(systemName: "repeat")
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(theme.primary)
             }
         }
     }
@@ -174,38 +180,45 @@ struct TaskDetailScreen: View {
     /// Editing is disabled in this state (see `editButton`); Retry re-attempts the
     /// fetch so the user can recover without leaving the screen.
     private var detailLoadFailedRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.md) {
             Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
+                .foregroundStyle(theme.warning)
             Text("taskDetail.detailLoad.failed")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .cueText(.callout)
+                .foregroundStyle(theme.textPrimary)
             Spacer(minLength: 0)
             Button(String(localized: "taskDetail.detailLoad.retry")) {
                 Task { await loadSeriesDetail() }
             }
-            .font(.footnote.weight(.semibold))
+            .cueText(.label)
+            .foregroundStyle(theme.accentText)
             .disabled(isLoadingDetail)
         }
-        .padding(12)
-        .background(.orange.opacity(0.1), in: .rect(cornerRadius: 12))
+        .padding(Spacing.md)
+        .background(
+            theme.warning.opacity(0.12),
+            in: RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                .strokeBorder(theme.warning.opacity(0.4), lineWidth: 1)
+        )
     }
 
     private var actionsSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.md) {
             if event.isRecurring {
                 Button {
                     performSkip()
                 } label: {
                     Label("taskDetail.skip.action", systemImage: "forward.fill")
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .buttonStyle(.cue(.secondary))
                 .disabled(isSkipping || isDeleting)
                 .overlay {
                     if isSkipping {
                         ProgressView()
+                            .tint(theme.primary)
                     }
                 }
             }
@@ -214,14 +227,13 @@ struct TaskDetailScreen: View {
                 showDeleteConfirm = true
             } label: {
                 Label("taskDetail.delete.action", systemImage: "trash")
-                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
+            .buttonStyle(.cue(.destructive))
             .disabled(isDeleting || isSkipping)
             .overlay {
                 if isDeleting {
                     ProgressView()
+                        .tint(theme.onAccent)
                 }
             }
         }
