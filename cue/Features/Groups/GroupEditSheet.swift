@@ -12,6 +12,7 @@ struct GroupEditSheet: View {
     let existingDTO: TaskGroupDTO?
     let onSaved: (TaskGroupDTO) -> Void
 
+    @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String = ""
@@ -29,15 +30,16 @@ struct GroupEditSheet: View {
     private var isEditing: Bool { existingDTO != nil }
     private let api: APIClient = .shared
 
-    // Preset color swatches (hex strings)
-    private let colorOptions: [(String, Color)] = [
-        ("#FF6B6B", .red),
-        ("#FF9F43", .orange),
-        ("#FECA57", .yellow),
-        ("#48DBFB", .cyan),
-        ("#1DD1A1", .green),
-        ("#5F27CD", .purple),
-        ("#C8D6E5", .gray),
+    /// Preset color swatches — the six Kraft & Ink semantic inks (persisted as
+    /// hex strings the backend round-trips). Resolved to a `Color` at render time
+    /// via `Color(hex:)` so what's stored is exactly what ships to the API.
+    private let colorOptions: [String] = [
+        "#5A3A24", // espresso
+        "#BE4A28", // clay
+        "#466234", // olive
+        "#A8331F", // brick
+        "#C9A24B", // brass
+        "#6E5C4C", // muted
     ]
 
     // SF Symbol presets
@@ -49,17 +51,32 @@ struct GroupEditSheet: View {
 
     var body: some View {
         Form {
-            Section(String(localized: "groups.edit.details")) {
+            Section {
                 TextField("groups.edit.name", text: $name)
                     .textInputAutocapitalization(.words)
+            } header: {
+                Text("groups.edit.details")
+                    .cueText(.label)
+                    .textCase(nil)
+                    .foregroundStyle(theme.textSecondary)
             }
 
-            Section(String(localized: "groups.edit.color")) {
+            Section {
                 colorPicker
+            } header: {
+                Text("groups.edit.color")
+                    .cueText(.label)
+                    .textCase(nil)
+                    .foregroundStyle(theme.textSecondary)
             }
 
-            Section(String(localized: "groups.edit.icon")) {
+            Section {
                 iconPicker
+            } header: {
+                Text("groups.edit.icon")
+                    .cueText(.label)
+                    .textCase(nil)
+                    .foregroundStyle(theme.textSecondary)
             }
 
             RecurrenceSection(recurrence: $recurrenceInput)
@@ -67,11 +84,13 @@ struct GroupEditSheet: View {
             if recurrenceInput != nil {
                 Section {
                     Label("groups.edit.recurrence.inheritNote", systemImage: "info.circle")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .cueText(.caption)
+                        .foregroundStyle(theme.textSecondary)
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(theme.background.ignoresSafeArea())
         .navigationTitle(isEditing
             ? String(localized: "groups.edit.title.edit")
             : String(localized: "groups.edit.title.create")
@@ -88,8 +107,9 @@ struct GroupEditSheet: View {
         }
         .overlay {
             if isSubmitting {
-                Color.black.opacity(0.15).ignoresSafeArea()
+                theme.textPrimary.opacity(0.08).ignoresSafeArea()
                 ProgressView()
+                    .tint(theme.primary)
             }
         }
         .alert(
@@ -110,30 +130,46 @@ struct GroupEditSheet: View {
 
     private var colorPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+            HStack(spacing: Spacing.md) {
                 // Clear / no color
-                colorSwatch(hex: nil, color: .secondary)
-                ForEach(colorOptions, id: \.0) { hex, color in
-                    colorSwatch(hex: hex, color: color)
+                colorSwatch(hex: nil)
+                ForEach(colorOptions, id: \.self) { hex in
+                    colorSwatch(hex: hex)
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, Spacing.xs)
         }
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+        .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg, bottom: Spacing.sm, trailing: Spacing.lg))
+        .listRowBackground(theme.surface)
     }
 
-    private func colorSwatch(hex: String?, color: Color) -> some View {
+    /// One color swatch. `hex == nil` is the "no color" option, drawn as a
+    /// hollow paper chip; otherwise the persisted hex resolves to its ink via
+    /// `Color(hex:)`. Selection is marked with an espresso ring (primary).
+    private func colorSwatch(hex: String?) -> some View {
         let isSelected = colorHex == hex
+        let fill = hex.flatMap { Color(hex: $0) }
         return Button {
             colorHex = hex
         } label: {
             Circle()
-                .fill(color.opacity(0.7))
+                .fill(fill ?? theme.surfaceSunken)
                 .frame(width: 32, height: 32)
+                .overlay {
+                    if fill == nil {
+                        Image(systemName: "slash.circle")
+                            .font(.system(size: 14))
+                            .foregroundStyle(theme.textSecondary)
+                    }
+                }
+                .overlay {
+                    Circle()
+                        .strokeBorder(theme.border, lineWidth: 1)
+                }
                 .overlay {
                     if isSelected {
                         Circle()
-                            .strokeBorder(.primary, lineWidth: 2)
+                            .strokeBorder(theme.primary, lineWidth: 2)
                             .padding(-4)
                     }
                 }
@@ -144,14 +180,17 @@ struct GroupEditSheet: View {
     // MARK: - Icon picker
 
     private var iconPicker: some View {
-        LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 6), spacing: 12) {
+        LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 6), spacing: Spacing.md) {
             ForEach(iconOptions, id: \.self) { symbolName in
                 iconSwatch(symbolName: symbolName)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.xs)
+        .listRowBackground(theme.surface)
     }
 
+    /// One icon tile. Selected → espresso fill with cream glyph; unselected →
+    /// a paper sheet tile with a functional border and ink glyph.
     private func iconSwatch(symbolName: String) -> some View {
         let isSelected = icon == symbolName
         return Button {
@@ -161,14 +200,14 @@ struct GroupEditSheet: View {
                 .font(.title3)
                 .frame(width: 40, height: 40)
                 .background(
-                    isSelected ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 8)
+                    isSelected ? theme.primary : theme.surface,
+                    in: RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 1.5)
+                    RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
+                        .strokeBorder(isSelected ? Color.clear : theme.border, lineWidth: 1)
                 )
-                .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                .foregroundStyle(isSelected ? theme.onAccent : theme.textSecondary)
         }
         .buttonStyle(.plain)
     }

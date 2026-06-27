@@ -16,6 +16,7 @@ struct TaskEditScreen: View {
     let seriesDTO: TaskDTO
     let onSaved: (TaskDTO) -> Void
 
+    @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
 
     @State private var title: String = ""
@@ -37,14 +38,19 @@ struct TaskEditScreen: View {
 
     var body: some View {
         Form {
-            Section(String(localized: "newEvent.details")) {
+            Section {
                 TextField("newEvent.titleField", text: $title)
                     .textInputAutocapitalization(.sentences)
                 TextField("newEvent.notesField", text: $notes, axis: .vertical)
                     .lineLimit(3...6)
+            } header: {
+                Text("newEvent.details")
+                    .cueText(.label)
+                    .textCase(nil)
+                    .foregroundStyle(theme.textSecondary)
             }
 
-            Section(String(localized: "newEvent.time")) {
+            Section {
                 Toggle("newEvent.allDay", isOn: $isAllDay.animation(.default))
                 if isAllDay {
                     DatePicker("newEvent.date", selection: $startAt, displayedComponents: .date)
@@ -61,6 +67,11 @@ struct TaskEditScreen: View {
                         displayedComponents: [.date, .hourAndMinute]
                     )
                 }
+            } header: {
+                Text("newEvent.time")
+                    .cueText(.label)
+                    .textCase(nil)
+                    .foregroundStyle(theme.textSecondary)
             }
 
             Section {
@@ -69,6 +80,8 @@ struct TaskEditScreen: View {
 
             RecurrenceSection(recurrence: $recurrenceInput)
         }
+        .scrollContentBackground(.hidden)
+        .background(theme.background.ignoresSafeArea())
         .navigationTitle(String(localized: "taskDetail.edit.title"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -79,13 +92,16 @@ struct TaskEditScreen: View {
                 Button(String(localized: "taskDetail.edit.save")) {
                     performSave()
                 }
+                .fontWeight(.semibold)
+                .tint(theme.primary)
                 .disabled(isSubmitting || title.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
         .overlay {
             if isSubmitting {
-                Color.black.opacity(0.15).ignoresSafeArea()
+                theme.textPrimary.opacity(0.08).ignoresSafeArea()
                 ProgressView()
+                    .tint(theme.primary)
             }
         }
         .alert(
@@ -182,12 +198,14 @@ struct TaskEditScreen: View {
 
 /// Inline section used by both `TaskEditScreen` and `NewEventScreen`.
 struct RecurrenceSection: View {
+    @Environment(\.theme) private var theme
+
     @Binding var recurrence: RecurrenceRuleInput?
 
     @State private var showEditor = false
 
     var body: some View {
-        Section(String(localized: "recurrence.section.title")) {
+        Section {
             Button {
                 showEditor = true
             } label: {
@@ -195,13 +213,18 @@ struct RecurrenceSection: View {
                     Text("recurrence.label")
                     Spacer()
                     Text(recurrenceSummary)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.textSecondary)
                     Image(systemName: "chevron.right")
-                        .foregroundStyle(.tertiary)
-                        .font(.caption)
+                        .cueText(.caption)
+                        .foregroundStyle(theme.textSecondary)
                 }
             }
-            .foregroundStyle(.primary)
+            .foregroundStyle(theme.textPrimary)
+        } header: {
+            Text("recurrence.section.title")
+                .cueText(.label)
+                .textCase(nil)
+                .foregroundStyle(theme.textSecondary)
         }
         .sheet(isPresented: $showEditor) {
             NavigationStack {

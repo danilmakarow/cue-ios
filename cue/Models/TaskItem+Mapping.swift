@@ -98,4 +98,27 @@ extension TaskItem {
             isRecurring: isRecurring
         )
     }
+
+    /// Projects this occurrence into the `Sendable` ``OccurrenceVM`` consumed by
+    /// the UIKit calendar scopes. Returns nil when the occurrence has no
+    /// effective start (`occurrenceStart == nil`) since it cannot be placed on a
+    /// timeline. The `startAt`/`endAt` derivation matches ``asScheduleEvent()``:
+    /// `endAt` falls back to `startAt + 1h` when `occurrenceEnd` is nil.
+    func asOccurrenceVM() -> OccurrenceVM? {
+        guard let start = occurrenceStart else { return nil }
+        let resolvedEnd = occurrenceEnd ?? start.addingTimeInterval(3600)
+        return OccurrenceVM(
+            id: occurrenceKey,
+            seriesId: seriesId,
+            occurrenceStart: occurrenceStart,
+            originalStart: originalStart,
+            title: title,
+            notes: notes,
+            startAt: start,
+            endAt: resolvedEnd,
+            requiresCompletion: requiresCompletion,
+            completedAt: completedAt,
+            isRecurring: isRecurring
+        )
+    }
 }

@@ -6,13 +6,18 @@
 import SwiftData
 import SwiftUI
 
-/// Push-navigated screen for creating a new calendar event.
+/// Push-navigated screen for creating a new calendar event. The Save action is
+/// the app's second wax-seal moment: committing the event presses the seal.
 struct NewEventScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.theme) private var theme
     @State private var viewModel = NewEventViewModel()
     @State private var showRecurrenceEditor = false
     @State private var groups: [TaskGroupDTO] = []
+    /// Drives the seal-press animation in the saving overlay (false → true on
+    /// appear so the seal stamps down once per submit).
+    @State private var sealStamped = false
 
     var body: some View {
         @Bindable var viewModel = viewModel
@@ -49,8 +54,8 @@ struct NewEventScreen: View {
                     Button("newEvent.useQuickPicker") {
                         withAnimation { viewModel.useClassicPicker = false }
                     }
-                    .font(.footnote)
-                    .foregroundStyle(.tint)
+                    .cueText(.caption)
+                    .foregroundStyle(theme.accentText)
                 } else {
                     durationChipStrip(viewModel: viewModel)
                     DatePicker(
@@ -61,8 +66,8 @@ struct NewEventScreen: View {
                     Button("newEvent.switchToClassicPicker") {
                         withAnimation { viewModel.useClassicPicker = true }
                     }
-                    .font(.footnote)
-                    .foregroundStyle(.tint)
+                    .cueText(.caption)
+                    .foregroundStyle(theme.accentText)
                 }
             }
 
@@ -85,6 +90,8 @@ struct NewEventScreen: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(theme.background.ignoresSafeArea())
         .navigationTitle("newEvent.title")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
@@ -129,36 +136,24 @@ struct NewEventScreen: View {
     @ViewBuilder
     private func durationChipStrip(viewModel: NewEventViewModel) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.sm) {
                 ForEach(EventDuration.allCases) { option in
-                    durationChip(option: option, viewModel: viewModel)
+                    CueChip(
+                        option.label,
+                        isSelected: viewModel.duration == option
+                    ) {
+                        withAnimation(.snappy) { viewModel.duration = option }
+                    }
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, Spacing.xs)
         }
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+        .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg, bottom: Spacing.sm, trailing: Spacing.lg))
     }
 
-    /// A single duration chip, accent-tinted when selected.
-    @ViewBuilder
-    private func durationChip(option: EventDuration, viewModel: NewEventViewModel) -> some View {
-        let isSelected = viewModel.duration == option
-        Button(option.label) {
-            withAnimation(.snappy) { viewModel.duration = option }
-        }
-        .buttonStyle(.bordered)
-        .tint(isSelected ? .accentColor : .secondary)
-        .controlSize(.small)
-        .fontWeight(isSelected ? .semibold : .regular)
-        .overlay {
-            if isSelected {
-                Capsule()
-                    .strokeBorder(Color.accentColor, lineWidth: 1.5)
-            }
-        }
-    }
-
-    /// Floating liquid-glass Save button anchored to the bottom safe area.
+    /// The key CTA — the one rationed terracotta `.decisive` button (a 6pt cut
+    /// sheet, not a pill), anchored to the bottom safe area. Submitting presses the
+    /// wax seal in the overlay.
     @ViewBuilder
     private func saveButton(viewModel: NewEventViewModel) -> some View {
         Button {
@@ -172,33 +167,30 @@ struct NewEventScreen: View {
             }
         } label: {
             Text("newEvent.save")
-                .font(.headline)
-                .foregroundStyle(.tint)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .contentShape(.capsule)
         }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .capsule)
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+        .buttonStyle(.cue(.decisive))
         .disabled(!viewModel.canSubmit)
-        .padding(.horizontal)
-        .padding(.bottom, 8)
+        .padding(.horizontal, Spacing.lg)
+        .padding(.bottom, Spacing.sm)
     }
 
+    /// Saving state — a warm scrim and the wax seal pressing down (the commit
+    /// signature), on a letterpress surface card.
     private var savingOverlay: some View {
         ZStack {
-            Color.black.opacity(0.15)
+            theme.textPrimary.opacity(0.08)
                 .ignoresSafeArea()
-            VStack(spacing: 12) {
-                ProgressView()
-                    .controlSize(.large)
+            VStack(spacing: Spacing.md) {
+                WaxSeal(isStamped: sealStamped, size: 64)
                 Text("newEvent.saving")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .cueText(.callout)
+                    .foregroundStyle(theme.textSecondary)
             }
-            .padding(24)
-            .background(.regularMaterial, in: .rect(cornerRadius: 16))
+            .padding(Spacing.xxl)
+            .background(theme.surface, in: RoundedRectangle(cornerRadius: Radius.large, style: .continuous))
+            .cueDepth(.valueCut, radius: Radius.large)
+            .onAppear { sealStamped = true }
+            .onDisappear { sealStamped = false }
         }
     }
 }

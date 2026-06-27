@@ -1,6 +1,11 @@
 # Spec: "The Traveler" color theme + magnifying-glass brand mark
 
-Status: Implemented (2026-06-08)
+> **⚠️ Superseded (2026-06-19) by [Kraft & Ink](design-tokens.md) — see [ADR 0003](../adr/0003-design-token-system.md).**
+> The Traveler Desert/Dusk palettes and the magnifying-glass mark were retired
+> in favor of the Kraft & Ink identity and a four-axis design-token system.
+> This doc is kept for history; it no longer reflects shipping behavior.
+
+Status: Superseded (was Implemented 2026-06-08)
 
 ## Context
 

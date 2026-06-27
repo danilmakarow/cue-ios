@@ -12,6 +12,8 @@ import SwiftUI
 /// Layout: Repeat picker → if not Off: interval stepper, weekday picker (weekly
 /// only), End picker (never / on date / after N occurrences).
 struct RecurrenceEditor: View {
+    @Environment(\.theme) private var theme
+
     @Binding var recurrence: RecurrenceRuleInput?
 
     // Internal form state — kept in sync with the binding via `onChange`.
@@ -34,22 +36,32 @@ struct RecurrenceEditor: View {
             }
 
             if recurrence != nil {
-                Section(String(localized: "recurrence.interval.section")) {
+                Section {
                     Stepper(
                         intervalLabel,
                         value: $interval,
                         in: 1...99
                     )
                     .onChange(of: interval) { _, _ in updateBinding() }
+                } header: {
+                    Text("recurrence.interval.section")
+                        .cueText(.label)
+                        .textCase(nil)
+                        .foregroundStyle(theme.textSecondary)
                 }
 
                 if frequency == .weekly {
-                    Section(String(localized: "recurrence.weekdays.section")) {
+                    Section {
                         weekdayGrid
+                    } header: {
+                        Text("recurrence.weekdays.section")
+                            .cueText(.label)
+                            .textCase(nil)
+                            .foregroundStyle(theme.textSecondary)
                     }
                 }
 
-                Section(String(localized: "recurrence.end.section")) {
+                Section {
                     Picker("recurrence.end.label", selection: $endType) {
                         Text("recurrence.end.never").tag(RecurrenceEndType.never)
                         Text("recurrence.end.onDate").tag(RecurrenceEndType.untilDate)
@@ -76,15 +88,22 @@ struct RecurrenceEditor: View {
                         )
                         .onChange(of: occurrenceCount) { _, _ in updateBinding() }
                     }
+                } header: {
+                    Text("recurrence.end.section")
+                        .cueText(.label)
+                        .textCase(nil)
+                        .foregroundStyle(theme.textSecondary)
                 }
 
                 Section {
                     Text(summaryLine)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .cueText(.callout)
+                        .foregroundStyle(theme.textSecondary)
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(theme.background.ignoresSafeArea())
         .navigationTitle(String(localized: "recurrence.editor.title"))
         .onAppear { loadFromBinding() }
     }
@@ -114,48 +133,37 @@ struct RecurrenceEditor: View {
     // MARK: - Weekday grid
 
     private var weekdayGrid: some View {
-        let days: [(Int, LocalizedStringKey)] = [
-            (0, "recurrence.weekday.mon"),
-            (1, "recurrence.weekday.tue"),
-            (2, "recurrence.weekday.wed"),
-            (3, "recurrence.weekday.thu"),
-            (4, "recurrence.weekday.fri"),
-            (5, "recurrence.weekday.sat"),
-            (6, "recurrence.weekday.sun"),
+        let days: [(index: Int, label: String)] = [
+            (0, String(localized: "recurrence.weekday.mon")),
+            (1, String(localized: "recurrence.weekday.tue")),
+            (2, String(localized: "recurrence.weekday.wed")),
+            (3, String(localized: "recurrence.weekday.thu")),
+            (4, String(localized: "recurrence.weekday.fri")),
+            (5, String(localized: "recurrence.weekday.sat")),
+            (6, String(localized: "recurrence.weekday.sun")),
         ]
-        return HStack(spacing: 6) {
-            ForEach(days, id: \.0) { dayIndex, label in
-                weekdayChip(index: dayIndex, label: label)
+        return HStack(spacing: Spacing.xs) {
+            ForEach(days, id: \.index) { day in
+                weekdayChip(index: day.index, label: day.label)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.xs)
     }
 
-    private func weekdayChip(index: Int, label: LocalizedStringKey) -> some View {
-        let isSelected = selectedWeekdays.contains(index)
-        return Button {
-            if isSelected {
-                selectedWeekdays.remove(index)
-            } else {
-                selectedWeekdays.insert(index)
+    private func weekdayChip(index: Int, label: String) -> some View {
+        CueChip(
+            label,
+            isSelected: selectedWeekdays.contains(index),
+            action: {
+                if selectedWeekdays.contains(index) {
+                    selectedWeekdays.remove(index)
+                } else {
+                    selectedWeekdays.insert(index)
+                }
+                updateBinding()
             }
-            updateBinding()
-        } label: {
-            Text(label)
-                .font(.caption.weight(isSelected ? .semibold : .regular))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .background(
-                    isSelected ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 8)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
-                )
-                .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-        }
-        .buttonStyle(.plain)
+        )
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Helpers

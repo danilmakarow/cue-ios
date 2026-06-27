@@ -5,24 +5,33 @@
 //  The single source of truth for Cue's color system.
 //
 //  ─────────────────────────────────────────────────────────────────────────
-//  "The Traveler" — a warm desert-meets-dusk palette (5 source colors)
+//  "Kraft & Ink on white" — espresso ink on a clean white page
 //  ─────────────────────────────────────────────────────────────────────────
-//      #CDD0DB  CLOUD   pale lavender-grey   →  cool neutral / background base
-//      #9197AA  AZUL    muted slate blue     →  calm cool grounding tone
-//      #F7B557  MIMOSA  warm golden amber    →  highlights, calls-to-attention
-//      #E27921  ORANGE  terracotta orange    →  the vibrant hero / primary
-//      #C1521E  APEROL  deep burnt sienna    →  darkest, strong contrast
+//      #FFFFFF  PAGE     pure white canvas    →  the page behind everything
+//      #FAF6EF  SHEET    faint warm paper     →  cards, panels (lift by value + 1px edge)
+//      #FEFCF8  RISER    near-white sheet     →  top sheets / elevated surfaces
+//      #F1EADF  TRAY     muted recessed tan   →  header strips, table zebra
+//      #5A3A24  ESPRESSO warm brown ink       →  the hero / primary / tint
+//      #2E211A  INK      near-black warm       →  text and headings
+//      #BE4A28  CLAY     warmed terracotta    →  the ONE rationed accent / TODAY seal
+//      #466234  OLIVE / #A8331F BRICK / #C9A24B BRASS — earthy status colors
+//
+//  This is a deliberate variation of the canonical Kraft & Ink spec: its canvas
+//  was kraft tan #F2E8D8; here the canvas is WHITE and the paper warmth is
+//  carried by the INK and ACCENTS instead. The surface ramp is retuned because
+//  "lighter than the canvas" inverts on white — surfaces now lift by faint
+//  warmth + a 1px functional edge (letterpress), not by going lighter.
 //
 //  The rest of the app never references hex or raw palette colors — it speaks in
 //  *roles* (`theme.background`, `theme.primary`, …) read from the environment.
 //
-//  Two switchable options, each fully designed for light AND dark:
-//    • Desert — warm-led. Sand canvas, terracotta-orange primary, mimosa accent.
-//    • Dusk   — cool-led. Lavender-grey canvas, slate-blue primary, mimosa spark.
+//  Kraft & Ink is the sole, opinionated identity (it replaced the earlier
+//  "Traveler" Desert/Dusk options). Dark mode is deferred — the app pins the
+//  light appearance for now — so each role is a single static color; when dark
+//  ships, swap the table to `Color(light:dark:)` pairs and nothing else changes.
 //
-//  Dark mode is *designed*, not inverted: Desert dark is a warm near-black, Dusk
-//  dark a cool blue-black, each with a brightened accent. Per the brand, plain
-//  white / black are avoided — neutrals are tinted toward the option's identity.
+//  Color is one of four token axes; see Tokens/{Spacing,Radius,Typography,Depth}
+//  and docs/specs/design-tokens.md for the full system.
 //
 
 import SwiftUI
@@ -66,12 +75,12 @@ enum AppearanceMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-// MARK: - Traveler palette (raw source colors)
+// MARK: - Traveler palette (legacy raw source colors)
 
-/// The five raw "Traveler" colors. *Implementation detail* — feature code should
-/// never reach in here; read the semantic `ThemeColors` roles from the
-/// environment (`@Environment(\.theme)`) instead. These exist so the brand mark
-/// and the two palette options can compose from one source of truth.
+/// The five raw "Traveler" colors. *Legacy* — retained only because the brand
+/// mark (`BrandMark`) still composes from them; it will be reworked to Kraft &
+/// Ink separately. Feature code must never reach in here — read the semantic
+/// `ThemeColors` roles from the environment (`@Environment(\.theme)`) instead.
 enum TravelerColor {
     static let cloud = Color(hex: 0xCDD0DB)  // pale lavender-grey
     static let azul = Color(hex: 0x9197AA)   // muted slate blue
@@ -82,34 +91,50 @@ enum TravelerColor {
 
 // MARK: - Semantic color roles
 
-/// A fully-resolved set of intent-named color roles for one palette option.
+/// A fully-resolved set of intent-named color roles for the active palette.
 ///
-/// Each role is a *dynamic* light/dark color, so a single value renders correctly
-/// in both appearances automatically (driven by `.preferredColorScheme` / the
-/// OS). The only thing that varies at runtime is *which option* is in force —
-/// that is injected once at the app root via `EnvironmentValues.theme` and read
-/// downstream with `@Environment(\.theme)`.
+/// A single value is injected once at the app root via `EnvironmentValues.theme`
+/// and read downstream with `@Environment(\.theme)` — the React analogy is one
+/// `ThemeContext.Provider` at the root and `useContext(Theme)` in the leaves.
+///
+/// Surfaces (by value): `background` (canvas) → `surface` (cards) →
+/// `surfaceElevated` (top sheets, lighter) and `surfaceSunken` (recessed
+/// strips, darker). Depth comes from these value-steps plus `border`, not from
+/// soft shadows — see `Depth`.
 ///
 /// Roles:
 /// - **background** — the app canvas behind everything.
-/// - **surface / surfaceElevated** — cards, grouped rows, sheets on top.
-/// - **primary / primaryPressed** — the hero color for key actions and the tint.
-/// - **secondary** — the warm highlight (mimosa) for subtle fills and selection.
+/// - **surface / surfaceElevated / surfaceSunken** — cards, raised sheets, and
+///   recessed strips (header bands, table zebra), respectively.
+/// - **primary / primaryPressed** — the espresso hero for key actions and the tint.
+/// - **secondary** — the rationed clay accent (CTA fills, the wax seal, thin
+///   accent marks). A *fill* color; for clay-as-text use `accentText`.
 /// - **accent** — alias of `primary`; mirrors the system `Color.accentColor`.
-/// - **onAccent** — ink (text / icons) placed on top of a `primary` fill.
+/// - **accentText** — the deepened clay safe to use as small text / icons / rules.
+/// - **onAccent** — cream ink placed on top of a `primary` or `secondary` fill.
 /// - **textPrimary / textSecondary** — body and supporting text.
-/// - **separator** — hairlines and dividers.
-struct ThemeColors: Sendable {
+/// - **separator** — decorative hairlines (ornament only).
+/// - **border** — functional edges a user must locate (inputs, card outlines).
+/// - **success / warning / danger / info** — earthy semantic roles (olive /
+///   brass-fill / brick / espresso). `warning` is a fill only — brass-as-text fails.
+struct ThemeColors: Sendable, Equatable {
     let background: Color
     let surface: Color
     let surfaceElevated: Color
+    let surfaceSunken: Color
     let primary: Color
     let primaryPressed: Color
     let secondary: Color
+    let accentText: Color
     let onAccent: Color
     let textPrimary: Color
     let textSecondary: Color
     let separator: Color
+    let border: Color
+    let success: Color
+    let warning: Color
+    let danger: Color
+    let info: Color
 
     /// Semantic alias of `primary`, for call sites that think in terms of the
     /// system accent tint.
@@ -118,95 +143,101 @@ struct ThemeColors: Sendable {
 
 // MARK: - Palette options
 
-/// The user-selectable color options. Replaces the old free accent-color picker:
-/// instead of an arbitrary hue, the user chooses one of two cohesive, fully
-/// designed palettes built from "The Traveler".
+/// The selectable color options. Kraft & Ink is currently the only one; the
+/// enum is retained (rather than collapsed to a struct) so re-introducing a
+/// second palette later is a one-case addition with no plumbing changes.
 ///
 /// Stored as a raw string so it round-trips through `UserDefaults`.
 enum AppPalette: String, CaseIterable, Identifiable, Sendable {
-    /// Warm-led: sand canvas, terracotta-orange primary, mimosa accent. The
-    /// vibrant, energetic identity. The default.
-    case desert
-    /// Cool-led: lavender-grey canvas, slate-blue primary, mimosa as the warm
-    /// spark. The calm, blue-hour identity.
-    case dusk
+    /// Kraft & Ink — warm kraft-paper workspace, espresso ink, one rationed clay
+    /// wax-seal accent. The sole identity.
+    case kraftInk
 
     var id: String { rawValue }
 
-    /// Localized option name for the picker (e.g. "Desert").
+    /// Localized option name for the picker.
     var titleKey: LocalizedStringKey {
         switch self {
-        case .desert: return "theme.palette.desert"
-        case .dusk: return "theme.palette.dusk"
+        case .kraftInk: return "theme.palette.kraftInk"
         }
     }
 
     /// Localized one-line description shown under the option name.
     var subtitleKey: LocalizedStringKey {
         switch self {
-        case .desert: return "theme.palette.desert.subtitle"
-        case .dusk: return "theme.palette.dusk.subtitle"
+        case .kraftInk: return "theme.palette.kraftInk.subtitle"
         }
     }
 
-    /// Three representative light-mode colors for the picker swatch:
-    /// canvas, primary, and secondary highlight.
+    /// Three representative colors for the picker swatch: canvas, primary, accent.
     var swatch: (canvas: Color, primary: Color, secondary: Color) {
         switch self {
-        case .desert:
-            return (Color(hex: 0xF3EDE4), Color(hex: 0xBA4D17), TravelerColor.mimosa)
-        case .dusk:
-            return (Color(hex: 0xE9EBF1), Color(hex: 0x586280), TravelerColor.mimosa)
+        case .kraftInk:
+            return (Color(hex: 0xFFFFFF), Color(hex: 0x5A3A24), Color(hex: 0xBE4A28))
         }
     }
 
-    /// The resolved semantic colors for this option. Each role is a dynamic
-    /// light/dark color, so the same `ThemeColors` value renders in both
-    /// appearances; only the option selection changes it.
+    /// The resolved semantic colors for this option.
     var colors: ThemeColors {
         switch self {
-        case .desert: return Self.desertColors
-        case .dusk: return Self.duskColors
+        case .kraftInk: return Self.kraftInkColors
         }
     }
 
     // MARK: Resolved tables
 
-    /// Desert — warm-led. Light: warm sand canvas + terracotta hero. Dark: warm
-    /// near-black with a brightened orange so the accent stays vivid.
+    /// Kraft & Ink on white — espresso ink on a clean white page. Single static
+    /// colors (dark deferred; the app pins `.light`). When dark ships, swap each
+    /// to `Color(light:dark:)`.
     ///
-    /// The light primary is a *deepened* terracotta (`#BA4D17`) rather than the
-    /// raw ORANGE `#E27921`: the bright orange is a mid-luminance "dead zone" hue
-    /// that can't clear WCAG 3:1 as a tint on the pale canvas nor carry AA ink, so
-    /// it would make every accent glyph/label inaccessible in the default theme.
-    /// The vivid `#E27921` still leads the app icon and the dark-mode accent.
-    private static let desertColors = ThemeColors(
-        background: Color(light: 0xF3EDE4, dark: 0x17120D),
-        surface: Color(light: 0xFBF7F0, dark: 0x211A13),
-        surfaceElevated: Color(light: 0xFFFDF9, dark: 0x2C241B),
-        primary: Color(light: 0xBA4D17, dark: 0xEE8B3B),
-        primaryPressed: Color(light: 0x9C3D12, dark: 0xE27921),
-        secondary: Color(light: 0xF7B557, dark: 0xF7B557),
-        onAccent: Color(light: 0xFFF7EC, dark: 0x2A190B),
-        textPrimary: Color(light: 0x2C2118, dark: 0xF4ECE1),
-        textSecondary: Color(light: 0x7A6657, dark: 0xB8A693),
-        separator: Color(light: 0xE6DBCB, dark: 0x3A3127)
-    )
-
-    /// Dusk — cool-led. Light: lavender-grey canvas + deepened slate-blue hero,
-    /// mimosa as the warm spark. Dark: cool blue-black with a light periwinkle
-    /// accent so the cool tone reads on the dark canvas.
-    private static let duskColors = ThemeColors(
-        background: Color(light: 0xE9EBF1, dark: 0x13151B),
-        surface: Color(light: 0xF4F5F9, dark: 0x1C1F27),
-        surfaceElevated: Color(light: 0xFCFCFE, dark: 0x252934),
-        primary: Color(light: 0x586280, dark: 0x97A0C2),
-        primaryPressed: Color(light: 0x434C66, dark: 0x7B85AB),
-        secondary: Color(light: 0xF7B557, dark: 0xF7B557),
-        onAccent: Color(light: 0xF5F6FA, dark: 0x14161D),
-        textPrimary: Color(light: 0x21242E, dark: 0xECEEF5),
-        textSecondary: Color(light: 0x5F6678, dark: 0xA2A8BA),
-        separator: Color(light: 0xD7DAE3, dark: 0x2E323D)
+    /// Surface ramp (retuned for a white canvas — you cannot go lighter than
+    /// white, so surfaces lift by faint warmth + a 1px functional edge, not by
+    /// going lighter): white `#FFFFFF` page → `surface` `#FAF6EF` (faint warm
+    /// paper) → `surfaceElevated` `#FEFCF8` (near-white top sheet) →
+    /// `surfaceSunken` `#F1EADF` (muted recessed tan, descendant of the old kraft).
+    ///
+    /// Accessibility (measured, sRGB / WCAG 2.1 — re-verified on the white canvas
+    /// and on every surface tone; lowest figure per role shown is on `sunken`):
+    /// - ink `#2E211A` text: white 15.57:1, surface 14.45, elevated 15.20, sunken 13.03 — AAA.
+    /// - muted `#6E5C4C` text: white 6.37:1, surface 5.91, elevated 6.21, sunken 5.33 — AA.
+    /// - espresso `#5A3A24` (primary/info) text: white 10.17:1, sunken 8.51 — AAA.
+    /// - clay-as-text `accentText` `#A53D22`: white 6.38:1, sunken 5.34 — AA. (The
+    ///   seal fill `secondary` `#BE4A28` is ~3.6:1 on white — FILL ONLY, never text.)
+    /// - success olive `#466234` text: white 6.87:1, sunken 5.75 — AA.
+    /// - danger brick `#A8331F` text: white 6.65:1, sunken 5.56 — AA.
+    /// - cream `onAccent` `#FBF5EA` on fills: on primary 9.37:1, on primaryPressed
+    ///   12.32, on seal `#BE4A28` 4.61 (AA), on success 6.33, on danger 6.13.
+    /// - `border` `#8C7142` functional edge: 4.61:1 on white, 3.86 on sunken
+    ///   (clears the 3:1 non-text minimum on every surface).
+    /// - `separator` `#D0BA98` is decorative ornament only: ~1.88:1 on white,
+    ///   ~1.58 on sunken — faintly visible, intentionally below the functional
+    ///   `border` so it never reads as an edge. (Bumped darker from the spec's
+    ///   `#D8C4A6`, which nearly vanished on white at ~1.70:1.)
+    /// - brass `warning` `#C9A24B` is a FILL only: ink `#2E211A` on it ≈ 6.49:1;
+    ///   cream on it ≈ 2.21:1 — so place INK (never cream, never text-as-brass) on it.
+    ///
+    /// More-accent discipline: the rationed terracotta `secondary` is the
+    /// calendar's one-hot moment — the TODAY / now marker. Olive `success` carries
+    /// completed/agreed states, brass `warning` carries pending/draft-like states,
+    /// espresso `primary` stays structural. Color presence, not a rainbow.
+    private static let kraftInkColors = ThemeColors(
+        background: Color(hex: 0xFFFFFF),
+        surface: Color(hex: 0xFAF6EF),
+        surfaceElevated: Color(hex: 0xFEFCF8),
+        surfaceSunken: Color(hex: 0xF1EADF),
+        primary: Color(hex: 0x5A3A24),
+        primaryPressed: Color(hex: 0x43291A),
+        secondary: Color(hex: 0xBE4A28),
+        accentText: Color(hex: 0xA53D22),
+        onAccent: Color(hex: 0xFBF5EA),
+        textPrimary: Color(hex: 0x2E211A),
+        textSecondary: Color(hex: 0x6E5C4C),
+        separator: Color(hex: 0xD0BA98),
+        border: Color(hex: 0x8C7142),
+        success: Color(hex: 0x466234),
+        warning: Color(hex: 0xC9A24B),
+        danger: Color(hex: 0xA8331F),
+        info: Color(hex: 0x5A3A24)
     )
 }
 
@@ -214,9 +245,9 @@ enum AppPalette: String, CaseIterable, Identifiable, Sendable {
 
 extension EnvironmentValues {
     /// The active semantic colors for the current palette option. Injected once
-    /// at the app root from `ThemeSettings.palette.colors`; defaults to Desert so
-    /// previews and detached views still resolve.
-    @Entry var theme: ThemeColors = AppPalette.desert.colors
+    /// at the app root from `ThemeSettings.palette.colors`; defaults to Kraft &
+    /// Ink so previews and detached views still resolve.
+    @Entry var theme: ThemeColors = AppPalette.kraftInk.colors
 }
 
 // MARK: - ThemeSettings
@@ -239,6 +270,7 @@ final class ThemeSettings {
     // MARK: Public
 
     /// Current appearance preference. Writing persists to `UserDefaults`.
+    /// (Dark mode is deferred; the app currently pins `.light` at the root.)
     var appearance: AppearanceMode {
         didSet {
             userDefaults.set(appearance.rawValue, forKey: Keys.appearance)
@@ -254,7 +286,7 @@ final class ThemeSettings {
 
     // MARK: Init
 
-    /// Loads persisted preferences, falling back to defaults (`.system`, `.desert`).
+    /// Loads persisted preferences, falling back to defaults (`.system`, `.kraftInk`).
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
 
@@ -263,8 +295,8 @@ final class ThemeSettings {
         self.appearance = AppearanceMode(rawValue: appearanceRaw) ?? .system
 
         let paletteRaw = userDefaults.string(forKey: Keys.palette)
-            ?? AppPalette.desert.rawValue
-        self.palette = AppPalette(rawValue: paletteRaw) ?? .desert
+            ?? AppPalette.kraftInk.rawValue
+        self.palette = AppPalette(rawValue: paletteRaw) ?? .kraftInk
     }
 }
 
@@ -295,7 +327,8 @@ extension Color {
     /// Builds a dynamic color that resolves to `light` in light mode and `dark`
     /// in dark mode, mirroring how an asset-catalog color with "Any/Dark"
     /// appearances behaves — but expressed in code so every role is reviewable
-    /// in one file.
+    /// in one file. (Currently unused by Kraft & Ink, which is light-only;
+    /// retained for when a dark palette ships.)
     init(light: Color, dark: Color) {
         self.init(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark

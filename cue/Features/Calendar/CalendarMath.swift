@@ -10,8 +10,8 @@ import Foundation
 /// (Mon/Sun) and month lengths follow the user's locale.
 ///
 /// Canonical keys produced here (`startOfDay`, `startOfMonth`) double as the
-/// `matchedTransitionSource` ids for the zoom navigation, so source and
-/// destination always agree.
+/// cell keys in the `ScopeFrameRegistry` and the selection state, so zoom
+/// anchors and selection always agree.
 enum CalendarMath {
     private static var calendar: Calendar { .current }
 

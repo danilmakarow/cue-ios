@@ -22,6 +22,7 @@ import SwiftUI
 /// On a successful `link()` the screen dismisses itself (so the sheet closes and
 /// a re-tap of the now-burned nonce can't happen here).
 struct ConnectTelegramView: View {
+    @Environment(\.theme) private var theme
     @Environment(TelegramLinkStore.self) private var store
     @Environment(NotificationStore.self) private var notifications
     @Environment(\.dismiss) private var dismiss
@@ -49,6 +50,8 @@ struct ConnectTelegramView: View {
                 failedState(message: message)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(theme.background.ignoresSafeArea())
         .navigationTitle("telegram.title")
         .navigationBarTitleDisplayMode(.inline)
         .loadingOverlay(store.isMutating, label: String(localized: "telegram.working"))
@@ -74,21 +77,29 @@ struct ConnectTelegramView: View {
     private func notConnectedState(viewModel: ConnectTelegramViewModel) -> some View {
         Section {
             Text("telegram.explanation")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .cueText(.callout)
+                .foregroundStyle(theme.textSecondary)
         }
 
-        Section("telegram.code.section") {
+        Section {
             TextField("telegram.code.placeholder", text: $viewModel.code)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .font(.body.monospaced())
+                .cueText(.code)
+                .foregroundStyle(theme.textPrimary)
 
             Button {
                 viewModel.pasteFromClipboard()
             } label: {
                 Label("telegram.paste", systemImage: "doc.on.clipboard")
+                    .cueText(.body)
+                    .foregroundStyle(theme.primary)
             }
+        } header: {
+            Text("telegram.code.section")
+                .cueText(.label)
+                .textCase(nil)
+                .foregroundStyle(theme.textSecondary)
         }
 
         Section {
@@ -96,9 +107,10 @@ struct ConnectTelegramView: View {
                 Task { await connect(viewModel: viewModel) }
             } label: {
                 Text("telegram.connect")
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.cue(.primary))
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
             .disabled(!viewModel.canSubmit || store.isMutating)
         }
     }
@@ -108,16 +120,21 @@ struct ConnectTelegramView: View {
         Section {
             LabeledContent("telegram.connectedAs") {
                 Text(handleDisplay(for: username))
-                    .foregroundStyle(.secondary)
+                    .cueText(.code)
+                    .foregroundStyle(theme.textSecondary)
             }
             if let formatted = Self.formattedLinkedAt(linkedAt) {
                 LabeledContent("telegram.linkedAt") {
                     Text(formatted)
-                        .foregroundStyle(.secondary)
+                        .cueText(.code)
+                        .foregroundStyle(theme.textSecondary)
                 }
             }
         } header: {
             Text("telegram.connected.section")
+                .cueText(.label)
+                .textCase(nil)
+                .foregroundStyle(theme.textSecondary)
         }
 
         Section {
@@ -125,8 +142,10 @@ struct ConnectTelegramView: View {
                 Task { await store.unlink() }
             } label: {
                 Text("telegram.disconnect")
-                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.cue(.destructive))
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
         }
     }
 
