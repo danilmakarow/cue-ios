@@ -33,18 +33,21 @@ struct OnboardingCalendarPage: View {
                 agendaRow(
                     icon: "person.2.fill",
                     tint: theme.success,
+                    washOpacity: 0.14,
                     title: LocalizedStringResource("onboarding.calendar.row1", defaultValue: "Standup with design"),
                     time: "9:00"
                 )
                 agendaRow(
                     icon: "stethoscope",
                     tint: theme.warning,
+                    washOpacity: 0.18,
                     title: LocalizedStringResource("onboarding.calendar.row2", defaultValue: "Dentist — Dr. Reyes"),
                     time: "11:30"
                 )
                 agendaRow(
                     icon: "doc.text.fill",
                     tint: theme.accentText,
+                    washOpacity: 0.12,
                     title: LocalizedStringResource("onboarding.calendar.row3", defaultValue: "Submit Q3 expense report"),
                     time: "16:00"
                 )
@@ -54,9 +57,9 @@ struct OnboardingCalendarPage: View {
                     .padding(.horizontal, Spacing.md)
 
                 HStack(spacing: Spacing.sm) {
-                    CueChip(String(localized: "onboarding.chip.recurring"), isSelected: false) {}
-                    CueChip(String(localized: "onboarding.chip.allDay"), isSelected: false) {}
-                    CueChip(String(localized: "onboarding.chip.telegram"), isSelected: false) {}
+                    CueChip(String(localized: "onboarding.chip.recurring", defaultValue: "Recurring"), isSelected: false) {}
+                    CueChip(String(localized: "onboarding.chip.allDay", defaultValue: "All-day"), isSelected: false) {}
+                    CueChip(String(localized: "onboarding.chip.telegram", defaultValue: "Telegram"), isSelected: false) {}
                 }
                 .allowsHitTesting(false)
                 .padding(Spacing.md)
@@ -71,12 +74,13 @@ struct OnboardingCalendarPage: View {
     private func agendaRow(
         icon: String,
         tint: Color,
+        washOpacity: Double,
         title: LocalizedStringResource,
         time: String
     ) -> some View {
         HStack(spacing: Spacing.md) {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(tint.opacity(0.15))
+                .fill(tint.opacity(washOpacity))
                 .frame(width: 30, height: 30)
                 .overlay {
                     Image(systemName: icon)
@@ -216,6 +220,7 @@ struct OnboardingNotificationsPage: View {
                 permissionRow(
                     icon: "bell.fill",
                     tint: theme.accentText,
+                    washOpacity: 0.12,
                     title: LocalizedStringResource("onboarding.notifications.task.title", defaultValue: "Task reminders"),
                     detail: LocalizedStringResource("onboarding.notifications.task.detail", defaultValue: "30 min before Dentist"),
                     showsToggle: false
@@ -226,6 +231,7 @@ struct OnboardingNotificationsPage: View {
                 permissionRow(
                     icon: "sun.max.fill",
                     tint: theme.warning,
+                    washOpacity: 0.18,
                     title: LocalizedStringResource("onboarding.notifications.brief.title", defaultValue: "Morning brief & evening recap"),
                     detail: LocalizedStringResource("onboarding.notifications.brief.detail", defaultValue: "Delivered in-app and on Telegram"),
                     showsToggle: true
@@ -282,13 +288,14 @@ struct OnboardingNotificationsPage: View {
     private func permissionRow(
         icon: String,
         tint: Color,
+        washOpacity: Double,
         title: LocalizedStringResource,
         detail: LocalizedStringResource,
         showsToggle: Bool
     ) -> some View {
         HStack(alignment: .top, spacing: Spacing.md) {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(tint.opacity(0.15))
+                .fill(tint.opacity(washOpacity))
                 .frame(width: 30, height: 30)
                 .overlay {
                     Image(systemName: icon)
@@ -380,7 +387,8 @@ struct OnboardingSignInPage: View {
             BrandMark(size: 96)
 
             Text(verbatim: "Cue")
-                .font(.custom(Typography.serifFamily, size: 50, relativeTo: .largeTitle).weight(.semibold))
+                .font(.custom(Typography.serifFamily, size: 50, relativeTo: .largeTitle))
+                .tracking(-1)
                 .foregroundStyle(theme.textPrimary)
 
             Text("auth.tagline")
@@ -424,7 +432,9 @@ struct OnboardingPageScaffold<Content: View, Footer: View>: View {
 
     var body: some View {
         VStack(spacing: Spacing.xl) {
-            VStack(spacing: Spacing.xl) {
+            // Header → illustrative-card gap is 24-26px in the Clean spec
+            // (`margin-top: 26px`/`24px`); map to `Spacing.xxl` (24).
+            VStack(spacing: Spacing.xxl) {
                 content()
             }
             .padding(.top, OnboardingLayout.topInset)

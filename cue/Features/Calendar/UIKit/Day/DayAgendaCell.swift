@@ -5,11 +5,16 @@
 
 import UIKit
 
-/// The `.list`-mode agenda row — the UIKit port of `CueEventCard`: a clean white
-/// card with a clay spine, a serif title (strikethrough when done), a monospaced
-/// "ledger" time range, optional notes, and — for tasks — the olive completion
-/// check. CUE — Clean resting depth (1pt hairline border + a soft floating
-/// shadow), matching `Depth.letterpress`.
+/// The `.list`-mode agenda row — the UIKit port of `CueEventCard`. It composes the
+/// shared ``DayTaskCardView`` (clean white card, 1pt hairline border, soft floating
+/// shadow, plus a task-colored full-height line down the card's LEFT edge, clipped
+/// to the rounded corners) and fills its ``DayTaskCardView/contentView`` with a serif
+/// title (strikethrough when done), a monospaced "ledger" time range, optional
+/// notes, and — for tasks — the olive completion check.
+///
+/// The rail names the row's GROUP (via ``CalendarColor``, clay `primary` fallback)
+/// while open and flips to olive (`success`) once done, matching the Day/Today spec
+/// rails — a full-height LEFT border line.
 ///
 /// The cell stays *dumb*: it renders an ``OccurrenceVM`` and reports `onToggle` /
 /// `onSelect` through closures the owning view controller sets.
@@ -26,8 +31,9 @@ final class DayAgendaCell: UICollectionViewCell {
 
     // MARK: - Subviews
 
-    private let card = UIView()
-    private let spine = UIView()
+    /// The shared floating card chrome + trailing color rail; the row's text +
+    /// seal live inside its ``DayTaskCardView/contentView``.
+    private let card = DayTaskCardView()
     private let titleLabel = UILabel()
     private let timeLabel = UILabel()
     private let notesLabel = UILabel()
@@ -53,16 +59,12 @@ final class DayAgendaCell: UICollectionViewCell {
     /// Builds the static hierarchy once; content + theme applied per-bind.
     private func setUp() {
         card.translatesAutoresizingMaskIntoConstraints = false
-        card.layer.cornerRadius = Radius.card
-        card.layer.cornerCurve = .continuous
-        card.layer.borderWidth = 1
-        // CUE — Clean resting card: a soft floating shadow lifts the card off the
-        // white page (the old blur-0 "letterpress value-cut" is retired). Params
-        // are filled per-theme in `applyTheme` from the `restShadow*` tokens.
+        // Roomy agenda insets on all sides (matches the old `Spacing.md` card
+        // padding); the card adds the rail width to the leading inset internally.
+        card.contentInsets = UIEdgeInsets(
+            top: Spacing.md, left: Spacing.md, bottom: Spacing.md, right: Spacing.md
+        )
         contentView.addSubview(card)
-
-        spine.translatesAutoresizingMaskIntoConstraints = false
-        card.addSubview(spine)
 
         titleLabel.numberOfLines = 0
         timeLabel.numberOfLines = 1
@@ -79,38 +81,38 @@ final class DayAgendaCell: UICollectionViewCell {
 
         bodyTapTarget.translatesAutoresizingMaskIntoConstraints = false
         bodyTapTarget.addTarget(self, action: #selector(handleSelect), for: .touchUpInside)
-        card.addSubview(bodyTapTarget)
-        card.addSubview(textStack)
+        card.contentView.addSubview(bodyTapTarget)
+        card.contentView.addSubview(textStack)
 
         sealButton.translatesAutoresizingMaskIntoConstraints = false
         sealButton.addTarget(self, action: #selector(handleToggle), for: .touchUpInside)
-        card.addSubview(sealButton)
+        card.contentView.addSubview(sealButton)
 
+        let content = card.contentView
         NSLayoutConstraint.activate([
             card.topAnchor.constraint(equalTo: contentView.topAnchor),
             card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
-            spine.topAnchor.constraint(equalTo: card.topAnchor),
-            spine.bottomAnchor.constraint(equalTo: card.bottomAnchor),
-            spine.leadingAnchor.constraint(equalTo: card.leadingAnchor),
-            spine.widthAnchor.constraint(equalToConstant: 4),
+            // The tap target + text fill the card's (already inset) content region.
+            bodyTapTarget.topAnchor.constraint(equalTo: content.topAnchor),
+            bodyTapTarget.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            bodyTapTarget.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            bodyTapTarget.bottomAnchor.constraint(equalTo: content.bottomAnchor),
 
-            bodyTapTarget.topAnchor.constraint(equalTo: card.topAnchor),
-            bodyTapTarget.leadingAnchor.constraint(equalTo: spine.trailingAnchor),
-            bodyTapTarget.trailingAnchor.constraint(equalTo: card.trailingAnchor),
-            bodyTapTarget.bottomAnchor.constraint(equalTo: card.bottomAnchor),
-
-            textStack.topAnchor.constraint(equalTo: card.topAnchor, constant: Spacing.md),
-            textStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -Spacing.md),
-            textStack.leadingAnchor.constraint(equalTo: spine.trailingAnchor, constant: Spacing.md),
+            textStack.topAnchor.constraint(equalTo: content.topAnchor),
+            textStack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            textStack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
 
             sealButton.leadingAnchor.constraint(
                 greaterThanOrEqualTo: textStack.trailingAnchor, constant: Spacing.sm
             ),
-            sealButton.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -Spacing.md),
-            sealButton.topAnchor.constraint(equalTo: card.topAnchor, constant: Spacing.sm),
+            sealButton.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            // The seal rides `Spacing.xs` above the text top — preserving the old
+            // layout's 4pt-higher nudge (seal was `card.top + Spacing.sm`, text was
+            // `card.top + Spacing.md`) now that both hang off the inset content top.
+            sealButton.topAnchor.constraint(equalTo: content.topAnchor, constant: -Spacing.xs),
             sealButton.widthAnchor.constraint(equalToConstant: 34),
             sealButton.heightAnchor.constraint(equalToConstant: 34),
         ])
@@ -158,27 +160,23 @@ final class DayAgendaCell: UICollectionViewCell {
         }
 
         bodyTapTarget.accessibilityLabel = event.title
+        bodyTapTarget.accessibilityIdentifier = "day.event.card"
         bodyTapTarget.accessibilityTraits = .button
         card.alpha = event.isCompleted ? 0.62 : 1
     }
 
     private func applyTheme() {
         guard let theme, let event else { return }
-        card.backgroundColor = theme.surface
-        card.layer.borderColor = theme.border.cgColor
-        // CUE — Clean resting card: a soft floating shadow (color textPrimary,
-        // baked opacity in `restShadowOpacity`), not the old hard value-cut.
-        card.layer.shadowColor = theme.textPrimary.cgColor
-        card.layer.shadowRadius = theme.restShadowRadius
-        card.layer.shadowOffset = theme.restShadowOffset
-        card.layer.shadowOpacity = theme.restShadowOpacity
-        // The spine names the row's GROUP (resolved via `CalendarColor`, falling
+        // The rail names the row's GROUP (resolved via `CalendarColor`, falling
         // back to clay `primary` when the group is uncolored) while the task is
         // open, and flips to olive (`success`) once done — the positive earthy
         // "completed" mark, matching the Day/Today specs' group-colored rails.
-        spine.backgroundColor = event.isCompleted
+        let railColor = event.isCompleted
             ? theme.success
             : CalendarColor.rail(for: event, theme: theme)
+        // Clean white card fill (the agenda row is not tinted like the timeline
+        // block); the shared card paints fill + border + soft floating shadow.
+        card.applyChrome(theme: theme, fillColor: theme.surface, railColor: railColor)
 
         let titleAttributes: [NSAttributedString.Key: Any] = [
             .font: theme.titleM,

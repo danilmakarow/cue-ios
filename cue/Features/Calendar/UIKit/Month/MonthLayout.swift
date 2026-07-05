@@ -34,8 +34,14 @@ enum MonthLayout {
     /// simple multiple of the section height.
     static let weekRowCount = 6
 
-    /// Height of a single day row. Mirrors the old `MonthDayCell.minHeight` (64).
-    static let dayRowHeight: CGFloat = 64
+    /// Height of a single day row. Raised from 64 (past the design's documented
+    /// cell `min-height:72px`, §4) with headroom so the Stacked density's full three
+    /// tinted chips fit under the 24pt number without the 2nd/3rd chip clipping at
+    /// the cell's bottom edge: 24 (number) + 2 (gap) + three ~16pt chips + two 1pt
+    /// inter-chip gaps ≈ 77pt, so 80 clears it with a sub-pixel-rounding margin.
+    /// (Pairs with the tightened `MonthChipView` vertical padding + `titleStack`
+    /// spacing below.)
+    static let dayRowHeight: CGFloat = 80
 
     /// Height of the per-section month-title header.
     static let monthTitleHeight: CGFloat = 44

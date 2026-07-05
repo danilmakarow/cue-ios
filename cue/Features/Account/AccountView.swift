@@ -152,7 +152,7 @@ private struct AccountContent: View {
                     .frame(width: 32, height: 32)
                     .overlay(Circle().strokeBorder(theme.border, lineWidth: 1))
                     .overlay {
-                        Image(systemName: "camera.fill")
+                        Image(systemName: "camera")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(theme.primary)
                     }
@@ -218,6 +218,7 @@ private struct AccountContent: View {
             HStack(spacing: Spacing.xs) {
                 Text("account.displayName.label")
                     .cueText(.label)
+                    .textCase(.uppercase)
                     .foregroundStyle(theme.textSecondary)
 
                 if store.nameChanged {
@@ -227,6 +228,7 @@ private struct AccountContent: View {
                             .frame(width: 6, height: 6)
                         Text("account.edited")
                             .cueText(.label)
+                            .textCase(.uppercase)
                             .foregroundStyle(theme.accentText)
                     }
                 }
@@ -242,21 +244,31 @@ private struct AccountContent: View {
                 .foregroundStyle(theme.textPrimary)
                 .tint(theme.primary)
                 .textContentType(.name)
+                .accessibilityIdentifier("account.displayName.field")
 
                 if !store.displayName.isEmpty {
                     Button {
                         store.clearDisplayName()
                         nameFocused = true
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 17))
-                            .foregroundStyle(theme.textTertiary)
+                        // A 20pt sunken disc with a thin stroked X (design), not the
+                        // heavier filled `xmark.circle.fill` glyph.
+                        Circle()
+                            .fill(theme.surfaceSunken)
+                            .frame(width: 20, height: 20)
+                            .overlay {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(theme.textSecondary)
+                            }
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text("common.clear"))
                 }
             }
-            .padding(.vertical, Spacing.sm)
+            // Design field padding is 10×12; no 10pt Spacing token exists, so the
+            // vertical inset is an explicit literal between sm (8) and md (12).
+            .padding(.vertical, 10)
             .padding(.horizontal, Spacing.md)
             .background(
                 RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
@@ -274,12 +286,20 @@ private struct AccountContent: View {
 
     @ViewBuilder
     private var timeZoneRow: some View {
-        SettingsRow(
-            String(localized: "account.timeZone.label"),
-            subValue: timeZoneDescription,
-            trailing: .plain,
-            showsSeparator: false
-        )
+        // A tappable disclosure (design renders a chevron): the device time zone is
+        // managed in the OS Settings app, so the row deep-links there — mirroring the
+        // "Manage Apple ID" pattern rather than inventing an in-app zone editor.
+        Button {
+            openSystemSettings()
+        } label: {
+            SettingsRow(
+                String(localized: "account.timeZone.label"),
+                subValue: timeZoneDescription,
+                trailing: .navigation,
+                showsSeparator: false
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Sign-in method section
@@ -320,7 +340,7 @@ private struct AccountContent: View {
 
                     VStack(spacing: Spacing.sm) {
                         Button {
-                            openAppleIDSettings()
+                            openSystemSettings()
                         } label: {
                             Text("account.manageAppleID")
                         }
@@ -399,7 +419,7 @@ private struct AccountContent: View {
             Task { await store.save() }
         } label: {
             HStack(spacing: Spacing.sm) {
-                WaxSeal(isStamped: true, size: 22)
+                WaxSeal(isStamped: false, size: 26)
                 Text("account.save")
             }
         }
@@ -417,6 +437,7 @@ private struct AccountContent: View {
     private func sectionLabel(_ key: LocalizedStringKey) -> some View {
         Text(key)
             .cueText(.label)
+            .textCase(.uppercase)
             .foregroundStyle(theme.textSecondary)
             .padding(.horizontal, Spacing.xs)
     }
@@ -460,10 +481,10 @@ private struct AccountContent: View {
         }
     }
 
-    /// Deep-links to the OS Settings app so the user can manage their Apple ID.
-    /// iOS doesn't expose a direct Apple-ID pane URL, so this opens the app's
-    /// Settings root — the closest reliable system destination.
-    private func openAppleIDSettings() {
+    /// Deep-links to the OS Settings app — the closest reliable system destination
+    /// for both managing the Apple ID and changing the device time zone (iOS exposes
+    /// no direct pane URL for either, so this opens the app's Settings root).
+    private func openSystemSettings() {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         openURL(url)
     }

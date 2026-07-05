@@ -74,6 +74,13 @@ final class TaskItem {
     var isRecurring: Bool
     /// True for overridden occurrences (start/end changed by an exception).
     var isException: Bool
+    /// When non-nil, this occurrence is a materialized OVERRIDE child of the
+    /// recurring parent named here (its `seriesId` is the child's own task id).
+    /// Lets the UI badge it and route edits/deletes to the child directly.
+    var parentSeriesId: String?
+    /// True when this override child's parent rule no longer generates its
+    /// original slot (rendered "detached from series").
+    var isDetached: Bool
     /// Optional group membership id.
     var groupId: String?
 
@@ -112,6 +119,8 @@ final class TaskItem {
         completedAt: Date? = nil,
         isRecurring: Bool = false,
         isException: Bool = false,
+        parentSeriesId: String? = nil,
+        isDetached: Bool = false,
         groupId: String? = nil,
         colorToken: String? = nil,
         groupColorToken: String? = nil,
@@ -133,6 +142,8 @@ final class TaskItem {
         self.completedAt = completedAt
         self.isRecurring = isRecurring
         self.isException = isException
+        self.parentSeriesId = parentSeriesId
+        self.isDetached = isDetached
         self.groupId = groupId
         self.colorToken = colorToken
         self.groupColorToken = groupColorToken

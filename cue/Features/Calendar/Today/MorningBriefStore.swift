@@ -11,7 +11,7 @@ import Observation
 ///
 /// The brief is a *non-essential* ritual card: a load failure (or an empty brief)
 /// degrades gracefully to a quiet placeholder rather than failing the whole Today
-/// screen — the same "the denominator can fail" posture as ``DailyCountsStore``.
+/// screen — a "this supporting card is allowed to fail" posture.
 /// Once a brief lands for a given local date it is cached for the session, so
 /// re-entering the Today tab doesn't re-hit the network for the same day.
 ///
@@ -66,7 +66,11 @@ final class MorningBriefStore {
 
         phase = .loading
         do {
-            let response = try await api.dailyBrief(date: key)
+            // A forced reload (the subtle header regenerate) passes `refresh: true`
+            // so the backend regenerates and OVERWRITES its per-day cache rather
+            // than replaying the stale copy — otherwise a re-tap would re-serve the
+            // same brief. A normal cold load uses the cached copy.
+            let response = try await api.dailyBrief(date: key, refresh: force)
             brief = response.brief
             cachedDate = response.localDate
             phase = .loaded

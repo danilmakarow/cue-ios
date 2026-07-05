@@ -33,10 +33,8 @@ struct LoadingStateView: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .controlSize(.large)
-                .tint(theme.primary)
+        VStack(spacing: 16) {
+            RingSpinner(size: 34, lineWidth: 3)
 
             if let label {
                 Text(label)
@@ -47,6 +45,47 @@ struct LoadingStateView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(label ?? String(localized: "common.loading"))
+    }
+}
+
+// MARK: - Ring spinner
+
+/// A single rotating-ring spinner matching the States-kit loading specimen: a
+/// faint warm-gray full track (`surfaceSunken`) with a clay (`primary`) arc on
+/// top that spins continuously. Replaces the system multi-spoke
+/// `ProgressView` so the loading mark reads as the design-kit's thin ring.
+private struct RingSpinner: View {
+    @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Outer diameter of the ring in points.
+    let size: CGFloat
+    /// Stroke thickness of both the track and the arc.
+    let lineWidth: CGFloat
+
+    @State private var isRotating = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(theme.surfaceSunken, lineWidth: lineWidth)
+            Circle()
+                .trim(from: 0, to: 0.25)
+                .stroke(
+                    theme.primary,
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                )
+                .rotationEffect(.degrees(isRotating ? 360 : 0))
+                .animation(
+                    reduceMotion
+                        ? nil
+                        : .linear(duration: 0.9).repeatForever(autoreverses: false),
+                    value: isRotating
+                )
+        }
+        .frame(width: size, height: size)
+        .onAppear { isRotating = true }
+        .accessibilityHidden(true)
     }
 }
 

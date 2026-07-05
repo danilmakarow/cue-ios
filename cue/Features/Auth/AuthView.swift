@@ -8,7 +8,8 @@ import SwiftUI
 import UIKit
 
 /// Sign-in screen. Currently a single Sign in with Apple button — the product's
-/// only authentication path. Kraft canvas, clay seal mark, Fraunces wordmark.
+/// only authentication path. White Clean canvas, clay brand mark, IBM Plex Serif
+/// wordmark.
 struct AuthView: View {
     @Environment(AuthStore.self) private var authStore
     @Environment(\.colorScheme) private var colorScheme
@@ -129,7 +130,8 @@ struct AuthView: View {
             BrandMark(size: 96)
 
             Text(verbatim: "Cue")
-                .font(.custom(Typography.serifFamily, size: 50, relativeTo: .largeTitle).weight(.semibold))
+                .font(.custom(Typography.serifFamily, size: 50, relativeTo: .largeTitle))
+                .tracking(-1)
                 .foregroundStyle(theme.textPrimary)
 
             Text("auth.tagline")
@@ -147,7 +149,7 @@ struct AuthView: View {
         }
         .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
         .frame(height: 52)
-        .clipShape(.rect(cornerRadius: Radius.medium))
+        .clipShape(.rect(cornerRadius: Radius.chip))
         .disabled(authStore.isAuthenticating)
     }
 

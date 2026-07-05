@@ -14,6 +14,15 @@ import Foundation
 /// ISO-8601 coders all come from the underlying verbs. Every method is
 /// `nonisolated` to match the verbs, so they're callable from any isolation.
 extension APIClient {
+    // MARK: - Sync
+
+    /// The cheap per-user "did anything change?" check via `GET /sync/state`.
+    /// Returns the current monotonic revision + server time; the client compares
+    /// `revision` to its last-seen value to decide whether to run a full delta.
+    nonisolated func syncState() async throws -> SyncStateDTO {
+        try await get("/sync/state")
+    }
+
     // MARK: - Tasks
 
     /// Searches the signed-in user's tasks by text via `GET /tasks/search` (M1).
@@ -125,13 +134,49 @@ extension APIClient {
     /// optional local `YYYY-MM-DD` (user timezone); omit for today. Served from a
     /// per-day cache; `brief` is nil when the day yielded nothing usable.
     ///
-    /// - Parameter date: optional local `YYYY-MM-DD` to brief on; defaults to today.
-    nonisolated func dailyBrief(date: String? = nil) async throws -> DailyBriefDTO {
+    /// - Parameters:
+    ///   - date: optional local `YYYY-MM-DD` to brief on; defaults to today.
+    ///   - refresh: when `true`, appends `&refresh=true` so the backend
+    ///     regenerates and OVERWRITES the cached brief (busting the per-day cache)
+    ///     rather than serving the cached copy. Defaults to `false`.
+    nonisolated func dailyBrief(date: String? = nil, refresh: Bool = false) async throws -> DailyBriefDTO {
         var items: [URLQueryItem] = []
         if let date {
             items.append(URLQueryItem(name: "date", value: date))
         }
+        if refresh {
+            items.append(URLQueryItem(name: "refresh", value: "true"))
+        }
         return try await get("/users/me/daily-brief", queryItems: items)
+    }
+
+    // MARK: - Brief configuration
+
+    /// Fetches the user's brief configuration via `GET /users/me/brief-settings`.
+    /// `customPrompt` is nil when no override is set (the brief uses its default
+    /// voice). Mirrors the persona-settings read shape.
+    nonisolated func briefSettings() async throws -> BriefSettingsDTO {
+        try await get("/users/me/brief-settings")
+    }
+
+    /// Updates the user's brief configuration via `PATCH /users/me/brief-settings`
+    /// and returns the persisted shape. Send the full `customPrompt` to set it (or
+    /// an explicit `null` to clear it). Per the shared contract the backend also
+    /// invalidates today's cached brief so the new prompt takes effect immediately.
+    ///
+    /// - Parameter request: the `{ customPrompt }` payload to persist.
+    nonisolated func updateBriefSettings(
+        _ request: UpdateBriefSettingsRequest
+    ) async throws -> BriefSettingsDTO {
+        try await patch("/users/me/brief-settings", body: request)
+    }
+
+    /// Resets the brief configuration to its default via
+    /// `DELETE /users/me/brief-settings` (clears `customPrompt`). Idempotent:
+    /// succeeds whether or not a custom prompt was set. Decodes and discards the
+    /// returned `{ customPrompt: null }` body (mirrors `resetPersona()`).
+    nonisolated func resetBriefSettings() async throws {
+        let _: BriefSettingsDTO = try await delete("/users/me/brief-settings")
     }
 
     // MARK: - Assistant (quick-create parse)

@@ -32,6 +32,12 @@ enum TaskColorResolver {
         "GRAY": .gray,
     ]
 
+    /// The neutral fallback ink for an occurrence that carries no task **and** no
+    /// group color — a token-aligned muted gray (`#9C9893`, the palette's
+    /// `textTertiary`). Rails, dots, and icons resolve to this so an uncolored
+    /// item still reads as a deliberate, consistent mark rather than a missing one.
+    static let neutral = Color(hex: 0x9C9893)
+
     /// Resolves a raw color token to a `Color`, or `nil` when the token is `nil`
     /// or unrecognized (neither a known preset nor a valid `#RRGGBB` hex).
     ///
@@ -47,5 +53,21 @@ enum TaskColorResolver {
             return preset
         }
         return Color(hex: trimmed)
+    }
+
+    /// The EFFECTIVE render color for an occurrence: its own `taskToken` when set,
+    /// else the owning `groupToken`, else the ``neutral`` gray. This is the single
+    /// rule for every rail / dot / icon that paints a task's color (per the design
+    /// decision `task ?? group ?? gray`).
+    ///
+    /// A token that is present but unrecognized (neither a preset nor valid hex)
+    /// is treated as absent so it can fall through to the next source rather than
+    /// collapsing straight to gray.
+    ///
+    /// - Parameters:
+    ///   - taskToken: the per-task color token (highest priority).
+    ///   - groupToken: the owning group's color token (fallback).
+    static func effectiveColor(taskToken: String?, groupToken: String?) -> Color {
+        color(from: taskToken) ?? color(from: groupToken) ?? neutral
     }
 }

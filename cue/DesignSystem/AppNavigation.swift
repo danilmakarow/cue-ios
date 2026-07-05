@@ -12,7 +12,6 @@ import SwiftUI
 enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
     case today
     case calendar
-    case dashboard
     case settings
     /// Not a real destination — an action item rendered inline in the native
     /// tab bar (so it inherits Liquid Glass) that opens the New Event sheet.
@@ -22,7 +21,7 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
 
     /// The real, selectable destination tabs — excludes the `newEvent` action
     /// item. Use this for anything that iterates over genuine tabs.
-    static var destinations: [AppTab] { [.today, .calendar, .dashboard, .settings] }
+    static var destinations: [AppTab] { [.today, .calendar, .settings] }
 
     var id: String { rawValue }
 
@@ -32,7 +31,6 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
         switch self {
         case .today: return String(localized: "tab.today")
         case .calendar: return String(localized: "tab.calendar")
-        case .dashboard: return String(localized: "tab.dashboard")
         case .settings: return String(localized: "tab.settings")
         case .newEvent: return String(localized: "newEvent.title")
         }
@@ -44,7 +42,6 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
         switch self {
         case .today: return "tab.today"
         case .calendar: return "tab.calendar"
-        case .dashboard: return "tab.dashboard"
         case .settings: return "tab.settings"
         case .newEvent: return "newEvent.title"
         }
@@ -55,7 +52,6 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
         switch self {
         case .today: return "sun.max.fill"
         case .calendar: return "calendar"
-        case .dashboard: return "chart.bar.fill"
         case .settings: return "gearshape"
         case .newEvent: return "plus.circle.fill"
         }

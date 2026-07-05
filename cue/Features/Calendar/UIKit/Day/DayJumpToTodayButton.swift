@@ -6,9 +6,10 @@
 import UIKit
 
 /// Floating "Today" pill — the UIKit port of the SwiftUI `JumpToTodayButton`: a
-/// Liquid Glass capsule with a leading `arrow.uturn.backward` glyph and the
-/// "Today" label in `theme.primary`, lifted by a warm value-shadow rather than a
-/// cold black float. Owned by the Day scope and placed bottom-leading.
+/// Liquid Glass capsule with a leading `clock` glyph and the "Today" label in
+/// `theme.primary`, lifted by a warm value-shadow rather than a cold black float.
+/// Used by the Day and Month scopes; the owning scope chooses its placement
+/// (the Month scope pins it bottom-trailing, matching the design).
 ///
 /// Named `DayJumpToTodayButton` (not `JumpToTodayButton`) so it coexists with the
 /// still-present SwiftUI `JumpToTodayButton` until Integration removes the old
@@ -54,7 +55,7 @@ final class DayJumpToTodayButton: UIControl {
         addSubview(glassContainer)
 
         iconView.image = UIImage(
-            systemName: "arrow.uturn.backward",
+            systemName: "clock",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
         )
         iconView.setContentHuggingPriority(.required, for: .horizontal)

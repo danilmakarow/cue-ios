@@ -2,21 +2,23 @@
 //  SegmentedControl.swift
 //  cue
 //
-//  A generic segmented picker. This is the NEUTRAL, non-semantic variant: the
-//  selected segment is carried by a GRAY pill (`fillSelected`) sliding on a
-//  recessed `surfaceSunken` track — per the selection rule, non-semantic
-//  selection is gray, not an accent. (The calendar week-strip's "today = clay"
-//  case is a separate, semantic control.) React analogy: a `<SegmentedControl
-//  options selection onChange>` over any `Hashable` value.
+//  A generic segmented picker. CUE — Clean treatment: the selected segment is
+//  carried by a WHITE raised pill (`surface` + 1px border + a soft resting
+//  shadow) sliding on a recessed `surfaceSunken` track — the track reads sunken,
+//  the active segment reads lifted. (The calendar week-strip's "today = clay"
+//  case is a separate, semantic control; standalone selection chips stay neutral
+//  gray — see `CueChip`.) React analogy: a `<SegmentedControl options selection
+//  onChange>` over any `Hashable` value.
 //
 
 import SwiftUI
 
 /// A segmented picker over any `Hashable` selection. Renders one segment per
-/// option on a recessed gray track; the selected segment sits under a neutral
-/// `fillSelected` pill that slides between positions (160ms). Selected ink reads
-/// `textPrimary`, unselected `textSecondary` — no accent colour, since this is a
-/// non-semantic mode/scope switch.
+/// option on a recessed gray track; the selected segment sits under a white
+/// raised pill (`surface` + 1px border + soft rest shadow) that slides between
+/// positions (160ms). Selected ink reads `textPrimary`, unselected
+/// `textSecondary` — no accent colour, since this is a non-semantic mode/scope
+/// switch.
 struct SegmentedControl<Value: Hashable>: View {
     @Environment(\.theme) private var theme
     @Namespace private var pill
@@ -72,7 +74,9 @@ struct SegmentedControl<Value: Hashable>: View {
                 .background {
                     if isSelected {
                         pillShape
-                            .fill(theme.fillSelected)
+                            .fill(theme.surface)
+                            .overlay(pillShape.strokeBorder(theme.border, lineWidth: 1))
+                            .shadow(color: theme.textPrimary.opacity(0.05), radius: 2, y: 1)
                             .matchedGeometryEffect(id: "pill", in: pill)
                     }
                 }

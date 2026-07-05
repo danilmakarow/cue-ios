@@ -7,7 +7,7 @@ import SwiftUI
 
 // MARK: - BrandMark
 
-/// The Cue brand mark: a clay wax seal with a cream IBM Plex Serif "C" monogram.
+/// The Cue brand mark: a near-black wax seal with a cream serif "C" monogram.
 /// It shares the `WaxSealShape` blob with the in-app `WaxSeal` save mark, so the
 /// logo and the app's "make it stick" voice are one idea — and it scales crisply
 /// at any size. (The seal is no longer the task-done marker; completion now uses
@@ -31,9 +31,10 @@ struct BrandMark: View {
         case monochrome(Color)
     }
 
-    // Fixed brand palette.
-    private static let clay = Color(hex: 0xBE4A28)
-    private static let clayRim = Color(hex: 0x8A2F18)
+    // Fixed brand palette. Near-black seal (clay retired as the brand color); the
+    // cream monogram reads as a light "C" on the dark seal.
+    private static let clay = Color(hex: 0x1A1A1A)
+    private static let clayRim = Color(hex: 0x000000)
     private static let cream = Color(hex: 0xFBF5EA)
 
     /// Rendered edge length in points. The mark is always square.
@@ -63,12 +64,12 @@ struct BrandMark: View {
         .accessibilityHidden(true)
     }
 
-    /// The IBM Plex Serif "C" at the seal's center — ties the serif brand voice
+    /// The Source Serif 4 Bold "C" at the seal's center — ties the serif brand voice
     /// into the mark itself. Tracks `Typography.serifFamily`, so a future face
     /// swap flows here automatically.
     private func monogram(_ color: Color) -> some View {
         Text(verbatim: "C")
-            .font(.custom(Typography.serifFamily, size: size * 0.46).weight(.semibold))
+            .font(.custom(Typography.serifFamily, size: size * 0.46))
             .foregroundStyle(color)
     }
 }

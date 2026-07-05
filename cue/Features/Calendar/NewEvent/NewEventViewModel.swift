@@ -71,7 +71,7 @@ final class NewEventViewModel {
             if useClassicPicker {
                 duration = nil
             } else if duration == nil {
-                duration = .fifteenMin
+                duration = .oneHour
             }
         }
     }

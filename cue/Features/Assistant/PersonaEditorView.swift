@@ -26,8 +26,20 @@ struct PersonaEditorView: View {
 
     /// Locally-owned store: this screen is the only place the persona is edited,
     /// so the store's lifetime matches the screen (unlike `TelegramLinkStore`,
-    /// which lives at app root because its deep link can arrive first).
-    @State private var store = PersonaStore()
+    /// which lives at app root because its deep link can arrive first). The init
+    /// default keeps existing call sites (`PersonaEditorView()`) unchanged; tests
+    /// pass a pre-loaded store so the editor renders its settled content without an
+    /// async load.
+    @State private var store: PersonaStore
+
+    /// Seeds the locally-owned `PersonaStore`. Passing `nil` (the default) makes a
+    /// fresh store that cold-loads in `.task` (the app's runtime path); a caller
+    /// can supply an already-loaded store (e.g. snapshot tests) to render the
+    /// settled editor directly. The store is built inside this MainActor init so
+    /// the default doesn't evaluate `PersonaStore()` in a nonisolated context.
+    init(store: PersonaStore? = nil) {
+        _store = State(initialValue: store ?? PersonaStore())
+    }
 
     /// The editing buffer for the custom prompt. Distinct from `store.active` so
     /// edits stay local until saved; seeded from the active persona on load and
@@ -110,8 +122,11 @@ struct PersonaEditorView: View {
                 store.bind(notifications: notifications)
                 if store.loadState != .loaded {
                     await store.load()
-                    syncFromActive()
                 }
+                // Seed the local editing state from the active persona — both after
+                // a cold load and when an already-loaded store was injected (tests /
+                // re-entry), so the injected case isn't left with an empty draft.
+                syncFromActive()
             }
             .confirmActionSheet(
                 isPresented: $showResetConfirm,
@@ -131,12 +146,21 @@ struct PersonaEditorView: View {
             )
     }
 
+    /// True while the persona is still loading — the chrome stays mounted and the
+    /// prompt well hosts a localized spinner (matching the design's in-well
+    /// loading state) rather than collapsing to a full-screen loader.
+    private var isLoading: Bool {
+        switch store.loadState {
+        case .idle, .loading: return true
+        default: return false
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch store.loadState {
         case .idle, .loading:
-            LoadingStateView(label: String(localized: "common.loading"))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            loadedContent
         case let .failed(message):
             ErrorStateView(
                 title: String(
@@ -174,9 +198,9 @@ struct PersonaEditorView: View {
     // MARK: Sections
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             Text("assistant.persona.title")
-                .cueText(.displayM)
+                .cueText(.displayL)
                 .foregroundStyle(theme.textPrimary)
             Text(
                 String(
@@ -203,7 +227,8 @@ struct PersonaEditorView: View {
                         CueChip(
                             preset.presetName,
                             systemImage: "sparkles",
-                            isSelected: !isCustomizing && selectedPresetId == preset.id
+                            isSelected: !isCustomizing && selectedPresetId == preset.id,
+                            selection: .neutral
                         ) {
                             selectPreset(preset)
                         }
@@ -211,7 +236,8 @@ struct PersonaEditorView: View {
                     CueChip(
                         String(localized: "assistant.persona.chip.custom", defaultValue: "Custom"),
                         systemImage: "plus",
-                        isSelected: isCustomizing
+                        isSelected: isCustomizing,
+                        selection: .neutral
                     ) {
                         beginCustomizing()
                     }
@@ -256,7 +282,7 @@ struct PersonaEditorView: View {
                     .padding(.horizontal, Spacing.sm)
                     .padding(.vertical, Spacing.xxs + 1)
                     .background(
-                        RoundedRectangle(cornerRadius: Radius.tight, style: .continuous)
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .fill(isCustomizing ? theme.primary : theme.surfaceSunken)
                     )
 
@@ -270,25 +296,40 @@ struct PersonaEditorView: View {
 
     @ViewBuilder
     private var promptWell: some View {
-        let shape = RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+        // Editable well: functional 12px (`Radius.card`) corner + floating depth.
+        // Locked preset well: calmer 6px corner, no depth — per the Clean spec.
+        let editShape = RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+        let lockedShape = RoundedRectangle(cornerRadius: 6, style: .continuous)
         Group {
-            if isCustomizing {
+            if isLoading {
+                // Field-level loading: chrome stays mounted, only the well shows a
+                // centered spinner — mirrors the design's in-well 22px ring.
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(theme.primary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 168)
+                    .background(lockedShape.fill(theme.surfaceSunken))
+                    .overlay(lockedShape.strokeBorder(theme.separator, lineWidth: 1))
+                    .clipShape(lockedShape)
+                    .accessibilityLabel(String(localized: "common.loading"))
+            } else if isCustomizing {
                 TextEditor(text: $draft)
                     .focused($promptFocused)
                     .cueText(.body)
                     .foregroundStyle(theme.textPrimary)
                     .tint(theme.primary)
                     .scrollContentBackground(.hidden)
-                    .padding(Spacing.sm)
-                    .frame(height: 196)
-                    .background(shape.fill(theme.surfaceSunken))
+                    .padding(Spacing.lg - 2)
+                    .frame(height: 168)
+                    .background(editShape.fill(theme.surfaceSunken))
                     .overlay(
-                        shape.strokeBorder(
+                        editShape.strokeBorder(
                             promptFocused ? theme.primary : theme.border,
                             lineWidth: 1
                         )
                     )
-                    .cueDepth(.letterpress, radius: Radius.card)
+                    .cueDepth(.valueCut, radius: Radius.card)
                     .animation(.easeOut(duration: 0.16), value: promptFocused)
             } else {
                 ScrollView {
@@ -296,12 +337,12 @@ struct PersonaEditorView: View {
                         .cueText(.body)
                         .foregroundStyle(theme.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(Spacing.md)
+                        .padding(Spacing.lg - 2)
                 }
-                .frame(height: 196)
-                .background(shape.fill(theme.surfaceSunken))
-                .overlay(shape.strokeBorder(theme.separator, lineWidth: 1))
-                .clipShape(shape)
+                .frame(height: 168)
+                .background(lockedShape.fill(theme.surfaceSunken))
+                .overlay(lockedShape.strokeBorder(theme.separator, lineWidth: 1))
+                .clipShape(lockedShape)
                 .opacity(0.92)
             }
         }
@@ -342,7 +383,7 @@ struct PersonaEditorView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Spacing.md)
                     .background(
-                        RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(theme.secondary)
                             .opacity(0.85)
                     )

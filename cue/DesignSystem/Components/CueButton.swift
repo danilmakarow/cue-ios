@@ -21,6 +21,11 @@ enum CueButtonVariant {
     case decisive
     /// Transparent + 1px functional border, clay label — secondary actions.
     case secondary
+    /// Olive fill, white label — the "done / positive" hero CTA (e.g. Event-Detail
+    /// "Mark done"). Mirrors `decisive` as the single committed action a screen is
+    /// built around, but resolves to `theme.success` (olive) per the token rule
+    /// "done/positive = olive" rather than clay.
+    case decisivePositive
     /// Brick fill, white label — destructive actions (delete, disconnect).
     case destructive
     /// Clay accent-text, no fill — inline/tertiary actions.
@@ -57,7 +62,7 @@ struct CueButtonStyle: ButtonStyle {
 
     private var foreground: Color {
         switch variant {
-        case .primary, .decisive, .destructive: return theme.onAccent
+        case .primary, .decisive, .decisivePositive, .destructive: return theme.onAccent
         case .secondary: return theme.primary
         case .ghost: return theme.accentText
         }
@@ -73,6 +78,10 @@ struct CueButtonStyle: ButtonStyle {
             // Same clay fill as primary — the distinction is context (the one hero
             // CTA), not hue. Press steps one shade darker to `primaryPressed`.
             shape.fill(pressed ? theme.primaryPressed : theme.secondary)
+        case .decisivePositive:
+            // Solid olive "done/positive" fill (theme.success / #466234), white
+            // label. Mirrors `decisive` otherwise; press dims one shade.
+            shape.fill(theme.success).opacity(pressed ? 0.85 : 1)
         case .destructive:
             shape.fill(theme.danger).opacity(pressed ? 0.85 : 1)
         case .secondary:

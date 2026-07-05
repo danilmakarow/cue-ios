@@ -51,11 +51,12 @@ final class CalendarDataAdapter {
         let rows = (try? context.fetch(descriptor)) ?? []
         return rows.compactMap { row in
             // `asOccurrenceVM()` (in the shared Models mapping) doesn't carry the
-            // group color token, so enrich the value here — the adapter owns the
-            // read path and `TaskItem.groupColorToken` is local. This is what lets
-            // the day rails and month chips/dots paint by GROUP.
+            // color tokens, so enrich the value here — the adapter owns the read
+            // path and `TaskItem.colorToken` / `.groupColorToken` are local. This
+            // is what lets the day rails and month chips/dots paint by the
+            // effective task-then-group color.
             guard let base = row.asOccurrenceVM() else { return nil }
-            return base.withGroupColorToken(row.groupColorToken)
+            return base.withColorTokens(taskToken: row.colorToken, groupToken: row.groupColorToken)
         }
     }
 

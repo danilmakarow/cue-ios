@@ -85,11 +85,30 @@ final class AuthStore {
         }
     }
 
+    #if DEBUG
+    /// Debug/test-only: builds a store already in `.authenticated(user)` without
+    /// any network, keychain, or `bootstrap()` round-trip. Snapshot tests and
+    /// previews use this so signed-in screens render their real body synchronously
+    /// and deterministically — no runloop pumping or settle timing. Compiled out of
+    /// release builds.
+    static func authenticated(_ user: UserDTO) -> AuthStore {
+        let store = AuthStore()
+        store.state = .authenticated(user)
+        return store
+    }
+    #endif
+
     // MARK: Bootstrap
 
     /// Verifies any persisted token by calling `/auth/me`. Transitions `state`
     /// to `.authenticated` on success, `.unauthenticated` otherwise.
     func bootstrap() async {
+        #if DEBUG
+        if UITestSupport.isActive {
+            state = .authenticated(UITestSupport.user)
+            return
+        }
+        #endif
         guard AuthTokenBridge.shared.currentToken() != nil else {
             state = .unauthenticated
             return

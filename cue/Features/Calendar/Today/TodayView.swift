@@ -8,14 +8,20 @@ import SwiftUI
 
 /// The **Today** presentation — a calm, scrollable "what's my day" surface, the
 /// SwiftUI render of `Today.dc.html`. It is a dedicated view (not a header bolted
-/// onto the day timeline): a greeting header, a "next up" hero card, a today's-load
-/// summary, the agenda grouped into "up next" / "this evening", and the AI morning
-/// brief — each a CUE — Clean card on the white page.
+/// onto the day timeline): a greeting block (date eyebrow + "Good morning, Jane" +
+/// avatar), the single **Up next** hero ``TaskBox`` (the next open occurrence,
+/// whole-tile tappable to open its detail), and the AI **Today's brief** — each a
+/// CUE — Clean card on the white page. There is no serif "Today" H1, no today's-load
+/// meter, and no "This evening" list: the greeting leads and the one next thing to
+/// do is the hero.
 ///
-/// **Data.** Today's occurrences are read from the already-synced `TaskItem` cache
-/// with a *day-windowed* `@Query` (the same windowed cache the calendar scopes
-/// serve from) — the predicate bounds the fetch to the reference day so SQLite
-/// returns one day's rows via an indexed range read rather than the whole table.
+/// **Data.** The Up-next hero is read from the already-synced `TaskItem` cache with
+/// a `@Query` whose predicate keeps the incomplete occurrences at or after the
+/// reference day's start (`occurrenceStart >= startOfDay && completedAt == nil`),
+/// ascending — deliberately *not* day-windowed, so the hero can surface the genuine
+/// soonest task across days (today, tomorrow, next week…). SQLite walks the
+/// `occurrenceStart` index for the ordered range read; `upNextOccurrence` then picks
+/// the single winner (ongoing-first, else soonest upcoming) against a live `now`.
 /// Completion toggles route through the shared ``CalendarStore`` (so the
 /// optimistic/SWR reconciliation is identical to the calendar). The Today tab also
 /// drives its own day sync on appear so it populates independently of the Calendar
@@ -26,35 +32,52 @@ struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(NotificationStore.self) private var notifications
     @Environment(CalendarStore.self) private var store
+    @Environment(AppNavigation.self) private var navigation
 
     let user: UserDTO
 
-    /// The reference day's occurrence rows, fetched with a day-bounded predicate so
-    /// the read is an indexed range scan of a single day (mirroring
-    /// ``CalendarDataAdapter`` / ``CalendarStore/pruneOccurrences``). Occurrence-less
-    /// rows are coalesced to `.distantPast`, landing below the range, so they're
-    /// excluded. The order matches the post-filter sort below.
-    @Query private var allOccurrences: [TaskItem]
+    /// The pool the **Up next** hero draws from — the incomplete occurrences at or
+    /// after the reference day's start, ascending, spanning FUTURE days (today,
+    /// tomorrow, next week…). A day-windowed query (the shape the calendar scopes
+    /// use) can only ever see the reference day, so it could never surface
+    /// tomorrow's next thing; this unbounded-above query is what lets the hero show
+    /// the genuine soonest task across days. `completedAt == nil` drops done
+    /// occurrences at the SQLite layer; occurrence-less rows coalesce to
+    /// `.distantPast` and fall below `dayStart`, so they're excluded. Bounded at
+    /// `dayStart` (not `now`) so an occurrence that already started earlier today but
+    /// hasn't ended yet — an "ongoing" item — is still in the pool for the pick to
+    /// prefer. Not capped to one row in the query: the earliest future row alone
+    /// can't express "prefer an ongoing occurrence", so the single-winner pick is
+    /// done at read time in `upNextOccurrence`.
+    @Query private var futureOccurrences: [TaskItem]
 
     @State private var brief = MorningBriefStore()
+
+    /// The occurrence whose detail is being pushed. Set by the Up-next hero's tap;
+    /// drives a value-based `navigationDestination` push onto the enclosing tab
+    /// stack (the same ``TaskDetailScreen`` the calendar opens).
+    @State private var selectedEvent: ScheduleEvent?
 
     /// The reference day, captured once on appear so a long-lived screen doesn't
     /// silently roll past midnight mid-session.
     @State private var today: Date
 
-    /// Captures the reference day once and seeds the day-windowed occurrence query
-    /// from its `[startOfDay, startOfNextDay)` bounds.
+    /// Captures the reference day once and seeds the cross-day Up-next occurrence
+    /// query from its start-of-day lower bound.
     init(user: UserDTO) {
         self.user = user
         let dayStart = CalendarMath.startOfDay(.now)
-        let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
-        let dayEnd = Calendar.current.startOfDay(for: nextDay)
         _today = State(initialValue: dayStart)
         let sentinel = Date.distantPast
-        _allOccurrences = Query(
+        // The Up-next pool: incomplete occurrences at/after the day start, ascending,
+        // with NO upper bound so it reaches into tomorrow / next week. The
+        // `?? .distantPast` sentinel excludes occurrence-less rows; `completedAt == nil`
+        // filters out done occurrences in SQLite. The runtime pick (`upNextOccurrence`)
+        // then chooses the soonest still-relevant one against a live `now`.
+        _futureOccurrences = Query(
             filter: #Predicate { task in
                 (task.occurrenceStart ?? sentinel) >= dayStart &&
-                (task.occurrenceStart ?? sentinel) < dayEnd
+                task.completedAt == nil
             },
             sort: \TaskItem.occurrenceStart
         )
@@ -63,37 +86,39 @@ struct TodayView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xxl) {
+                // The greeting leads the page (per the decided order): a date
+                // eyebrow + "Good morning, Jane" + avatar. The old serif "Today" H1
+                // and the large nav title are gone — the greeting is the header.
                 header
 
-                let occurrences = todaysOccurrences
-                if let next = upNext(in: occurrences) {
-                    nextUpHero(next)
-                }
-
-                loadCard(occurrences: occurrences)
-
-                if occurrences.isEmpty {
-                    clearDay
+                if let next = upNextOccurrence {
+                    // The genuine SOONEST open occurrence across days (today,
+                    // tomorrow, next week…), rendered as the hero Task Box: the most
+                    // actionable thing coming up, whole-tile tappable to its detail.
+                    // Its relative meta reads "in 18 min" / "tomorrow" / "in 3 d"
+                    // naturally via `RelativeTimeFormatter`.
+                    upNextSection(next)
                 } else {
-                    agendaSection(
-                        title: "today.section.upNext",
-                        occurrences: morning(in: occurrences)
-                    )
-                    agendaSection(
-                        title: "today.section.evening",
-                        occurrences: evening(in: occurrences)
-                    )
+                    // Genuinely nothing upcoming at all — a calm clear-day block
+                    // instead of the hero (no load meter to sit beneath it any more).
+                    clearDay
                 }
 
-                morningBriefCard
+                todaysBriefCard
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.top, Spacing.sm)
             .padding(.bottom, Spacing.xxl)
         }
         .background(theme.background.ignoresSafeArea())
-        .navigationTitle(Text("today.title"))
-        .navigationBarTitleDisplayMode(.large)
+        // The greeting block is the page header now, so the nav bar carries no
+        // large serif "Today" title — the CUE — Clean Today screen leads with the
+        // greeting, not an H1.
+        .navigationTitle(Text(verbatim: ""))
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $selectedEvent) { event in
+            TaskDetailScreen(event: event)
+        }
         .refreshable {
             // Pull-to-refresh: re-sync today's occurrences and reload the brief.
             await store.invalidateAndResync(around: today, context: modelContext)
@@ -118,7 +143,13 @@ struct TodayView: View {
                     .cueText(.codeSmall)
                     .foregroundStyle(theme.textSecondary)
                 Text(greeting)
-                    .cueText(.displayM)
+                    // Design (Today.dc.html line 61): the greeting is system SANS
+                    // 34pt/600, tracking -0.4 — it is now the page's lead line (the
+                    // serif "Today" H1 was removed). There is no sans large-title
+                    // token (`.displayL`/`.displayM` are both serif), so the role is
+                    // applied directly here.
+                    .font(.system(.largeTitle).weight(.semibold))
+                    .tracking(-0.4)
                     .foregroundStyle(theme.textPrimary)
             }
             Spacer(minLength: Spacing.md)
@@ -135,38 +166,64 @@ struct TodayView: View {
         return String(format: String(localized: "today.greeting.named"), part, name)
     }
 
-    // MARK: - Next up hero
+    // MARK: - Up next
 
+    /// The "Up next" section: a header row (title + right-aligned ghost "See all →")
+    /// over the single next-open occurrence rendered as the hero ``TaskBox``. The
+    /// whole tile is tappable to open the occurrence's detail; the trailing slot
+    /// keeps the functional done toggle for tasks.
     @ViewBuilder
-    private func nextUpHero(_ occurrence: OccurrenceVM) -> some View {
-        CueCard(padding: 0, depth: .valueCut) {
-            HStack(spacing: 0) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(railColor(for: occurrence))
-                    .frame(width: 4)
-                    .padding(.vertical, Spacing.lg)
-
-                VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text(occurrence.startAt.formatted(date: .omitted, time: .shortened))
-                        .cueText(.code)
-                        .foregroundStyle(theme.textSecondary)
-                    Text(occurrence.title)
-                        .cueText(.titleM)
-                        .foregroundStyle(theme.textPrimary)
-                        .lineLimit(2)
-                    Text(relativeLine(for: occurrence))
-                        .cueText(.callout)
-                        .foregroundStyle(theme.textSecondary)
+    private func upNextSection(_ occurrence: OccurrenceVM) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            // `.center` (not `.firstTextBaseline`): the smaller "See all" ghost
+            // button sits vertically centered against the taller `.titleL` heading
+            // in the same row, flush right via the `Spacer`.
+            HStack(alignment: .center) {
+                // Section heading stays system-sans (.titleL): CUE — Clean reserves
+                // the IBM Plex Serif voice for display/large titles, not section
+                // headings.
+                Text("today.section.upNext")
+                    .cueText(.titleL)
+                    .foregroundStyle(theme.textPrimary)
+                Spacer(minLength: Spacing.md)
+                Button {
+                    seeAll()
+                } label: {
+                    Text("today.section.seeAll")
                 }
-                .padding(.vertical, Spacing.lg)
-                .padding(.horizontal, Spacing.md)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .buttonStyle(.cue(.ghost))
+                // `CueButtonStyle` stretches every label to `maxWidth: .infinity`,
+                // which parks the ghost's text mid-row; `.fixedSize()` collapses it
+                // back to its label so the Spacer can pin it to the right edge
+                // (same counter-measure as the onboarding Skip / Not-now ghosts).
+                .fixedSize()
+            }
 
-                if occurrence.requiresCompletion {
-                    TodayAgendaRowToggle(occurrence: occurrence) {
-                        toggle(occurrence)
-                    }
-                    .padding(.trailing, Spacing.lg)
+            upNextHero(occurrence)
+        }
+    }
+
+    /// The hero Task Box for the next occurrence: mono time, title, and a meta line
+    /// of the human-friendly time-until (``RelativeTimeFormatter``) plus the
+    /// duration. Tapping anywhere opens the occurrence's detail; the trailing slot
+    /// carries the done toggle for tasks.
+    @ViewBuilder
+    private func upNextHero(_ occurrence: OccurrenceVM) -> some View {
+        TaskBox(
+            style: .hero,
+            time: heroTime(for: occurrence),
+            title: occurrence.title,
+            meta: .init(
+                relative: heroRelative(for: occurrence),
+                duration: durationText(for: occurrence)
+            ),
+            railColor: railColor(for: occurrence),
+            isCompleted: occurrence.isCompleted,
+            onTap: { open(occurrence) }
+        ) {
+            if occurrence.requiresCompletion {
+                TodayAgendaRowToggle(occurrence: occurrence) {
+                    toggle(occurrence)
                 }
             }
         }
@@ -176,93 +233,56 @@ struct TodayView: View {
         )
     }
 
-    // MARK: - Today's load
+    // MARK: - Today's brief
 
     @ViewBuilder
-    private func loadCard(occurrences: [OccurrenceVM]) -> some View {
-        let total = occurrences.count
-        let done = occurrences.filter(\.isCompleted).count
-        let remaining = max(0, total - done)
-        let fraction = total == 0 ? 0 : Double(done) / Double(total)
-
-        CueCard(padding: 0) {
-            Text("today.load.title")
-                .cueText(.label)
-                .foregroundStyle(theme.textSecondary)
-        } content: {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("today.load.count \(total)")
-                        .cueText(.code)
-                        .foregroundStyle(theme.textPrimary)
-                    Spacer()
-                    Text(loadWeight(total))
-                        .cueText(.callout)
-                        .foregroundStyle(theme.textSecondary)
-                }
-
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(theme.surfaceSunken)
-                        Capsule()
-                            .fill(theme.primary)
-                            .frame(width: proxy.size.width * fraction)
-                    }
-                }
-                .frame(height: 8)
-
-                HStack(spacing: Spacing.xs) {
-                    Text("today.load.done \(done)")
-                        .foregroundStyle(theme.success)
-                    Text("today.load.remaining \(remaining)")
-                        .foregroundStyle(theme.textSecondary)
-                }
-                .cueText(.code)
-            }
-        }
-    }
-
-    // MARK: - Agenda sections
-
-    @ViewBuilder
-    private func agendaSection(title: LocalizedStringKey, occurrences: [OccurrenceVM]) -> some View {
-        if !occurrences.isEmpty {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                Text(title)
-                    .cueText(.titleL)
-                    .foregroundStyle(theme.textPrimary)
-                CueCard(padding: 0) {
-                    VStack(spacing: 0) {
-                        ForEach(Array(occurrences.enumerated()), id: \.element.id) { index, occurrence in
-                            TodayAgendaRow(occurrence: occurrence) {
-                                toggle(occurrence)
-                            }
-                            if index < occurrences.count - 1 {
-                                Rectangle()
-                                    .fill(theme.separator)
-                                    .frame(height: 1)
-                                    .padding(.leading, Spacing.sm)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Morning brief
-
-    @ViewBuilder
-    private var morningBriefCard: some View {
-        CueCard(padding: 0, depth: .valueCut) {
-            HStack {
-                Text("today.brief.title")
+    private var todaysBriefCard: some View {
+        // `Spacing.lg` (not 0) so the eyebrow/author header strip and the brief
+        // body carry the standard 16pt horizontal card inset — the brief was
+        // rendering edge-to-edge against the card border, out of line with the
+        // other content. `CueCard`'s `padding` drives both the header's horizontal
+        // inset and the content's all-side inset.
+        CueCard(padding: Spacing.lg, depth: .valueCut) {
+            HStack(spacing: Spacing.sm) {
+                Text(String(localized: "today.brief.eyebrow", defaultValue: "Today's brief"))
                     .cueText(.label)
                     .foregroundStyle(theme.textSecondary)
+
+                // A subtle regenerate control lives beside the eyebrow only once a
+                // brief exists (`.loaded`): the day auto-loads, so `.loaded` already
+                // means "planned". While `.loading` the well shows its own loader
+                // (no regen); on `.failed` the body keeps its retry button.
+                if brief.phase == .loaded {
+                    Button {
+                        regenerateBrief()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(theme.textSecondary)
+                    .accessibilityLabel(
+                        Text(String(localized: "today.brief.regenerate", defaultValue: "Regenerate brief"))
+                    )
+                }
+
                 Spacer()
-                Text(briefAuthor)
-                    .cueText(.label)
+
+                // The byline pushes the Brief configuration editor onto the Today
+                // tab's stack — it still reads as the "Jarvis" byline (accent label)
+                // with a small chevron so it registers as tappable.
+                NavigationLink {
+                    BriefConfigView()
+                } label: {
+                    HStack(spacing: Spacing.xxs) {
+                        Text(briefAuthor)
+                            .cueText(.label)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
                     .foregroundStyle(theme.accentText)
+                }
+                .buttonStyle(.plain)
             }
         } content: {
             VStack(alignment: .leading, spacing: Spacing.lg) {
@@ -294,22 +314,70 @@ struct TodayView: View {
                 .buttonStyle(.cue(.secondary))
             }
         case .loaded:
+            // The brief auto-loads on appear, so once `.loaded` a brief already
+            // exists ("planned"); the big decisive "Plan my day" CTA was removed.
+            // Regeneration now lives as the subtle header control (see
+            // `todaysBriefCard`). The body is just the rendered brief.
             briefText
-                .font(Typography.font(for: .headline))
+                // System SANS body role (matching the rest of the app), not the
+                // former editorial serif. Line spacing + primary color preserved.
+                .cueText(.body)
+                .lineSpacing(2)
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    /// The loaded brief body: the server-generated text rendered verbatim, or the
-    /// calm localized placeholder when the day yielded nothing usable.
+    /// The loaded brief body: the server-generated text rendered as Markdown, or
+    /// the calm localized placeholder when the day yielded nothing usable.
+    ///
+    /// SwiftUI's single-string Markdown collapses hard newlines, so the brief is
+    /// split into lines and each rendered as its own `Text` in a leading `VStack`
+    /// — preserving the paragraph / line breaks the assistant emits. Each non-empty
+    /// line is parsed with the `.full` interpreted syntax (lists, emphasis, links,
+    /// etc.); a line that fails to parse (or yields an empty result) falls back to
+    /// its verbatim string, so a plain-text brief from the old cache still renders.
+    /// Blank lines render as a small spacer to keep paragraph separation.
     @ViewBuilder
     private var briefText: some View {
         if let brief = brief.brief, !brief.isEmpty {
-            Text(verbatim: brief)
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                ForEach(Array(brief.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
+                    if line.trimmingCharacters(in: .whitespaces).isEmpty {
+                        // A blank source line separates paragraphs; render a thin
+                        // spacer so the gap survives (an empty `Text` collapses).
+                        Color.clear.frame(height: Spacing.xxs)
+                    } else {
+                        Text(Self.markdown(from: line))
+                    }
+                }
+            }
         } else {
             Text("today.brief.empty")
         }
+    }
+
+    /// Parses one line of the brief as Markdown with inline-only interpreted
+    /// syntax, tolerating partial parses. Falls back to the verbatim line when
+    /// parsing throws or yields an empty result — so plain-text briefs (old cache)
+    /// and any unparseable line still render intact.
+    ///
+    /// `.inlineOnlyPreservingWhitespace` (not `.full`): `.full` is block-aware and
+    /// consumes list/heading markers (`- `, `1. `, `# `) into a `presentationIntent`
+    /// that plain SwiftUI `Text` cannot render, so bullets/numbers/headings vanish.
+    /// Inline-only keeps the emphasis/link parsing (**bold**, *italics*, links) while
+    /// leaving those block markers as literal, visible characters.
+    private static func markdown(from line: String) -> AttributedString {
+        let options = AttributedString.MarkdownParsingOptions(
+            interpretedSyntax: .inlineOnlyPreservingWhitespace,
+            failurePolicy: .returnPartiallyParsedIfPossible
+        )
+        guard let parsed = try? AttributedString(markdown: line, options: options),
+              !parsed.characters.isEmpty
+        else {
+            return AttributedString(line)
+        }
+        return parsed
     }
 
     /// The brief byline — the active persona's display, defaulting to "Jarvis".
@@ -322,46 +390,69 @@ struct TodayView: View {
         EmptyStateView(
             title: String(localized: "today.empty.title"),
             message: String(localized: "today.empty.message"),
-            systemImage: "circle.dashed"
+            systemImage: "circle.dashed",
+            actionTitle: emptyActionTitle,
+            action: { navigation.isPresentingNewEvent = true }
         )
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.xl)
     }
 
+    /// The clear-day CTA label. Resolved through `String(localized:defaultValue:)`
+    /// so the string carries an inline default (the catalog auto-extracts the key
+    /// at build time) and never renders as a bare key, then handed to the
+    /// `LocalizedStringKey`-typed `actionTitle` as verbatim text.
+    private var emptyActionTitle: LocalizedStringKey {
+        LocalizedStringKey(
+            String(localized: "today.empty.action", defaultValue: "Add to today")
+        )
+    }
+
     // MARK: - Occurrence derivation
 
-    /// Today's occurrences (mapped to ``OccurrenceVM`` with their group color),
-    /// ascending by start. The `@Query` already bounds rows to the reference day,
-    /// so this only maps the rows into view models.
-    private var todaysOccurrences: [OccurrenceVM] {
-        allOccurrences
+    /// The Up-next candidate pool (mapped to ``OccurrenceVM`` with their effective
+    /// task/group color), ascending by start. Drawn from `futureOccurrences`, which
+    /// spans FUTURE days — so the hero can reach into tomorrow / next week, not just
+    /// today. The `@Query` already filters completed + occurrence-less rows and
+    /// sorts ascending; this only folds the color tokens onto each view model. The
+    /// defensive re-sort guards against any adapter reordering during the optimistic
+    /// SWR window.
+    private var futureOccurrenceVMs: [OccurrenceVM] {
+        futureOccurrences
             .compactMap { row -> OccurrenceVM? in
                 guard let base = row.asOccurrenceVM() else { return nil }
-                return base.withGroupColorToken(row.groupColorToken)
+                return base.withColorTokens(taskToken: row.colorToken, groupToken: row.groupColorToken)
             }
             .sorted { $0.startAt < $1.startAt }
     }
 
-    /// The next still-open occurrence at or after now (the hero), or nil when the
-    /// day has none left.
-    private func upNext(in occurrences: [OccurrenceVM]) -> OccurrenceVM? {
+    /// The single **Up next** hero: the soonest still-relevant incomplete occurrence
+    /// across days, or nil only when nothing is upcoming at all. Selection, against a
+    /// live `now`:
+    /// 1. **Ongoing wins** — an occurrence already underway (`startAt <= now < endAt`)
+    ///    is what the user is in the middle of, so it's surfaced ahead of anything
+    ///    still to come. This also naturally catches an **all-day** item earlier
+    ///    today (its midnight `startAt` is in the past but its `endAt` is later),
+    ///    keeping today's all-day item as the hero rather than skipping to tomorrow.
+    ///    Ties break on the soonest `endAt` (the one about to free up).
+    /// 2. **Soonest upcoming** — otherwise the earliest occurrence whose `startAt`
+    ///    is still in the future, by `startAt`.
+    ///
+    /// `completedAt == nil` is already enforced by the query; the `!isCompleted`
+    /// guard is a belt-and-braces re-check for the optimistic window before the
+    /// query re-runs.
+    private var upNextOccurrence: OccurrenceVM? {
         let now = Date.now
-        return occurrences.first { !$0.isCompleted && $0.startAt >= now }
-            ?? occurrences.first { !$0.isCompleted }
-    }
+        let candidates = futureOccurrenceVMs.filter { !$0.isCompleted }
 
-    /// Occurrences before the evening boundary (18:00).
-    private func morning(in occurrences: [OccurrenceVM]) -> [OccurrenceVM] {
-        occurrences.filter { hour(of: $0.startAt) < Self.eveningHour }
-    }
+        let ongoing = candidates
+            .filter { $0.startAt <= now && $0.endAt > now }
+            .min { $0.endAt < $1.endAt }
+        if let ongoing { return ongoing }
 
-    /// Occurrences at/after the evening boundary (18:00).
-    private func evening(in occurrences: [OccurrenceVM]) -> [OccurrenceVM] {
-        occurrences.filter { hour(of: $0.startAt) >= Self.eveningHour }
-    }
-
-    private func hour(of date: Date) -> Int {
-        Calendar.current.component(.hour, from: date)
+        return candidates
+            .filter { $0.startAt > now }
+            .min { $0.startAt < $1.startAt }
     }
 
     // MARK: - Actions
@@ -372,32 +463,78 @@ struct TodayView: View {
         Task { await store.toggleCompletion(occurrenceKey: occurrence.id, context: modelContext) }
     }
 
+    /// Opens the occurrence's detail — pushes the same ``TaskDetailScreen`` the
+    /// calendar opens by projecting to a ``ScheduleEvent`` and driving the
+    /// value-based `navigationDestination`.
+    private func open(_ occurrence: OccurrenceVM) {
+        selectedEvent = occurrence.asScheduleEvent
+    }
+
+    /// "See all →" on the Up next header — jumps to the Calendar tab in its flat
+    /// list (TODO) presentation, the full day's agenda the Today hero summarizes.
+    private func seeAll() {
+        store.viewMode = .list
+        navigation.selectedTab = .calendar
+    }
+
+    /// Regenerates the brief for the reference day — the subtle header control.
+    /// Forces a fresh fetch through ``MorningBriefStore`` with `force: true`, which
+    /// passes `refresh: true` to the daily-brief GET so the server BUSTS its per-day
+    /// cache and generates anew (rather than replaying the cached copy).
+    private func regenerateBrief() {
+        Task { await brief.load(for: today, force: true) }
+    }
+
     // MARK: - Formatting helpers
 
-    /// A "in 18 min · 30 min" style line for the hero — relative start plus the
-    /// occurrence's duration.
-    private func relativeLine(for occurrence: OccurrenceVM) -> String {
-        let relative = occurrence.startAt.formatted(.relative(presentation: .named))
-        let minutes = Int(occurrence.endAt.timeIntervalSince(occurrence.startAt) / 60)
-        guard minutes > 0 else { return relative }
-        let duration = minutes < 60
-            ? "\(minutes)m"
-            : "\(minutes / 60)h\(minutes % 60 == 0 ? "" : String(format: "%02d", minutes % 60))"
-        return "\(relative) · \(duration)"
-    }
-
-    /// A qualitative, localized load label keyed to the day's task count.
-    private func loadWeight(_ total: Int) -> String {
-        switch total {
-        case 0: return String(localized: "today.load.weight.light")
-        case 1...4: return String(localized: "today.load.weight.moderate")
-        default: return String(localized: "today.load.weight.heavy")
+    /// The hero's leading time label — the start time (mono), or the "all-day"
+    /// label when the occurrence spans the whole day.
+    private func heroTime(for occurrence: OccurrenceVM) -> String {
+        if occurrence.isAllDay {
+            return String(localized: "newEvent.allDay")
         }
+        return occurrence.startAt.formatted(date: .omitted, time: .shortened)
     }
 
+    /// The hero meta's relative phrase, guarded so it never reads a nonsensical
+    /// past countdown:
+    /// - **all-day** items have no meaningful start-of-day countdown, so they read
+    ///   the "all day" label instead of "N min ago";
+    /// - an item that has **already started** (its start is at/before now, within a
+    ///   one-minute grace) reads "now" rather than a negative/past value;
+    /// - otherwise the future countdown ("in 18 min") via ``RelativeTimeFormatter``.
+    private func heroRelative(for occurrence: OccurrenceVM) -> String {
+        if occurrence.isAllDay {
+            return String(localized: "today.hero.allDay", defaultValue: "All day")
+        }
+        // A one-minute grace so an item that just began still reads "now" instead of
+        // flipping to a past phrasing the instant it starts.
+        let grace: TimeInterval = 60
+        if occurrence.startAt.timeIntervalSinceNow < -grace {
+            return String(localized: "relativeTime.now", defaultValue: "now")
+        }
+        return RelativeTimeFormatter.timeUntil(occurrence.startAt)
+    }
+
+    /// The occurrence's duration in the design's "30 min" / "1 h 30 min" form
+    /// (spelled-out unit, never "30m"), or nil for a zero-length occurrence.
+    private func durationText(for occurrence: OccurrenceVM) -> String? {
+        let minutes = Int(occurrence.endAt.timeIntervalSince(occurrence.startAt) / 60)
+        guard minutes > 0 else { return nil }
+        guard minutes >= 60 else { return "\(minutes) min" }
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        return remainder == 0 ? "\(hours) h" : "\(hours) h \(remainder) min"
+    }
+
+    /// The hero rail color: the EFFECTIVE task color (`task ?? group ?? gray`) per
+    /// the color decision, flipping to olive once the occurrence is done.
     private func railColor(for occurrence: OccurrenceVM) -> Color {
         if occurrence.isCompleted { return theme.success }
-        return TaskColorResolver.color(from: occurrence.groupColorToken) ?? theme.primary
+        return TaskColorResolver.effectiveColor(
+            taskToken: occurrence.colorToken,
+            groupToken: occurrence.groupColorToken
+        )
     }
 
     // MARK: - User
@@ -417,9 +554,6 @@ struct TodayView: View {
     }
 
     // MARK: - Constants
-
-    /// The hour that splits "up next" from "this evening".
-    private static let eveningHour = 18
 
     /// Maps the current hour to a localized part-of-day greeting.
     private static func partOfDay() -> String {
@@ -478,6 +612,7 @@ private struct TodayAgendaRowToggle: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("task.toggle")
         .accessibilityLabel(
             occurrence.isCompleted ? "task.toggle.markNotDone" : "task.toggle.markDone"
         )

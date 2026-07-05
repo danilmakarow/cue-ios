@@ -6,14 +6,14 @@
 import UIKit
 
 /// Pure compositional-layout geometry for the year scope: one section per year,
-/// each a grid of twelve mini-month cells (three columns, mirroring the SwiftUI
-/// `YearPage`) preceded by a year-title supplementary header.
+/// each a grid of twelve mini-month cells (two columns, mirroring the CUE — Clean
+/// `Calendar Year` design) preceded by a year-title supplementary header.
 ///
 /// Kept free of any data or view-controller state so the layout is testable and
 /// the owning ``YearScopeViewController`` only wires the section provider. Every
 /// section is laid out at the same fixed height (`sectionHeight`) regardless of
 /// how many rows the months actually need — a year always has 12 mini-months in
-/// four rows of three — which makes the infinite-scroll prepend content-offset
+/// six rows of two — which makes the infinite-scroll prepend content-offset
 /// correction a simple `prependedSectionCount * sectionHeight`.
 enum YearLayout {
 
@@ -25,17 +25,20 @@ enum YearLayout {
 
     // MARK: - Fixed structure
 
-    /// Number of mini-month columns per year. Matches the SwiftUI `YearPage`'s
-    /// three-column `LazyVGrid`.
-    static let columnCount = 3
+    /// Number of mini-month columns per year. Matches the CUE — Clean design's
+    /// two-column `repeat(2, 1fr)` year grid (wide 2-up mini-months).
+    static let columnCount = 2
 
-    /// Number of mini-month rows per year (12 months / 3 columns = 4 rows).
-    static let rowCount = 4
+    /// Number of mini-month rows per year (12 months / 2 columns = 6 rows).
+    static let rowCount = 6
 
     /// Height of one mini-month cell. Sized to comfortably hold the abbreviated
-    /// month name plus a six-row 7-column day-number mini-grid (see
-    /// ``YearMiniMonthCell``).
-    static let miniMonthHeight: CGFloat = 104
+    /// month name, the `M T W T F S S` weekday header row, and a six-row 7-column
+    /// day-number heatmap mini-grid (see ``YearMiniMonthCell``). The heatmap rows
+    /// are taller than the old dot-free grid (13pt vs 11pt) to give each tinted
+    /// tile room, and the weekday header adds ~15pt above the grid, so the cell is
+    /// a touch taller than the header-less version.
+    static let miniMonthHeight: CGFloat = 132
 
     /// Height of the per-section year-title header (a large Fraunces year plus an
     /// underline rule), mirroring the SwiftUI `YearPage` title block.
@@ -79,7 +82,7 @@ enum YearLayout {
     // MARK: - Layout
 
     /// Builds the compositional layout: a section provider laying out the
-    /// three-column / four-row mini-month grid plus the per-section year-title
+    /// two-column / six-row mini-month grid plus the per-section year-title
     /// header, with a fixed inter-section gap.
     static func make() -> UICollectionViewCompositionalLayout {
         let configuration = UICollectionViewCompositionalLayoutConfiguration()
@@ -93,7 +96,7 @@ enum YearLayout {
 
     // MARK: - Section
 
-    /// One year: a three-column grid of four mini-month rows plus a year-title
+    /// One year: a two-column grid of six mini-month rows plus a year-title
     /// header item.
     private static func makeYearSection() -> NSCollectionLayoutSection {
         let itemSize = NSCollectionLayoutSize(

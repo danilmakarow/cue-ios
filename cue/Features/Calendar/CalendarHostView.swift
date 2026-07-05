@@ -8,37 +8,37 @@ import SwiftUI
 
 /// Entry point for the Calendar tab and SwiftUI host of the UIKit calendar.
 ///
-/// It is the successor to `CalendarRootView`: it owns the shared
-/// ``CalendarStore`` (via `@State`), injects it into the environment, provides
-/// the `NavigationStack` used for leaf pushes (task detail), and drives the
+/// It is the successor to `CalendarRootView`: it reads the shared
+/// ``CalendarStore`` from the environment (owned and injected by `MainTabs`, so
+/// the Today and Calendar tabs share one instance), provides the
+/// `NavigationStack` used for leaf pushes (task detail), and drives the
 /// foreground-refresh trigger off `@Environment(\.scenePhase)`. The actual
 /// year/month/day surface and the continuous zoom between scopes now live in the
 /// UIKit ``CalendarContainerViewController``, bridged in via ``CalendarUIKitView``.
 ///
 /// **Why the toolbar lives here.** The old day scope (`CalendarView`) rendered
-/// its nav-bar chrome — the serif date title, the "open today" button, and the
-/// timeline/list ``ViewModeSwitcher`` — through SwiftUI's `.toolbar`. The UIKit
+/// its nav-bar chrome — the serif date title and the timeline/list
+/// ``ViewModeSwitcher`` — through SwiftUI's `.toolbar`. The UIKit
 /// `DayScopeViewController` can't contribute to the SwiftUI nav bar, so this host
-/// reproduces those exact affordances at the SwiftUI level. The day scope keeps
-/// its own floating Today *pill* (recenter the pager); this host's nav-bar
-/// "today" control mirrors the old `onOpenToday` (recenter to today's day),
-/// driven through the same `jump(to:)` entry the deep link uses — so the two
-/// Today affordances stay consistent and don't conflict.
+/// reproduces those affordances at the SwiftUI level. Today is handled entirely
+/// by each scope's own bottom-right floating Today *pill* (`DayJumpToTodayButton`
+/// in the Day/Month/Year scope VCs); the duplicate nav-bar "today" button was
+/// removed so there is a single Today control. The host still keeps the one-shot
+/// `jump(to:)` (`pendingJump`) plumbing as the deep-link seam.
 struct CalendarHostView: View {
     let user: UserDTO
 
-    @Environment(AuthStore.self) private var authStore
-    @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.theme) private var theme
     @Environment(AppNavigation.self) private var navigation
     /// The shared calendar store, owned by `MainTabs` and injected into the
     /// environment so the Today and Calendar tabs operate on the same instance.
     @Environment(CalendarStore.self) private var store
     @State private var path = NavigationPath()
-    /// A one-shot "jump to date" handed to the representable. Set by the nav-bar
-    /// Today control (and any future deep link); cleared once the container
-    /// consumes it so it fires exactly once.
+    /// A one-shot "jump to date" handed to the representable, cleared once the
+    /// container consumes it (via `onConsumeJump`) so it fires exactly once. This
+    /// is the deep-link seam the container drives through `jump(to:)`; the in-scope
+    /// "Today" affordance is each scope's own floating pill, not the nav bar, so
+    /// nothing sets this today — it stays wired for future deep links.
     @State private var pendingJump: Date?
 
     var body: some View {
@@ -64,23 +64,26 @@ struct CalendarHostView: View {
                 TaskDetailScreen(event: event)
             }
         }
-        .onChange(of: scenePhase) { oldPhase, newPhase in
-            handleScenePhaseChange(from: oldPhase, to: newPhase)
-        }
+        // Foreground-refresh + the periodic sync heartbeat are hoisted to
+        // `MainTabs`, so they run for the whole authenticated session regardless of
+        // the selected tab (this handler used to be dead until the Calendar tab was
+        // first opened).
     }
 
     // MARK: - Toolbar
 
-    /// Reproduces the old day-scope nav-bar chrome: a serif principal date title,
-    /// an "open today" control (shown only while off today), and the
-    /// timeline/list view-mode switcher.
+    /// Reproduces the day-scope nav-bar chrome: an inline principal date title, a
+    /// search affordance, and the timeline/list view-mode switcher. There is no
+    /// nav-bar "today" control — Today is the scope's own floating pill.
     @ToolbarContentBuilder
     private func calendarToolbar(store: CalendarStore) -> some ToolbarContent {
         @Bindable var store = store
 
         ToolbarItem(placement: .principal) {
+            // System-sans inline nav date title — CUE — Clean reserves IBM Plex
+            // Serif for display titles only; nav/section headings use sans.
             Text(dayTitle)
-                .cueText(.titleM)
+                .font(.system(.title3, design: .default).weight(.semibold))
                 .foregroundStyle(theme.textPrimary)
         }
         // Search affordance — every calendar scope's nav carries it (matching the
@@ -92,16 +95,14 @@ struct CalendarHostView: View {
             } label: {
                 Image(systemName: "magnifyingglass")
             }
-            .accessibilityLabel("calendar.chrome.search.accessibility")
+            .accessibilityLabel(String(localized: "calendar.chrome.search.accessibility", defaultValue: "Search"))
+            .accessibilityIdentifier("calendar.chrome.search")
         }
-        if !isOnToday {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: goToToday) {
-                    Image(systemName: "calendar.circle")
-                }
-                .accessibilityLabel("calendar.chrome.today.accessibility")
-            }
-        }
+        // NOTE: no nav-bar "today" button here. Each scope owns its own bottom-right
+        // floating Today pill (`DayJumpToTodayButton` in the Day/Month/Year scope
+        // VCs), so a duplicate nav-bar affordance was removed — the pill is the
+        // single Today control. The one-shot `pendingJump` plumbing below stays as
+        // the deep-link seam the container consumes via `jump(to:)`.
         ToolbarItem(placement: .topBarTrailing) {
             ViewModeSwitcher(mode: $store.viewMode)
         }
@@ -112,42 +113,6 @@ struct CalendarHostView: View {
     private var dayTitle: String {
         store.selectedDate.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
     }
-
-    /// True when the selection is today's day, so the "open today" control hides
-    /// — mirroring the old day scope.
-    private var isOnToday: Bool {
-        CalendarMath.isToday(store.selectedDate)
-    }
-
-    /// Navigates the calendar to today by queuing a one-shot `jump(to:)` the
-    /// container consumes. Equivalent to the old `onOpenToday` recenter.
-    private func goToToday() {
-        pendingJump = CalendarMath.startOfDay(.now)
-    }
-
-    // MARK: - Foreground refresh
-
-    /// Refetches visible data when the app returns to the foreground.
-    ///
-    /// Only acts on a transition *into* `.active`, and only while authenticated.
-    /// A real background trip (`.background → .active`) drives a precise
-    /// `/tasks/changes` delta inside ``CalendarStore/refreshIfStale(context:wasBackgrounded:)``
-    /// → `refresh`: only the windows touched by changed series, deletions, or
-    /// exceptions are re-pulled, with a graceful fall back to the old blunt full
-    /// re-pull when the delta fails or the cursor is invalid. A brief
-    /// `.inactive → .active` blip defers to the store's staleness threshold so it
-    /// doesn't spam the API. The store guards overlap.
-    ///
-    /// The store owns the delta-vs-fallback decision (it needs the resolved
-    /// calendar id and the durable cursor), so this host no longer bluntly
-    /// invalidates every synced month up front — that path is now the fallback only.
-    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
-        guard newPhase == .active else { return }
-        guard case .authenticated = authStore.state else { return }
-
-        let wasBackgrounded = oldPhase == .background
-        store.refreshIfStale(context: modelContext, wasBackgrounded: wasBackgrounded)
-    }
 }
 
 // MARK: - OccurrenceVM → ScheduleEvent
@@ -157,6 +122,11 @@ extension OccurrenceVM {
     /// task-detail `navigationDestination` consumes. The two types are
     /// field-for-field identical (same occurrence-identity contract), so this is
     /// a direct projection — keeping `TaskDetailScreen`/`ScheduleEvent` untouched.
+    ///
+    /// The full color set (`colorToken` + `groupColorToken`) AND the `groupId` are
+    /// forwarded so the pushed detail resolves the same effective task color and
+    /// group name the calendar cells show — otherwise the sheet would paint a bare
+    /// gray with no group meta.
     var asScheduleEvent: ScheduleEvent {
         ScheduleEvent(
             id: id,
@@ -168,6 +138,8 @@ extension OccurrenceVM {
             startAt: startAt,
             endAt: endAt,
             isAllDay: isAllDay,
+            groupId: groupId,
+            colorToken: colorToken,
             groupColorToken: groupColorToken,
             requiresCompletion: requiresCompletion,
             completedAt: completedAt,

@@ -17,6 +17,12 @@ struct cueApp: App {
     @State private var languageSettings = LanguageSettings()
     @State private var telegramLink = TelegramLinkStore()
 
+    init() {
+        // Configure global UIKit chrome (serif navigation-title fonts) once at
+        // launch. Idempotent — see CueAppearance.
+        CueAppearance.apply()
+    }
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             EventCalendar.self,
@@ -24,7 +30,17 @@ struct cueApp: App {
             EventTaskGroup.self,
             WindowSyncMeta.self,
             SyncCursorState.self,
+            SyncMeta.self,
         ])
+        #if DEBUG
+        if UITestSupport.isActive {
+            let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            // Force-try: a fresh in-memory store cannot fail to construct here.
+            let container = try! ModelContainer(for: schema, configurations: [configuration])
+            UITestSupport.seed(into: container)
+            return container
+        }
+        #endif
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {

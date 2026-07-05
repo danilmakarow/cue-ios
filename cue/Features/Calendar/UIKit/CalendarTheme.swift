@@ -42,6 +42,9 @@ struct CalendarTheme: Equatable {
     let separator: UIColor
     let border: UIColor
     let success: UIColor
+    /// Fresh green today-marker accent (mirrors ``ThemeColors/todayAccent``) —
+    /// distinct from the olive `success`. Used for the week-strip today border + caption.
+    let todayAccent: UIColor
     let warning: UIColor
     let danger: UIColor
     let info: UIColor
@@ -52,6 +55,8 @@ struct CalendarTheme: Equatable {
     let displayM: UIFont
     let titleL: UIFont
     let titleM: UIFont
+    let titleLSans: UIFont
+    let titleMSans: UIFont
     let headline: UIFont
     let body: UIFont
     let bodyEmphasis: UIFont
@@ -115,6 +120,7 @@ struct CalendarTheme: Equatable {
         separator = UIColor(colors.separator)
         border = UIColor(colors.border)
         success = UIColor(colors.success)
+        todayAccent = UIColor(colors.todayAccent)
         warning = UIColor(colors.warning)
         danger = UIColor(colors.danger)
         info = UIColor(colors.info)
@@ -128,6 +134,11 @@ struct CalendarTheme: Equatable {
         displayM = Self.serif(27, weight: .semibold, relativeTo: .title1, traits: traits)
         titleL = Self.serif(22, weight: .medium, relativeTo: .title2, traits: traits)
         titleM = Self.serif(18, weight: .medium, relativeTo: .title3, traits: traits)
+        // System-sans variants of the title roles — same point sizes as the serif
+        // titleL/titleM, semibold. Use these for section/nav headings (the Clean
+        // rule: serif is DISPLAY titles only); keep titleL/titleM for true display.
+        titleLSans = Self.bodyFont(22, weight: .semibold, relativeTo: .title2, traits: traits)
+        titleMSans = Self.bodyFont(18, weight: .semibold, relativeTo: .title3, traits: traits)
         headline = Self.serif(17, weight: .medium, relativeTo: .headline, traits: traits)
         body = Self.bodyFont(16, weight: .regular, relativeTo: .body, traits: traits)
         bodyEmphasis = Self.bodyFont(16, weight: .semibold, relativeTo: .body, traits: traits)
@@ -140,9 +151,11 @@ struct CalendarTheme: Equatable {
 
     // MARK: - Font builders
 
-    /// A serif `UIFont` at `size`/`weight`, scaled for Dynamic Type relative to
-    /// `style`. Falls back to the system serif design when the bundled face isn't
-    /// registered, matching the SwiftUI token's behavior.
+    /// The bundled Source Serif 4 display `UIFont` at `size`, scaled for Dynamic
+    /// Type relative to `style`. `Typography.serifFamily` is the exact PostScript
+    /// name of the Bold display face, so the weight is intrinsic and no weight trait
+    /// is applied (the `weight` param only tunes the system-serif fallback when the
+    /// bundled face isn't registered), matching the SwiftUI token's behavior.
     private static func serif(
         _ size: CGFloat,
         weight: UIFont.Weight,
@@ -151,7 +164,7 @@ struct CalendarTheme: Equatable {
     ) -> UIFont {
         let base: UIFont
         if let serifFace = UIFont(name: Typography.serifFamily, size: size) {
-            base = Self.applying(weight: weight, to: serifFace, size: size)
+            base = serifFace
         } else {
             base = Self.designed(.serif, size: size, weight: weight)
         }

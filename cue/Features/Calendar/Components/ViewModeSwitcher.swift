@@ -5,8 +5,14 @@
 
 import SwiftUI
 
-/// Pill-style segmented toggle that switches between the two Calendar
-/// view modes. Purely presentational — holds no state of its own.
+/// Text segmented toggle ("Timeline | List") that switches between the two
+/// Calendar view modes. Purely presentational — holds no state of its own.
+///
+/// Matches `Calendar Day.dc.html`'s inline control: WORD labels (12px / 600) on
+/// `Radius.chip` pills over a recessed `surfaceSunken` track, the active segment
+/// a raised `surface` pill — not SF Symbol icons. Per the CUE — Clean selection
+/// rule a mode picker is a NEUTRAL selection, so the active label carries clay
+/// (`primary`) ink on the raised pill rather than a solid clay fill.
 struct ViewModeSwitcher: View {
     @Environment(\.theme) private var theme
     @Binding var mode: CalendarViewMode
@@ -17,9 +23,10 @@ struct ViewModeSwitcher: View {
                 segment(for: option)
             }
         }
-        .padding(4)
+        .padding(3)
         .background {
-            Capsule().fill(theme.surfaceSunken)
+            RoundedRectangle(cornerRadius: Radius.chip + 3, style: .continuous)
+                .fill(theme.surfaceSunken)
         }
         .accessibilityElement(children: .contain)
     }
@@ -29,20 +36,18 @@ struct ViewModeSwitcher: View {
         return Button {
             withAnimation(.snappy) { mode = option }
         } label: {
-            Image(systemName: option.systemImage)
-                // A mode picker is a NEUTRAL selection: a gray track (`surfaceSunken`)
-                // with the active segment a raised surface pill carrying clay
-                // (`primary`) ink — "clay ink on a pill", per the CUE — Clean
-                // selection rule — not a solid clay fill.
-                .font(.body.weight(.semibold))
+            Text(option.displayName)
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(isSelected ? theme.primary : theme.textSecondary)
-                .frame(width: 56, height: 30)
+                .padding(.horizontal, Spacing.sm)
+                .frame(height: 26)
                 .background {
                     if isSelected {
-                        Capsule().fill(theme.surface)
+                        RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+                            .fill(theme.surface)
                     }
                 }
-                .contentShape(.capsule)
+                .contentShape(RoundedRectangle(cornerRadius: Radius.chip, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(option.displayName)

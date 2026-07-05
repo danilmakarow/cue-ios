@@ -43,6 +43,39 @@ final class CalendarStore {
     /// revalidates once — then the durable row keeps the next launch quiet.
     static let windowTTL: TimeInterval = 5 * 60
 
+    /// Foreground heartbeat cadence — how often, while the app is active, the store
+    /// runs the cheap `GET /sync/state` check and (only when the revision moved) a
+    /// full delta + visible-window re-pull. Small enough that a server-side change
+    /// (e.g. from the Telegram assistant) surfaces within ~this window with zero
+    /// user interaction.
+    static let heartbeatInterval: TimeInterval = 25
+
+    /// Every Nth heartbeat runs the delta unconditionally (even when the revision
+    /// looks unmoved) — the self-healing floor for a lost bump. ~5 min at 25s.
+    private static let unconditionalDeltaEvery = 12
+
+    /// Monotonic heartbeat tick counter, used only for the unconditional-delta floor.
+    private var heartbeatTickCount = 0
+
+    /// Bumped whenever `dayCountsCache` is invalidated. The Day scope's week-strip
+    /// count guard compares `(weekRange, epoch)` so a delta that changed counts
+    /// re-fetches the visible week, while a bare revision bump does no count work.
+    private(set) var countsEpoch: Int = 0
+
+    /// The outcome of a `refresh()` — lets the caller (heartbeat / foreground
+    /// return) decide whether to advance the revision watermark and re-pull the
+    /// visible windows.
+    enum RefreshOutcome {
+        /// A delta was fetched and applied (possibly empty). Memos for changed
+        /// windows were invalidated; the caller should re-pull the visible ones.
+        case deltaApplied
+        /// First-run cursor seeding — no delta ran; do NOT advance the watermark.
+        case seeded
+        /// Error path — cursor cleared, ±1-month fallback resync ran; do NOT
+        /// advance the watermark (the next tick retries).
+        case fellBack
+    }
+
     /// Wall-clock time of the most recent *successful* month fetch.
     private(set) var lastSyncedAt: Date?
 
@@ -105,9 +138,13 @@ final class CalendarStore {
 
     // MARK: - Sync
 
-    /// Ensures the month containing `day` is synced.
-    func ensureDaySynced(_ day: Date, context: ModelContext) async {
-        await ensureMonthSynced(CalendarMath.startOfMonth(day), context: context)
+    /// Ensures the month containing `day` is synced. `quiet` suppresses the error
+    /// banner + loading flag (used by background heartbeat re-pulls).
+    func ensureDaySynced(_ day: Date, context: ModelContext, quiet: Bool = false) async {
+        #if DEBUG
+        if UITestSupport.isActive { return }
+        #endif
+        await ensureMonthSynced(CalendarMath.startOfMonth(day), context: context, quiet: quiet)
     }
 
     /// Revalidates the month containing `monthAnchor` under stale-while-revalidate.
@@ -121,11 +158,14 @@ final class CalendarStore {
     /// meta row, so it revalidates once; a within-TTL repeat short-circuits.
     /// External signature is unchanged so Phase 1's `PrefetchCoordinator` routing
     /// is unaffected.
-    func ensureMonthSynced(_ monthAnchor: Date, context: ModelContext) async {
+    func ensureMonthSynced(_ monthAnchor: Date, context: ModelContext, quiet: Bool = false) async {
+        #if DEBUG
+        if UITestSupport.isActive { return }
+        #endif
         let anchor = CalendarMath.startOfMonth(monthAnchor)
 
-        isLoading = true
-        defer { isLoading = false }
+        if !quiet { isLoading = true }
+        defer { if !quiet { isLoading = false } }
 
         do {
             let calendarId = try await ensureDefaultCalendarId(context: context)
@@ -136,12 +176,17 @@ final class CalendarStore {
             guard !isFresh(windowKey: windowKey, in: context) else { return }
 
             let (from, to) = CalendarMath.monthBounds(anchor)
+            // `includeCompleted=true` so the prune-then-upsert keeps completed
+            // occurrences — otherwise a heartbeat re-pull would erase a checkmark
+            // seconds after the user (or the assistant) set it. The UI already
+            // renders completed rows as struck/checked.
             let occurrences: [OccurrenceDTO] = try await APIClient.shared.get(
                 "/tasks",
                 queryItems: [
                     URLQueryItem(name: "calendarId", value: calendarId),
                     URLQueryItem(name: "from", value: Self.isoFractional.string(from: from)),
                     URLQueryItem(name: "to", value: Self.isoFractional.string(from: to)),
+                    URLQueryItem(name: "includeCompleted", value: "true"),
                 ]
             )
 
@@ -165,7 +210,9 @@ final class CalendarStore {
             commit(context)
             lastSyncedAt = .now
         } catch {
-            notifications?.postError(error, title: String(localized: "calendar.error.loadTasks"))
+            if !quiet {
+                notifications?.postError(error, title: String(localized: "calendar.error.loadTasks"))
+            }
         }
     }
 
@@ -279,6 +326,10 @@ final class CalendarStore {
     private func invalidateDayCounts(context: ModelContext) {
         dayCountsCache.removeAll()
         deleteCountsWeekMetas(in: context)
+        // Move the epoch so the Day scope's same-week count guard re-fetches the
+        // visible week after a delta that changed counts (a bare revision bump
+        // alone must not trigger count work).
+        countsEpoch &+= 1
     }
 
     /// Deletes all `countsWeek`-scoped ``WindowSyncMeta`` rows. Does NOT save — the
@@ -308,6 +359,9 @@ final class CalendarStore {
     /// `invalidateDayCounts` clears both, and `evictStaleDayCounts` drops both per
     /// evicted week — so a "fresh" meta can never vouch for a cache hole.
     func ensureCountsSynced(weekRange: ClosedRange<Date>, context: ModelContext) async {
+        #if DEBUG
+        if UITestSupport.isActive { return }
+        #endif
         let calendar = Calendar.current
         let centerStart = CalendarMath.startOfDay(weekRange.lowerBound)
         // Visible week + one week either side (load-ahead).
@@ -424,14 +478,25 @@ final class CalendarStore {
 
     // MARK: - Foreground refresh
 
-    /// Refetches visible data when the app returns to the foreground.
-    func refreshIfStale(context: ModelContext, wasBackgrounded: Bool) {
+    /// Refetches visible data when the app returns to the foreground (or on a
+    /// forced trigger — pull-to-refresh, a Telegram deep-link open). Deliberately
+    /// revision-UNGATED: it always runs the delta, as the backstop for any
+    /// watermark pathology. On an applied delta it re-pulls the invalidated
+    /// visible windows so a parked user actually sees the change.
+    func refreshIfStale(context: ModelContext, wasBackgrounded: Bool, force: Bool = false) {
+        #if DEBUG
+        if UITestSupport.isActive { return }
+        #endif
         guard refreshTask == nil else { return }
-        guard wasBackgrounded || isStale else { return }
+        guard force || wasBackgrounded || isStale else { return }
 
         refreshTask = Task { [weak self] in
-            await self?.refresh(context: context)
-            self?.refreshTask = nil
+            guard let self else { return }
+            let outcome = await self.refresh(context: context)
+            if case .deltaApplied = outcome {
+                await self.resyncVisibleWindows(context: context)
+            }
+            self.refreshTask = nil
         }
     }
 
@@ -449,7 +514,7 @@ final class CalendarStore {
     /// This replaces the old "invalidate ALL synced months on every foreground
     /// return" with a targeted delta — only the windows touched by changed series,
     /// deletions, or exceptions get re-pulled.
-    private func refresh(context: ModelContext) async {
+    private func refresh(context: ModelContext) async -> RefreshOutcome {
         do {
             let calendarId = try await ensureDefaultCalendarId(context: context)
 
@@ -465,12 +530,13 @@ final class CalendarStore {
                 // Without this, an app kill before the next foreground commit loses the
                 // cursor and the app keeps cold-reinitializing.
                 try? context.save()
-                return
+                return .seeded
             }
 
             // Subsequent return: ask the server what changed since the stored cursor.
             let response = try await fetchChanges(calendarId: calendarId, since: cursorState.cursor)
-            applyDelta(response, calendarId: calendarId, context: context)
+            applyDelta(response, calendarId: calendarId, since: cursorState.cursor, context: context)
+            return .deltaApplied
         } catch {
             // Cursor invalid / rejected or the request failed: clear the cursor so
             // the next return re-initializes from scratch, then fall back to the
@@ -479,7 +545,83 @@ final class CalendarStore {
                 deleteSyncCursorState(calendarId: calendarId, in: context)
             }
             await invalidateAndResync(around: selectedDate, context: context)
+            return .fellBack
         }
+    }
+
+    // MARK: - Heartbeat (periodic while active)
+
+    /// One heartbeat cycle: the cheap `GET /sync/state` check, then — only when the
+    /// revision moved since last seen (or the periodic floor is due) — a full delta,
+    /// a re-pull of the invalidated visible windows, and advancing the watermark.
+    /// Holds `refreshTask` for the WHOLE cycle so a concurrent foreground
+    /// `refreshIfStale` can't run a second delta on the same cursor. Silent on all
+    /// failures (the ticker retries on its next tick).
+    func heartbeatTick(context: ModelContext) async {
+        #if DEBUG
+        if UITestSupport.isActive { return }
+        #endif
+        guard refreshTask == nil else { return }
+        let cycle = Task { [weak self] in
+            guard let self else { return }
+            await self.runHeartbeatCycle(context: context)
+        }
+        refreshTask = cycle
+        defer { refreshTask = nil }
+        await cycle.value
+    }
+
+    private func runHeartbeatCycle(context: ModelContext) async {
+        heartbeatTickCount &+= 1
+
+        // 1) Cheap check. A failure (offline) just ends this tick; the next retries.
+        guard let state = try? await APIClient.shared.syncState() else { return }
+
+        let meta = syncMeta(in: context)
+        let revisionMoved = state.revision != meta.lastSeenRevision
+        let floorDue = heartbeatTickCount % Self.unconditionalDeltaEvery == 0
+        // Idle: nothing changed and no floor tick due — skip the network.
+        guard revisionMoved || floorDue else { return }
+
+        // 2) Delta. `.seeded` / `.fellBack` do NOT advance the watermark so the next
+        //    tick retries; only an applied delta vouches for the revision.
+        let outcome = await refresh(context: context)
+        guard case .deltaApplied = outcome else { return }
+
+        // 3) Re-pull the invalidated on-screen windows so a parked user sees the
+        //    change (the delta only invalidated memos — it never upserts rows).
+        await resyncVisibleWindows(context: context)
+
+        // 4) Only now vouch for the revision.
+        meta.lastSeenRevision = state.revision
+        try? context.save()
+    }
+
+    /// Re-pulls the on-screen month windows a just-applied delta invalidated.
+    /// `ensureMonthSynced` skips windows still fresh (memo intact) and re-pulls the
+    /// stale ones (memo deleted by the delta), so a parked user's visible content
+    /// converges without any interaction. Quiet — background work shows no banner.
+    private func resyncVisibleWindows(context: ModelContext) async {
+        let anchors: Set<Date> = [
+            CalendarMath.startOfMonth(selectedDate),
+            CalendarMath.startOfMonth(Date.now),
+        ]
+        for anchor in anchors {
+            await ensureMonthSynced(anchor, context: context, quiet: true)
+        }
+    }
+
+    /// Fetches the singleton ``SyncMeta`` row, creating (inserting) it on first
+    /// access. Does NOT save — the caller commits.
+    private func syncMeta(in context: ModelContext) -> SyncMeta {
+        let id = SyncMeta.singletonId
+        let descriptor = FetchDescriptor<SyncMeta>(predicate: #Predicate { $0.id == id })
+        if let existing = (try? context.fetch(descriptor))?.first {
+            return existing
+        }
+        let meta = SyncMeta()
+        context.insert(meta)
+        return meta
     }
 
     // MARK: - Delta sync (Phase 3)
@@ -514,7 +656,7 @@ final class CalendarStore {
     /// The new cursor (`serverTime`) and `lastDeltaAt` are stored in the SAME commit
     /// as the deletes/invalidations so the cursor never advances past data the
     /// client failed to invalidate.
-    private func applyDelta(_ response: ChangesResponse, calendarId: String, context: ModelContext) {
+    private func applyDelta(_ response: ChangesResponse, calendarId: String, since: String?, context: ModelContext) {
         // No-op delta (the common foreground case): nothing changed server-side, so
         // there's no occurrence work to do. Advance + persist the cursor with a BARE
         // save (mirroring the first-run cursor seeding) and DO NOT bump `revision` —
@@ -539,21 +681,54 @@ final class CalendarStore {
             }
         }
 
-        // (b) Changed series: invalidate every month window overlapping the series'
-        // active span so the next SWR re-pulls + re-expands only those windows.
+        // (b) Changed series — occurrence-FOOTPRINT invalidation (not just the
+        // record-audit span, which never reaches future months). For each changed
+        // series:
+        //   1. ghost sweep — the month of every currently-cached local row (covers
+        //      moves-away, truncations, past-dated edits);
+        //   2. destination months — month(startAt) / month(endAt) where occurrences
+        //      now live or will live;
+        //   3. the audit-span walk (cheap, subsumes the old behavior);
+        //   4. a rule change (recurrenceUpdatedAt moved since the cursor) can place
+        //      occurrences in ANY month → drop all month memos. Keyed on
+        //      recurrenceUpdatedAt, NOT `recurrence != nil` (which would wipe every
+        //      window on a routine per-occurrence completion of a recurring series).
         for task in response.tasks {
+            let seriesId = task.id
+            let localDescriptor = FetchDescriptor<TaskItem>(
+                predicate: #Predicate { $0.seriesId == seriesId }
+            )
+            for row in (try? context.fetch(localDescriptor)) ?? [] {
+                guard let start = row.occurrenceStart else { continue }
+                invalidateMonthWindow(containing: start, calendarId: calendarId, context: context)
+            }
+            if let startAt = task.startAt {
+                invalidateMonthWindow(containing: startAt, calendarId: calendarId, context: context)
+            }
+            if let endAt = task.endAt {
+                invalidateMonthWindow(containing: endAt, calendarId: calendarId, context: context)
+            }
             invalidateMonthWindows(
                 overlapping: task.createdAt..<seriesSpanEnd(for: task),
                 calendarId: calendarId,
                 context: context
             )
+            if ruleChangedSince(task, since: since) {
+                deleteAllMonthMemos(in: context)
+            }
         }
 
-        // (c) Changed exceptions: invalidate the single month window containing the
-        // exception's original start (simplest correct path — forces re-fetch).
+        // (c) Changed exceptions: invalidate the month containing the original slot
+        // AND — when the occurrence was moved — the destination month too, so a
+        // per-occurrence reschedule re-pulls both ends.
         for exception in response.exceptions {
-            guard let originalStart = Self.isoFractional.date(from: exception.originalStartAt) else { continue }
-            invalidateMonthWindow(containing: originalStart, calendarId: calendarId, context: context)
+            if let originalStart = Self.isoFractional.date(from: exception.originalStartAt) {
+                invalidateMonthWindow(containing: originalStart, calendarId: calendarId, context: context)
+            }
+            if let overrideStartAt = exception.overrideStartAt,
+               let moved = Self.isoFractional.date(from: overrideStartAt) {
+                invalidateMonthWindow(containing: moved, calendarId: calendarId, context: context)
+            }
         }
 
         // (d) A delta may have run mid-toggle: re-apply any pending optimistic
@@ -645,6 +820,9 @@ final class CalendarStore {
     /// which a single-month resync would leave stale. Call after an edit, delete,
     /// skip, or foreground return.
     func invalidateAndResync(around date: Date, context: ModelContext) async {
+        #if DEBUG
+        if UITestSupport.isActive { return }
+        #endif
         guard let calendarId = try? await ensureDefaultCalendarId(context: context) else { return }
         let center = CalendarMath.startOfMonth(date)
         let anchors = neighboringMonthAnchors(around: center).map(CalendarMath.startOfMonth)
@@ -668,16 +846,37 @@ final class CalendarStore {
     /// targeted ±1 `invalidateAndResync` fan-out isn't broad enough. Deletes every
     /// `month`-scope ``WindowSyncMeta`` row atomically.
     func invalidateAllSyncedMonths(context: ModelContext) {
+        guard deleteAllMonthMemos(in: context) else { return }
+        try? context.save()
+    }
+
+    /// Deletes every `month`-scope ``WindowSyncMeta`` row. Does NOT save — returns
+    /// whether any were deleted. Shared by ``invalidateAllSyncedMonths`` (which
+    /// then saves) and `applyDelta`'s rule-change widening (which folds the delete
+    /// into its own single commit).
+    @discardableResult
+    private func deleteAllMonthMemos(in context: ModelContext) -> Bool {
         let scope = WindowScope.month.rawValue
         let descriptor = FetchDescriptor<WindowSyncMeta>(
             predicate: #Predicate { $0.scope == scope }
         )
         let metas = (try? context.fetch(descriptor)) ?? []
-        guard !metas.isEmpty else { return }
+        guard !metas.isEmpty else { return false }
         for meta in metas {
             context.delete(meta)
         }
-        try? context.save()
+        return true
+    }
+
+    /// Whether a changed series' recurrence RULE changed since the client's cursor
+    /// — i.e. `recurrenceUpdatedAt` moved past `since`. Only then does the delta
+    /// wipe all month memos (a rule edit can relocate occurrences into any month).
+    /// A missing `recurrenceUpdatedAt` ⇒ not a rule change; an unparseable cursor
+    /// ⇒ treat as changed (safe over-invalidation).
+    private func ruleChangedSince(_ task: TaskDTO, since: String?) -> Bool {
+        guard let recurrenceUpdatedAt = task.recurrenceUpdatedAt else { return false }
+        guard let since, let sinceDate = Self.isoFractional.date(from: since) else { return true }
+        return recurrenceUpdatedAt > sinceDate
     }
 
     // MARK: - Eviction

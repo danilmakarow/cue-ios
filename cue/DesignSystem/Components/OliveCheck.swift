@@ -8,8 +8,10 @@
 //  while this is the quiet, repeatable "this row is done" dot.
 //
 //  When it transitions to done it springs in (scale + a brief overshoot); when it
-//  transitions back to not-done it settles out. Empty state is a hairline ring,
-//  so the control reads as a tappable affordance even before completion.
+//  transitions back to not-done it settles out. The open (not-done) state is a
+//  neutral DASHED ring, so the control reads as a tappable "to-do" affordance
+//  even before completion — usable as both the open and done marker on any
+//  surface (agenda, timeline, detail, search).
 //
 
 import SwiftUI
@@ -35,9 +37,16 @@ struct OliveCheck: View {
 
     var body: some View {
         ZStack {
-            // Empty affordance — a hairline ring that fades out as the fill arrives.
+            // Open affordance — a neutral DASHED ring that fades out as the olive
+            // fill arrives, so an incomplete row reads as a tappable "to-do" dot.
             Circle()
-                .strokeBorder(theme.border, lineWidth: max(1, size * 0.07))
+                .strokeBorder(
+                    theme.border,
+                    style: StrokeStyle(
+                        lineWidth: max(1, size * 0.07),
+                        dash: [size * 0.16, size * 0.12]
+                    )
+                )
                 .opacity(isDone ? 0 : 1)
 
             // Done state — olive fill + white check.

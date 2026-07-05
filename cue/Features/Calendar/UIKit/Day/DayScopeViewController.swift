@@ -194,7 +194,8 @@ final class DayScopeViewController: UIViewController, CalendarScopeViewControlle
             pager.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             pager.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            jumpToToday.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.xl),
+            // Floating Today pill: bottom-RIGHT (spec §3), trailing `-Spacing.xl`.
+            jumpToToday.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.xl),
             jumpToToday.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.xxl),
         ])
     }
@@ -223,6 +224,9 @@ final class DayScopeViewController: UIViewController, CalendarScopeViewControlle
         let lastDay = pageDates.last ?? from
         let upper = Calendar.current.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay
         eventsByDay = adapter.occurrencesByDay(from: from, to: upper)
+        // Feed the week strip its colored task bubbles from the SAME windowed
+        // occurrences (the store's count-only cache can't color/label them).
+        weekStrip.setDayBubbles(makeDayBubbles(from: eventsByDay))
         refreshVisiblePages()
         // Counts are invalidated on every occurrence mutation; refresh the visible
         // week's badges off the same reactive `revision` edge that drove this reload.
@@ -268,6 +272,34 @@ final class DayScopeViewController: UIViewController, CalendarScopeViewControlle
         for month in months {
             Task { await store.ensureDaySynced(month, context: modelContext) }
         }
+    }
+
+    /// Derives per-day bubble summaries for the week strip from the windowed
+    /// occurrences: up to 3 leading task bubbles (first-letter + color tokens) per
+    /// day plus the day's total count for the `+N` overflow pill. Each day's bucket
+    /// is already ascending by `startAt` (the adapter sorts it), so `prefix(3)`
+    /// takes the earliest three.
+    private func makeDayBubbles(from eventsByDay: [Date: [OccurrenceVM]]) -> [Date: WeekDayBubbles] {
+        var result: [Date: WeekDayBubbles] = [:]
+        for (day, occurrences) in eventsByDay where !occurrences.isEmpty {
+            let bubbles = occurrences.prefix(3).map { occurrence in
+                WeekDayBubble(
+                    letter: Self.firstLetter(of: occurrence.title),
+                    colorToken: occurrence.colorToken,
+                    groupColorToken: occurrence.groupColorToken
+                )
+            }
+            result[day] = WeekDayBubbles(bubbles: Array(bubbles), totalCount: occurrences.count)
+        }
+        return result
+    }
+
+    /// The uppercased first character of `title` (empty when the title has no
+    /// letter/character), for a bubble glyph.
+    private static func firstLetter(of title: String) -> String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first else { return "" }
+        return String(first).uppercased()
     }
 
     /// Reconfigures the currently-visible page cells in place (no reload flash).

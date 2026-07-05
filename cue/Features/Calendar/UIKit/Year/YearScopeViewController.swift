@@ -31,6 +31,17 @@ import UIKit
 /// the year scope renders no event density, this keeps the shared pipeline warm so
 /// a zoom-in lands on already-synced months).
 ///
+/// ## Sync throttle (bounded concurrency + coalescing)
+/// A fast zoom-out/scroll materializes a whole year of mini-months at once, and
+/// both `willDisplay` and the prefetch source fire a month sync for each — so a
+/// naive fire-and-forget per call would launch 12+ (up to ~36 across the seeded
+/// years) concurrent `ensureMonthSynced` tasks, whose `isLoading`/`revision`/
+/// `context` churn stalls the main actor and delays the zoom-out/close. Every month
+/// sync therefore funnels through a single coalescing pump
+/// (``enqueueMonthSync(_:)`` → ``pumpMonthSyncs()``): duplicate month requests are
+/// dropped and the queue is drained by at most ``maxConcurrentMonthSyncs`` serial
+/// workers, so at any instant only one or two syncs are actually in flight.
+///
 /// ## Construction (for the Integration engineer)
 /// The container builds it with the four shared dependencies and an initial theme:
 /// ```swift
@@ -67,9 +78,25 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
 
     // MARK: - Infinite-scroll window
 
-    /// The sliding window of year-start anchors (one per section). Seeded around
-    /// the centered year; grown/trimmed on scroll-settle only.
-    private var window = InfiniteSectionWindow(step: .year)
+    /// How many years to seed on each side of the centered year (so the window
+    /// holds `2 * yearSeedRadius + 1` sections). Small on purpose: the design shows
+    /// only ~3 years (a tail-peek, the full current year, a head-peek), and each
+    /// year section is 12 mini-months. The `InfiniteSectionWindow` DEFAULT radius
+    /// (18 → 37 years → ~444 mini-month cells materialized + a 37-year windowed
+    /// occurrence fetch) is what made `applySnapshot` stall the year scope; a tight
+    /// window with cheap on-settle growth fixes it while keeping infinite scroll.
+    private static let yearSeedRadius = 2
+
+    /// The sliding window of year-start anchors (one per section). Seeded around the
+    /// centered year (see ``yearSeedRadius``); grown/trimmed on scroll-settle only.
+    /// Small growth/cap sized for years (not months): `growBy 3`, `maxWindowSize 9`,
+    /// `edgeThreshold 1` — grow a few years at a time, keep at most ~9 in memory.
+    private var window = InfiniteSectionWindow(
+        step: .year,
+        growBy: 3,
+        maxWindowSize: 9,
+        edgeThreshold: 1
+    )
 
     /// The year the scope considers "centered" — drives Jump-to-Today and the
     /// edge-growth decision. Updated on scroll-settle.
@@ -86,9 +113,78 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
     /// the oldest seeded year instead of the current/focused year.
     private var pendingCenter: (year: Date, animated: Bool)?
 
+    /// Whether the user has scrolled the year overview away from where it opened.
+    /// Drives the progressive Today button (mirrors Month/Day): once scrolled, a
+    /// tap scrolls back to the current year and resets this; if never scrolled, a
+    /// tap zooms one level into today's month. Reset on a Today recenter and on a
+    /// cross-scope `center(on:)`.
+    private var hasScrolled = false
+
+    // MARK: - Per-day heatmap density
+
+    /// Per-day task-occurrence counts for every windowed year, keyed by
+    /// `startOfDay`. Drives the mini-month heatmap tint. Rebuilt from a single
+    /// windowed fetch on every `revision` change (and as years sync in), exactly
+    /// like the Month scope's `chipsByDay`. Days with no tasks are absent (⇒ 0).
+    private var countsByDay: [Date: Int] = [:]
+
+    // MARK: - Sync coalescing / throttle
+
+    /// Years whose month-sync fan-out is currently in flight, so a re-entrant
+    /// `syncYear` (fast scroll re-triggering `willDisplay`/prefetch for the same
+    /// year) doesn't launch a second bounded burst for it.
+    private var syncingYears: Set<Date> = []
+
+    /// Ceiling on how many `ensureMonthSynced` may run **at once** across the whole
+    /// scope. A fast zoom-out/scroll materializes twelve mini-months (×3 seeded
+    /// years on open) and both `willDisplay` and the prefetch source fire
+    /// `syncMonth` for each — previously spawning 12–36 concurrent
+    /// fire-and-forget tasks whose `isLoading`/`revision`/`context` churn stalled
+    /// the main actor and delayed the zoom-out/close. All month syncs now funnel
+    /// through ``enqueueMonthSync(_:)`` into a small pool of at most this many
+    /// serial drain workers, with duplicate month requests dropped.
+    private static let maxConcurrentMonthSyncs = 2
+
+    /// Months requested but not yet started, in insertion order, deduplicated by
+    /// ``queuedMonths``. Drained by the ``runningMonthSyncWorkers`` pool.
+    private var pendingMonthSyncs: [Date] = []
+
+    /// Membership mirror of `pendingMonthSyncs` (+ the in-flight month keys) so a
+    /// re-requested month is dropped rather than enqueued twice — the coalescing
+    /// that stops fast scrolling from stacking duplicate syncs for the same month.
+    private var queuedMonths: Set<Date> = []
+
+    /// How many drain workers are currently running, capped at
+    /// ``maxConcurrentMonthSyncs`` — the live concurrency the throttle enforces.
+    private var runningMonthSyncWorkers = 0
+
+    /// Per-year set of that year's month anchors still queued or in flight, so a
+    /// year's loading spinner is dismissed only once its *last* month settles even
+    /// though the months drain through the shared throttle (out of year order). A
+    /// set (not a count) so it stays correct when a month is already pending for a
+    /// different reason or completes between enqueues. A year is removed from
+    /// `syncingYears` when its set empties.
+    private var pendingMonthsByYear: [Date: Set<Date>] = [:]
+
+    /// The year the loading overlay is currently gating on, if any — the last year
+    /// whose sync we surfaced a spinner for. Cleared when its sync settles.
+    private var loadingYear: Date?
+
+    // MARK: - Reload debounce
+
+    /// Trailing-debounce window for the reactive reload. A single year sync bumps
+    /// `revision` twelve times (once per month), so an undebounced reload would run
+    /// twelve full windowed count-fetches back to back; coalescing to one trailing
+    /// reload keeps that work off the hot path (mirrors the Month scope's fix).
+    private static let reloadDebounce: TimeInterval = 0.12
+
+    /// The pending debounced reload, cancelled + rescheduled on each `revision`.
+    private var reloadWorkItem: DispatchWorkItem?
+
     // MARK: - Views
 
     private let jumpToToday = DayJumpToTodayButton()
+    private let loadingOverlay = YearSyncOverlayView()
 
     private lazy var collectionView: UICollectionView = {
         let view = UICollectionView(frame: .zero, collectionViewLayout: YearLayout.make())
@@ -137,7 +233,7 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
         self.prefetchCoordinator = prefetchCoordinator
         self.centeredYear = CalendarMath.startOfYear(store.selectedDate)
         super.init(nibName: nil, bundle: nil)
-        window.seed(around: centeredYear)
+        window.seed(around: centeredYear, radius: Self.yearSeedRadius)
     }
 
     @available(*, unavailable)
@@ -153,11 +249,17 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
         wireJumpToToday()
         applyTheme()
 
-        // One-time reactive registration: re-style visible cells on data change so
-        // a zoom-in finds freshly-synced months without rebuilding the snapshot.
-        adapter.observeRevision { [weak self] in self?.reload() }
+        // One-time reactive registration: rebuild heatmap counts + re-style visible
+        // cells on data change so a zoom-in finds freshly-synced months without
+        // rebuilding the snapshot. Debounced so a year sync's twelve `revision`
+        // bumps coalesce into a single trailing reload.
+        adapter.observeRevision { [weak self] in self?.scheduleReload() }
 
         applySnapshot(animated: false)
+        reload()
+        // Fill the initially-centered year's heatmap (coalesced + throttled), which
+        // also surfaces the loading spinner on a cold launch.
+        syncYear(centeredYear, surfaceLoading: true)
         // Defer the initial center until the collection view has real bounds —
         // `viewDidLoad` runs before layout, so an immediate scroll would no-op.
         requestCenter(on: centeredYear, animated: false)
@@ -178,7 +280,9 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
         view.backgroundColor = theme.background
 
         jumpToToday.translatesAutoresizingMaskIntoConstraints = false
+        loadingOverlay.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(collectionView)
+        view.addSubview(loadingOverlay)
         view.addSubview(jumpToToday)
 
         NSLayoutConstraint.activate([
@@ -186,6 +290,12 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            // A small floating spinner pinned bottom-center, ABOVE the tab bar — it
+            // never blocks the grid (which renders + closes immediately), it only
+            // signals that the visible year is still filling its heatmap.
+            loadingOverlay.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loadingOverlay.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.xxl),
 
             jumpToToday.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.xl),
             jumpToToday.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.xxl),
@@ -221,15 +331,26 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
         return source
     }
 
-    /// Configures a mini-month cell from its month anchor — the model is memoized,
-    /// so this stays allocation-light while scrolling.
+    /// Configures a mini-month cell from its month anchor — the model is memoized
+    /// and the per-day counts are a dictionary slice, so this stays allocation-light
+    /// while scrolling.
     private func configure(_ cell: YearMiniMonthCell, with monthAnchor: Date) {
         let todayMonth = CalendarMath.startOfMonth(.now)
         cell.configure(
             model: MonthGridModel.model(for: monthAnchor),
+            countsByDay: countsForMonth(monthAnchor),
             todayKey: monthAnchor == todayMonth ? CalendarMath.startOfDay(.now) : nil,
             theme: theme
         )
+    }
+
+    /// The per-day counts restricted to `monthAnchor`'s `[startOfMonth,
+    /// startOfNextMonth)` — the slice a single mini-month heatmap needs. Handing a
+    /// small per-month dictionary (rather than the whole windowed map) keeps each
+    /// cell's draw pass reading only its own days.
+    private func countsForMonth(_ monthAnchor: Date) -> [Date: Int] {
+        let (from, to) = CalendarMath.monthBounds(monthAnchor)
+        return countsByDay.filter { $0.key >= from && $0.key < to }
     }
 
     /// Builds a supplementary view for the given kind (only the year title).
@@ -246,7 +367,7 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
         )
         guard let titleHeader = header as? YearTitleHeaderView,
               let year = year(forSection: indexPath.section) else { return header }
-        titleHeader.configure(title: heading(for: year), theme: theme)
+        titleHeader.configure(title: heading(for: year), isCurrentYear: isCurrentYear(year), theme: theme)
         return titleHeader
     }
 
@@ -269,12 +390,71 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
 
     // MARK: - Data
 
-    /// Re-styles the visible mini-months in place after a data change. The year
-    /// scope renders no event density, so there are no titles to rebuild — this
-    /// only repaints the today highlight (e.g. across a midnight rollover) and
-    /// keeps the shared `revision` pipeline live.
+    /// Schedules a debounced reload on the main queue, cancelling any pending one.
+    /// The store bumps `revision` once per month-sync completion; a year sync would
+    /// otherwise fire twelve full re-fetches back to back. Coalescing to a single
+    /// trailing reload keeps that work off the hot path.
+    private func scheduleReload() {
+        reloadWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in self?.reload() }
+        reloadWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.reloadDebounce, execute: workItem)
+    }
+
+    /// Rebuilds the per-day heatmap counts from a single windowed fetch, then
+    /// re-styles the visible mini-months in place. Bound (debounced) to
+    /// `store.revision` via the adapter (the `@Query` replacement) and called after a
+    /// year's months finish syncing, so the heatmap tints fill in as data arrives.
     private func reload() {
+        rebuildCounts()
         reconfigureVisible()
+    }
+
+    /// Rebuilds `countsByDay` from a single fetch spanning only the **visible year(s)
+    /// (padded one year on each side)**, grouped by day. The old version fetched the
+    /// entire multi-year section window `[firstYear, yearAfterLast)` — up to 9 years —
+    /// on every debounced reload, even though only the ~3 on-screen years render a
+    /// heatmap; the pad covers the years a partial scroll straddles so their tints are
+    /// ready before they fully settle. Each cell still slices out its own days from
+    /// the result; a cell outside the fetched range simply reads zero (no fill) until
+    /// it scrolls into range and a settle reload widens the fetch to include it.
+    private func rebuildCounts() {
+        guard let (fromYear, toYear) = visibleYearRange() else { return }
+        let from = CalendarMath.startOfYear(fromYear)
+        // Exclusive upper bound: the start of the year after the last visible year
+        // (December's `monthBounds` upper bound is the next year's January 1).
+        let lastDecember = CalendarMath.monthsOfYear(toYear).last ?? toYear
+        let to = CalendarMath.monthBounds(lastDecember).to
+        let byDay = adapter.occurrencesByDay(from: from, to: to)
+        var counts: [Date: Int] = [:]
+        for (day, occurrences) in byDay {
+            counts[day] = occurrences.count
+        }
+        countsByDay = counts
+    }
+
+    /// The `(first, last)` year anchors the heatmap fetch should span: the currently
+    /// on-screen years padded one year on each side, clamped to the section window.
+    /// Falls back to the centered year ± 1 (still window-clamped) before the
+    /// collection view has visible items (e.g. the first `reload()` pre-layout), so
+    /// the initial center's heatmap still fills. Returns nil only when the window is
+    /// empty.
+    private func visibleYearRange() -> (first: Date, last: Date)? {
+        guard let windowFirst = window.anchors.first, let windowLast = window.anchors.last else {
+            return nil
+        }
+        let visibleYears = Set(
+            collectionView.indexPathsForVisibleItems.compactMap { year(forSection: $0.section) }
+        )
+        let lowerCenter = CalendarMath.startOfYear(visibleYears.min() ?? centeredYear)
+        let upperCenter = CalendarMath.startOfYear(visibleYears.max() ?? centeredYear)
+        // Pad one year on each side, then clamp into the materialized window so we
+        // never fetch a range with no cells to tint.
+        let padLower = CalendarMath.years(before: lowerCenter, count: 1).first ?? lowerCenter
+        let padUpper = CalendarMath.years(after: upperCenter, count: 1).last ?? upperCenter
+        let lower = max(padLower, windowFirst)
+        let upper = min(padUpper, windowLast)
+        return (lower, upper)
     }
 
     /// Reconfigures the currently-visible items in place (no reload flash).
@@ -288,21 +468,147 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
         dataSource.apply(snapshot, animatingDifferences: false)
     }
 
-    // MARK: - Per-unit sync
+    // MARK: - Per-unit sync (coalesced + throttled)
 
-    /// Syncs a single month's occurrences. Idempotent and cheap — the store
-    /// early-returns on its durable `WindowSyncMeta` memo while fresh (TTL-gated) —
-    /// so it is safe to call for every
-    /// visible and prefetched mini-month. Driven from `willDisplay` and
-    /// `prefetchItemsAt` so coverage is independent of scroll speed.
+    /// Requests a single month's occurrences via the shared throttle. Idempotent and
+    /// cheap — the store early-returns on its durable `WindowSyncMeta` memo while
+    /// fresh (TTL-gated) — so it is safe to call for every visible and prefetched
+    /// mini-month. Driven from `willDisplay` and `prefetchItemsAt`.
+    ///
+    /// Unlike the old fire-and-forget `Task { ensureMonthSynced }`, this funnels
+    /// through ``enqueueMonthSync(_:)`` so a fast scroll that materializes a dozen
+    /// mini-months at once can never launch a dozen concurrent syncs — duplicates
+    /// are dropped and at most ``maxConcurrentMonthSyncs`` run at a time.
     private func syncMonth(_ month: Date) {
-        Task { await store.ensureMonthSynced(CalendarMath.startOfMonth(month), context: modelContext) }
+        enqueueMonthSync(CalendarMath.startOfMonth(month))
     }
 
-    /// Syncs all twelve months of a year. Called as a year section comes into view
-    /// so a subsequent zoom-in lands on already-synced months.
-    private func syncYear(_ year: Date) {
-        for month in CalendarMath.monthsOfYear(year) { syncMonth(month) }
+    /// Requests all twelve months of a year through the same shared throttle rather
+    /// than fanning out twelve unstructured `Task`s at once. This is the fix for the
+    /// year-scope lag: the old whole-year path launched 12 concurrent
+    /// `ensureMonthSynced` per visible year (×3 seeded years on open = up to 36 in
+    /// flight), whose `isLoading`/`revision`/`context` churn stalled the main actor
+    /// and delayed the zoom-out and close.
+    ///
+    /// Now the year's months are enqueued into the coalescing pump, which drains
+    /// them through at most ``maxConcurrentMonthSyncs`` serial workers. The whole
+    /// pass is coalesced so a re-entrant call for an in-flight year is a no-op (fast
+    /// scroll re-fires `willDisplay`/prefetch for the same visible year repeatedly),
+    /// and gated by a loading overlay so the grid renders + closes immediately while
+    /// the heatmap fills in behind the spinner. The spinner is dismissed only once
+    /// the year's *last* month drains (tracked in ``pendingMonthsByYear``), since
+    /// the months no longer complete in a single ordered task.
+    ///
+    /// - Parameters:
+    ///   - year: the year whose months to sync.
+    ///   - surfaceLoading: whether to gate the loading spinner on this sync. `true`
+    ///     for the visible/centered year (the user is looking at it); `false` for
+    ///     offscreen growth/prefetch years, so the spinner never tracks a year the
+    ///     user can't see.
+    private func syncYear(_ year: Date, surfaceLoading: Bool = false) {
+        let anchor = CalendarMath.startOfYear(year)
+        // Coalesce: don't relaunch a burst for a year already syncing (fast scroll
+        // re-fires willDisplay/prefetch for the same visible year repeatedly).
+        guard !syncingYears.contains(anchor) else {
+            // Already in flight, but a now-visible year should still claim the
+            // spinner if this call is the one surfacing it.
+            if surfaceLoading { beginLoading(for: anchor) }
+            return
+        }
+        syncingYears.insert(anchor)
+        if surfaceLoading { beginLoading(for: anchor) }
+
+        let months = CalendarMath.monthsOfYear(anchor).map { CalendarMath.startOfMonth($0) }
+        // Track exactly the months this year is still waiting on. Enqueue first so a
+        // month that turns out to be already-drained isn't recorded as pending (its
+        // completion has already fired and won't come again). Any month still in the
+        // shared queue after enqueuing — freshly added or already pending from a
+        // single-month request — will emit a `finishMonthSync`, so it belongs here.
+        for month in months { enqueueMonthSync(month) }
+        let waiting = months.filter { queuedMonths.contains($0) }
+        guard !waiting.isEmpty else {
+            // Everything was already synced (nothing left in flight) — nothing will
+            // decrement, so settle the year immediately.
+            syncingYears.remove(anchor)
+            endLoading(for: anchor)
+            return
+        }
+        pendingMonthsByYear[anchor] = Set(waiting)
+    }
+
+    // MARK: - Month-sync throttle (coalescing pump)
+
+    /// Adds `month` (a `startOfMonth`) to the drain queue unless it is already
+    /// queued or in flight (dedup via ``queuedMonths``), then kicks the pump. This
+    /// is the single choke point every month sync passes through, so no scroll speed
+    /// can stack duplicate or unbounded-concurrent syncs.
+    private func enqueueMonthSync(_ month: Date) {
+        guard !queuedMonths.contains(month) else { return }
+        queuedMonths.insert(month)
+        pendingMonthSyncs.append(month)
+        pumpMonthSyncs()
+    }
+
+    /// Starts drain workers up to ``maxConcurrentMonthSyncs`` while the queue has
+    /// work. Each worker awaits one `ensureMonthSynced`, then re-pumps — so the pool
+    /// self-refills as syncs complete but never exceeds the concurrency cap.
+    ///
+    /// Staying on `@MainActor` (each worker `Task` inherits this scope's isolation)
+    /// keeps the non-`Sendable` `ModelContext` from crossing an isolation boundary —
+    /// the reason a `TaskGroup` of unstructured child tasks isn't used here.
+    private func pumpMonthSyncs() {
+        while runningMonthSyncWorkers < Self.maxConcurrentMonthSyncs, !pendingMonthSyncs.isEmpty {
+            let month = pendingMonthSyncs.removeFirst()
+            runningMonthSyncWorkers += 1
+            Task { [weak self] in
+                guard let self else { return }
+                await self.store.ensureMonthSynced(month, context: self.modelContext)
+                self.finishMonthSync(month)
+            }
+        }
+    }
+
+    /// Completes one month's drain: releases its worker slot, clears its dedup
+    /// membership, decrements its owning year's remaining count (dismissing that
+    /// year's spinner when it hits zero), then re-pumps to admit the next queued
+    /// month.
+    private func finishMonthSync(_ month: Date) {
+        runningMonthSyncWorkers -= 1
+        queuedMonths.remove(month)
+
+        let year = CalendarMath.startOfYear(month)
+        if var waiting = pendingMonthsByYear[year] {
+            waiting.remove(month)
+            if waiting.isEmpty {
+                pendingMonthsByYear[year] = nil
+                syncingYears.remove(year)
+                endLoading(for: year)
+            } else {
+                pendingMonthsByYear[year] = waiting
+            }
+        }
+        pumpMonthSyncs()
+    }
+
+    // MARK: - Loading overlay
+
+    /// Marks `year` as the year the loading spinner gates on and shows it. Only the
+    /// most recently-surfaced (visible) year owns the spinner, so scrolling through
+    /// several years shows a single spinner tracking the latest, not a stack. The
+    /// overlay's own show-delay means an already-cached (instant) year never flashes.
+    private func beginLoading(for year: Date) {
+        loadingYear = year
+        loadingOverlay.setVisible(true, animated: true)
+    }
+
+    /// Hides the spinner when the year it was gating on finishes. A completion for a
+    /// year that no longer owns the spinner (a superseded earlier year, or an
+    /// offscreen growth/prefetch sync that never surfaced) is ignored, so it can't
+    /// hide a spinner still owed to the visible year.
+    private func endLoading(for year: Date) {
+        guard loadingYear == year else { return }
+        loadingYear = nil
+        loadingOverlay.setVisible(false, animated: true)
     }
 
     // MARK: - Prefetch (ahead-of-visibility buffer, capped)
@@ -355,8 +661,16 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
     /// window away.
     private func handleScrollSettled() {
         guard let centered = centeredYearFromViewport() else { return }
+        // A settled user scroll that lands on a different year means the overview
+        // has moved — arm the progressive Today button's "scroll back" behavior.
+        if centered != centeredYear {
+            hasScrolled = true
+        }
         centeredYear = centered
         jumpToToday.setVisible(true, animated: true)
+        // Ensure the now-centered year's heatmap fills in (coalesced: a no-op if it
+        // is already syncing/synced), surfacing the spinner while it does.
+        syncYear(centered, surfaceLoading: true)
 
         guard let index = window.index(of: centered) else { return }
 
@@ -385,6 +699,10 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
             CGPoint(x: priorOffset.x, y: priorOffset.y + shift),
             animated: false
         )
+        // Refresh the heatmap counts for the widened window so already-cached
+        // newly-prepended years paint immediately (a fresh sync also re-drives this
+        // via `revision` once it lands).
+        reload()
         for year in added { syncYear(year) }
     }
 
@@ -396,6 +714,9 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
         let trimmed = window.trimLeading()
         evictWindowsAndRows(yearAnchors: trimmed)
         applySnapshot(animated: false)
+        // Refresh the heatmap counts for the widened window so already-cached
+        // newly-appended years paint immediately.
+        reload()
         for year in added { syncYear(year) }
     }
 
@@ -453,31 +774,43 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
         year.formatted(.dateTime.year())
     }
 
+    /// Whether the given start-of-year anchor is the current calendar year — drives
+    /// the olive emphasis on the year heading and underline (per CUE — Clean design).
+    private func isCurrentYear(_ year: Date) -> Bool {
+        year == CalendarMath.startOfYear(.now)
+    }
+
     // MARK: - Jump-to-Today
 
-    /// Progressive "Today": if the centered year isn't the current year, scroll it
-    /// back into view; if it already is, ask the container to zoom one level into
-    /// today's month via `scopeDidRequestToday` — mirroring the SwiftUI behavior.
+    /// Progressive "Today", identical in spirit to the Month/Day scopes: if the
+    /// user has scrolled the overview away (or the current year simply isn't
+    /// centered), a tap scrolls the current year back into view and resets the
+    /// scrolled flag; if the overview hasn't been scrolled since it opened (and the
+    /// current year is centered), a tap zooms one level into today's month via
+    /// `scopeDidRequestToday`.
     private func handleJumpToToday() {
         let currentYear = CalendarMath.startOfYear(.now)
-        if centeredYear == currentYear {
-            scopeDelegate?.scopeDidRequestToday(self)
-        } else {
+        if hasScrolled || centeredYear != currentYear {
             scrollToCurrentYear()
+        } else {
+            scopeDelegate?.scopeDidRequestToday(self)
         }
     }
 
     /// Brings the current year back into the window (extending it if the user has
-    /// scrolled far away) and centers on it.
+    /// scrolled far away), centers on it, and clears `hasScrolled` so the NEXT tap
+    /// (with the current year now centered and unscrolled) zooms in instead.
     private func scrollToCurrentYear() {
         let currentYear = CalendarMath.startOfYear(.now)
         if !window.contains(currentYear) {
-            window.seed(around: currentYear)
+            window.seed(around: currentYear, radius: Self.yearSeedRadius)
             applySnapshot(animated: false)
+            reload()
         }
         centeredYear = currentYear
+        hasScrolled = false
         requestCenter(on: currentYear, animated: true)
-        syncYear(currentYear)
+        syncYear(currentYear, surfaceLoading: true)
     }
 
     /// Centers on `year` if the collection view already has real bounds; else
@@ -516,13 +849,14 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
     private func applyTheme() {
         view.backgroundColor = theme.background
         jumpToToday.apply(theme: theme)
+        loadingOverlay.apply(theme: theme)
         for case let cell as YearMiniMonthCell in collectionView.visibleCells {
             cell.apply(theme: theme)
         }
         for indexPath in collectionView.indexPathsForVisibleSupplementaryElements(ofKind: YearLayout.yearTitleKind) {
             let view = collectionView.supplementaryView(forElementKind: YearLayout.yearTitleKind, at: indexPath)
             if let title = view as? YearTitleHeaderView, let year = year(forSection: indexPath.section) {
-                title.configure(title: heading(for: year), theme: theme)
+                title.configure(title: heading(for: year), isCurrentYear: isCurrentYear(year), theme: theme)
             }
         }
     }
@@ -539,12 +873,16 @@ final class YearScopeViewController: UIViewController, CalendarScopeViewControll
     func center(on unit: Date, animated: Bool) {
         let year = CalendarMath.startOfYear(unit)
         if !window.contains(year) {
-            window.seed(around: year)
+            window.seed(around: year, radius: Self.yearSeedRadius)
             applySnapshot(animated: false)
+            reload()
         }
         centeredYear = year
+        // A cross-scope zoom-out lands the scope freshly on `year`; it hasn't been
+        // scrolled, so the next Today tap should zoom in (when it's the current year).
+        hasScrolled = false
         requestCenter(on: year, animated: animated)
-        syncYear(year)
+        syncYear(year, surfaceLoading: true)
     }
 
     /// The frame of `unit`'s mini-month cell, converted into `coordinateSpace`, or
@@ -612,9 +950,13 @@ extension YearScopeViewController: UICollectionViewDelegate {
         }
     }
 
-    /// A fresh drag starts: drop stale velocity/direction history.
+    /// A fresh drag starts: drop stale velocity/direction history and mark the
+    /// overview as scrolled so the progressive Today button switches to its
+    /// "scroll back to the current year" behavior (a settle onto a different year
+    /// also arms this, but a drag that returns to the same year should count too).
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         guard scrollView === collectionView else { return }
+        hasScrolled = true
         prefetchCoordinator.resetVelocity()
     }
 

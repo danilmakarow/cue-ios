@@ -17,6 +17,13 @@ final class DayPageCell: UICollectionViewCell {
 
     static let reuseIdentifier = "DayPageCell"
 
+    /// Bottom clearance added to the timeline scroll so the final tile can scroll
+    /// clear of the floating (Liquid Glass) tab bar and stay fully reachable. The
+    /// tab bar sits ~21pt off the bottom at ~64pt tall; ~132pt matches the design's
+    /// day-body `padding-bottom: 132px`. This is IN ADDITION to the ~30-min tail the
+    /// timeline content already carries (see ``DayTimelineLayout``'s `tailPadding`).
+    private static let timelineBottomClearance: CGFloat = 132
+
     // MARK: - Callbacks
 
     var onToggle: ((OccurrenceVM) -> Void)?
@@ -29,8 +36,19 @@ final class DayPageCell: UICollectionViewCell {
 
     // MARK: - Timeline mode
 
+    /// The ALL-DAY band shown above the timeline scroll (spec §3). Present in the
+    /// hierarchy always; collapsed (hidden + zero-height constraint) when the day
+    /// has no all-day events.
+    private let allDayBand = DayAllDayBandView()
     private let timelineScroll = UIScrollView()
     private let timelineContent = DayTimelineDayView()
+
+    /// Timeline-scroll top constraints, toggled by whether the all-day band has
+    /// content: below the band (with content) vs directly below the heading rule.
+    private var timelineTopBelowBand: NSLayoutConstraint?
+    private var timelineTopBelowRule: NSLayoutConstraint?
+    /// All-day band top constraint (below the heading rule).
+    private var allDayBandTop: NSLayoutConstraint?
 
     // MARK: - List mode
 
@@ -53,6 +71,11 @@ final class DayPageCell: UICollectionViewCell {
 
     private var date = Date()
     private var events: [OccurrenceVM] = []
+    /// The day's TIMED occurrences (all-day pulled out into `allDayBand`), fed to
+    /// the timeline so all-day items no longer render at their midnight start.
+    private var timedEvents: [OccurrenceVM] = []
+    /// The day's ALL-DAY occurrences, rendered in `allDayBand` above the timeline.
+    private var allDayEvents: [OccurrenceVM] = []
     private var sortedListEvents: [OccurrenceVM] = []
     private var mode: CalendarViewMode = .timeline
     private var theme: CalendarTheme?
@@ -78,9 +101,19 @@ final class DayPageCell: UICollectionViewCell {
         contentView.addSubview(headingLabel)
         contentView.addSubview(headingRule)
 
+        allDayBand.translatesAutoresizingMaskIntoConstraints = false
+        allDayBand.onSelect = { [weak self] event in self?.onSelect?(event) }
+        contentView.addSubview(allDayBand)
+
         timelineScroll.translatesAutoresizingMaskIntoConstraints = false
         timelineScroll.showsVerticalScrollIndicator = false
         timelineScroll.alwaysBounceVertical = true
+        // Deterministic bottom clearance for the floating tab bar: the page ignores
+        // the bottom safe area (it extends behind the bar), so drive the clearance
+        // explicitly and stop the system layering its own adjustment on top.
+        timelineScroll.contentInsetAdjustmentBehavior = .never
+        timelineScroll.contentInset.bottom = Self.timelineBottomClearance
+        timelineScroll.verticalScrollIndicatorInsets.bottom = Self.timelineBottomClearance
         timelineContent.translatesAutoresizingMaskIntoConstraints = false
         timelineScroll.addSubview(timelineContent)
         timelineContent.onToggle = { [weak self] event in self?.onToggle?(event) }
@@ -89,6 +122,19 @@ final class DayPageCell: UICollectionViewCell {
 
         contentView.addSubview(listCollection)
         setUpEmptyState()
+
+        let allDayBandTop = allDayBand.topAnchor.constraint(equalTo: headingRule.bottomAnchor, constant: Spacing.md)
+        self.allDayBandTop = allDayBandTop
+        // Two toggled timeline-scroll top constraints: below the all-day band when
+        // it has content, else directly below the heading rule (band collapsed).
+        let timelineTopBelowBand = timelineScroll.topAnchor.constraint(
+            equalTo: allDayBand.bottomAnchor, constant: Spacing.md
+        )
+        let timelineTopBelowRule = timelineScroll.topAnchor.constraint(
+            equalTo: headingRule.bottomAnchor, constant: Spacing.md
+        )
+        self.timelineTopBelowBand = timelineTopBelowBand
+        self.timelineTopBelowRule = timelineTopBelowRule
 
         NSLayoutConstraint.activate([
             headingLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Spacing.sm),
@@ -100,7 +146,11 @@ final class DayPageCell: UICollectionViewCell {
             headingRule.widthAnchor.constraint(equalToConstant: 44),
             headingRule.heightAnchor.constraint(equalToConstant: 2),
 
-            timelineScroll.topAnchor.constraint(equalTo: headingRule.bottomAnchor, constant: Spacing.md),
+            allDayBandTop,
+            allDayBand.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.lg),
+            allDayBand.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.lg),
+
+            timelineTopBelowRule,
             timelineScroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             timelineScroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             timelineScroll.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
@@ -118,7 +168,7 @@ final class DayPageCell: UICollectionViewCell {
     }
 
     private func setUpEmptyState() {
-        emptyStateIcon.image = UIImage(systemName: "circle.dashed")
+        emptyStateIcon.image = UIImage(systemName: "calendar")
         emptyStateIcon.contentMode = .scaleAspectFit
         emptyStateLabel.numberOfLines = 0
         emptyStateLabel.textAlignment = .center
@@ -131,8 +181,10 @@ final class DayPageCell: UICollectionViewCell {
         emptyStateStack.addArrangedSubview(emptyStateLabel)
         contentView.addSubview(emptyStateStack)
         NSLayoutConstraint.activate([
-            emptyStateStack.centerXAnchor.constraint(equalTo: listCollection.centerXAnchor),
-            emptyStateStack.centerYAnchor.constraint(equalTo: listCollection.centerYAnchor),
+            emptyStateStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            // TOP-anchored ~72px below the heading rule (matches the design's
+            // padding:72px from the top of the scroll body), not vertically centered.
+            emptyStateStack.topAnchor.constraint(equalTo: headingRule.bottomAnchor, constant: 72),
             emptyStateStack.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: Spacing.xl),
             emptyStateStack.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -Spacing.xl),
             emptyStateIcon.widthAnchor.constraint(equalToConstant: 44),
@@ -146,15 +198,20 @@ final class DayPageCell: UICollectionViewCell {
         onSelect = nil
         didInitialTimelineScroll = false
         events = []
+        timedEvents = []
+        allDayEvents = []
         sortedListEvents = []
     }
 
     // MARK: - Configuration
 
-    /// Binds the page to a day, its events, the active mode, and a theme.
+    /// Binds the page to a day, its events, the active mode, and a theme. Splits
+    /// all-day occurrences out of the timeline feed and into the all-day band.
     func configure(date: Date, events: [OccurrenceVM], mode: CalendarViewMode, theme: CalendarTheme) {
         self.date = date
         self.events = events
+        self.timedEvents = events.filter { !$0.isAllDay }
+        self.allDayEvents = events.filter { $0.isAllDay }
         self.mode = mode
         self.theme = theme
         self.sortedListEvents = Self.sortedForList(events)
@@ -175,9 +232,10 @@ final class DayPageCell: UICollectionViewCell {
         guard self.theme != theme else { return }
         self.theme = theme
         applyTheme()
-        // Re-feed the timeline so its block colors refresh.
+        // Re-feed the timeline + all-day band so their block colors refresh.
         if mode == .timeline {
-            timelineContent.configure(events: events, date: date, theme: theme)
+            timelineContent.configure(events: timedEvents, date: date, theme: theme)
+            if !allDayEvents.isEmpty { allDayBand.apply(theme: theme) }
         } else {
             listCollection.reloadData()
         }
@@ -185,7 +243,9 @@ final class DayPageCell: UICollectionViewCell {
 
     private func applyTheme() {
         guard let theme else { return }
-        headingLabel.font = theme.titleL
+        // System-sans title — CUE — Clean keeps IBM Plex Serif for display titles
+        // only; this body section heading uses the sans titleL variant.
+        headingLabel.font = theme.titleLSans
         headingLabel.textColor = theme.textPrimary
         headingLabel.text = headingText(for: mode)
         headingRule.backgroundColor = theme.secondary
@@ -206,12 +266,33 @@ final class DayPageCell: UICollectionViewCell {
         guard let theme else { return }
         headingLabel.text = headingText(for: mode)
         let isTimeline = mode == .timeline
-        timelineScroll.isHidden = !isTimeline
-        listCollection.isHidden = isTimeline
+        let isEmpty = events.isEmpty
+        // The all-day band only participates in TIMELINE mode (the list mode shows
+        // all-day items as ordinary agenda rows). Toggle its presence + the
+        // timeline-scroll top constraint accordingly.
+        updateAllDayBand(active: isTimeline, theme: theme)
+
+        // A timeline page is "empty" (clean page, no ruled 24h grid) only when
+        // there are NO timed events. All-day-only days still show the band above,
+        // so the empty placeholder is suppressed when the band carries content.
+        let hasTimed = !timedEvents.isEmpty
+        // An empty TODAY still shows the timeline: DayTimelineLayout builds a
+        // fill-height 00:00→now / now→24:00 split with the now-mark between them,
+        // so keep the scroll visible even with no timed events. A non-today empty
+        // day has nothing to render there and falls back to the placeholder.
+        let showTimeline = isTimeline && (hasTimed || Calendar.current.isDateInToday(date))
+        // The clean-page placeholder is reserved for a truly-empty NON-today day in
+        // timeline mode: no timed events and not today (an empty today shows the
+        // now-split timeline instead).
+        let timelineIsEmpty = isTimeline && !hasTimed && !Calendar.current.isDateInToday(date)
+        timelineScroll.isHidden = !showTimeline
+        listCollection.isHidden = isTimeline || isEmpty
 
         if isTimeline {
-            emptyStateStack.isHidden = true
-            timelineContent.configure(events: events, date: date, theme: theme)
+            // Show the empty placeholder only for a truly-clean non-today empty day
+            // (an empty today renders the fill-height now-split timeline instead).
+            emptyStateStack.isHidden = !timelineIsEmpty
+            timelineContent.configure(events: timedEvents, date: date, theme: theme)
             setNeedsLayout()
             layoutIfNeeded()
             applyInitialTimelineScrollIfNeeded()
@@ -219,6 +300,21 @@ final class DayPageCell: UICollectionViewCell {
             emptyStateStack.isHidden = !events.isEmpty
             listCollection.reloadData()
         }
+    }
+
+    /// Shows/hides the all-day band and swaps the timeline-scroll top constraint
+    /// between "below the band" and "below the heading rule". The band renders only
+    /// in timeline mode and only when there are all-day events.
+    private func updateAllDayBand(active: Bool, theme: CalendarTheme) {
+        let showBand = active && !allDayEvents.isEmpty
+        allDayBand.isHidden = !showBand
+        if showBand {
+            allDayBand.configure(events: allDayEvents, theme: theme)
+        }
+        timelineTopBelowRule?.isActive = !showBand
+        timelineTopBelowBand?.isActive = showBand
+        // Collapse the band's top gap when hidden so it claims no vertical space.
+        allDayBandTop?.constant = showBand ? Spacing.md : 0
     }
 
     override func layoutSubviews() {
@@ -252,9 +348,10 @@ final class DayPageCell: UICollectionViewCell {
         let isToday = Calendar.current.isDateInToday(date)
         switch mode {
         case .timeline:
-            if isToday { return String(localized: "calendar.timeline.heading.today") }
-            let formatted = date.formatted(.dateTime.weekday().day().month(.abbreviated))
-            return String(format: String(localized: "calendar.timeline.heading.other"), formatted)
+            // Constant "Schedule" heading — the nav bar already carries the date,
+            // so the timeline body heading is a stable section label (per spec),
+            // not a duplicate date.
+            return String(localized: "calendar.timeline.heading", defaultValue: "Schedule")
         case .list:
             if isToday { return String(localized: "calendar.list.heading.today") }
             let formatted = date.formatted(.dateTime.weekday().day().month(.abbreviated))

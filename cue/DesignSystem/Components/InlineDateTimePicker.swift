@@ -22,6 +22,18 @@ enum DateTimePickerMode {
     case dateAndTime
 }
 
+/// How a `InlineDateTimePicker` paints itself.
+enum InlineDateTimePickerStyle {
+    /// The standalone recessed well: a `surfaceSunken` fill with a hairline edge
+    /// (clay while open), and an uppercased `.label` eyebrow. The default — used
+    /// when the picker sits directly on the page canvas.
+    case well
+    /// A flush in-card row: NO fill and NO border (so it doesn't read as a
+    /// card-in-card), with the label as a body-size row title (not an uppercased
+    /// eyebrow). Used when the picker lives inside an existing white `CueCard`.
+    case flush
+}
+
 /// An inline expandable date/time well styled to Clean. The collapsed row shows
 /// an `.label` eyebrow and the value as mono receipt text (`.code`); tapping it
 /// expands the well to reveal a graphical (date) or wheel (time) `DatePicker`.
@@ -34,19 +46,25 @@ struct InlineDateTimePicker: View {
     private let label: String
     @Binding private var date: Date
     private let mode: DateTimePickerMode
+    private let style: InlineDateTimePickerStyle
 
     /// - Parameters:
     ///   - label: the eyebrow label on the collapsed row.
     ///   - date: the bound date/time value.
     ///   - mode: which components are editable (default `.dateAndTime`).
+    ///   - style: the chrome treatment — the recessed `.well` (default) or a
+    ///     `.flush` in-card row with no fill/border and a body-size title. The
+    ///     default keeps every existing call site byte-for-byte unchanged.
     init(
         label: String,
         date: Binding<Date>,
-        mode: DateTimePickerMode = .dateAndTime
+        mode: DateTimePickerMode = .dateAndTime,
+        style: InlineDateTimePickerStyle = .well
     ) {
         self.label = label
         self._date = date
         self.mode = mode
+        self.style = style
     }
 
     private var shape: RoundedRectangle {
@@ -82,14 +100,33 @@ struct InlineDateTimePicker: View {
                 Divider()
                     .overlay(theme.separator)
                 picker
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.bottom, Spacing.md)
+                    .padding(.horizontal, style == .flush ? 0 : Spacing.md)
+                    .padding(.bottom, style == .flush ? 0 : Spacing.md)
             }
         }
-        .background(shape.fill(theme.surfaceSunken))
-        .overlay(shape.strokeBorder(isExpanded ? theme.primary : theme.border, lineWidth: 1))
+        // `.flush` paints no fill/border (it lives inside an existing card, so a
+        // well here would read as a card-in-card); `.well` keeps the recessed
+        // surfaceSunken card with its hairline edge that deepens to clay while open.
+        .background(wellBackground)
+        .overlay(wellBorder)
         .clipShape(shape)
         .animation(.easeOut(duration: 0.16), value: isExpanded)
+    }
+
+    /// The recessed `surfaceSunken` fill for `.well`; none for `.flush`.
+    @ViewBuilder
+    private var wellBackground: some View {
+        if style == .well {
+            shape.fill(theme.surfaceSunken)
+        }
+    }
+
+    /// The hairline edge (clay while open) for `.well`; none for `.flush`.
+    @ViewBuilder
+    private var wellBorder: some View {
+        if style == .well {
+            shape.strokeBorder(isExpanded ? theme.primary : theme.border, lineWidth: 1)
+        }
     }
 
     private var collapsedRow: some View {
@@ -97,9 +134,7 @@ struct InlineDateTimePicker: View {
             isExpanded.toggle()
         } label: {
             HStack(spacing: Spacing.sm) {
-                Text(label.uppercased())
-                    .cueText(.label)
-                    .foregroundStyle(theme.textSecondary)
+                rowLabel
                 Spacer()
                 Text(receipt)
                     .cueText(.code)
@@ -110,10 +145,29 @@ struct InlineDateTimePicker: View {
                     .rotationEffect(.degrees(isExpanded ? 180 : 0))
             }
             .padding(.vertical, Spacing.md)
-            .padding(.horizontal, Spacing.md)
+            // `.flush` defers to the host card's own horizontal padding (no inner
+            // inset); `.well` keeps its own padding as a standalone card.
+            .padding(.horizontal, style == .flush ? 0 : Spacing.md)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// The collapsed-row label: an uppercased `.label` eyebrow for `.well`, or a
+    /// body-size primary row title for `.flush` (matching the design's flat
+    /// in-card "Starts" row, not a card-in-card eyebrow).
+    @ViewBuilder
+    private var rowLabel: some View {
+        switch style {
+        case .well:
+            Text(label.uppercased())
+                .cueText(.label)
+                .foregroundStyle(theme.textSecondary)
+        case .flush:
+            Text(label)
+                .cueText(.body)
+                .foregroundStyle(theme.textPrimary)
+        }
     }
 
     @ViewBuilder

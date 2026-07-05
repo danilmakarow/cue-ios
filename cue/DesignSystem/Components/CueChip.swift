@@ -9,6 +9,18 @@
 
 import SwiftUI
 
+/// How a `CueChip` paints its SELECTED state.
+///
+/// - `accent`: the default clay WASH (`accentSoft` + `accentText`, no border) —
+///   the semantic "this option is chosen" treatment.
+/// - `neutral`: a gray selection (`fillSelected` + `textPrimary`) for a
+///   NON-semantic picker (e.g. a persona/preset switcher) where clay would
+///   over-signal. The unselected look is identical to `.accent`.
+enum CueChipSelection {
+    case accent
+    case neutral
+}
+
 /// A selectable chip. Selection is carried by *fill + ink*, not a separate
 /// indicator dot: unselected reads as a neutral gray chip (`surfaceSunken` fill +
 /// 1px functional border + muted `textSecondary` ink); selected flips to a clay
@@ -20,17 +32,28 @@ struct CueChip: View {
     private let title: String
     private let systemImage: String?
     private let isSelected: Bool
+    private let selection: CueChipSelection
     private let action: () -> Void
 
+    /// - Parameters:
+    ///   - title: the chip label.
+    ///   - systemImage: an optional leading SF Symbol.
+    ///   - isSelected: whether the chip is currently chosen.
+    ///   - selection: the selected-state treatment — `.accent` (clay wash,
+    ///     default) for a semantic choice, `.neutral` (gray) for a non-semantic
+    ///     picker. Defaults to `.accent` so existing callers are unchanged.
+    ///   - action: invoked on tap.
     init(
         _ title: String,
         systemImage: String? = nil,
         isSelected: Bool,
+        selection: CueChipSelection = .accent,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.systemImage = systemImage
         self.isSelected = isSelected
+        self.selection = selection
         self.action = action
     }
 
@@ -43,7 +66,7 @@ struct CueChip: View {
                 Text(title)
             }
         }
-        .buttonStyle(CueChipStyle(isSelected: isSelected))
+        .buttonStyle(CueChipStyle(isSelected: isSelected, selection: selection))
         .animation(.easeOut(duration: 0.16), value: isSelected)
     }
 }
@@ -57,19 +80,36 @@ private struct CueChipStyle: ButtonStyle {
     @Environment(\.theme) private var theme
 
     let isSelected: Bool
+    let selection: CueChipSelection
 
     private var shape: RoundedRectangle {
         RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+    }
+
+    /// The ink color for the current state — selected ink depends on the
+    /// selection style (clay `accentText` vs neutral `textPrimary`).
+    private var inkColor: Color {
+        guard isSelected else { return theme.textSecondary }
+        return selection == .neutral ? theme.textPrimary : theme.accentText
+    }
+
+    /// The resting fill — selected fill depends on the selection style (clay
+    /// `accentSoft` wash vs neutral `fillSelected` gray).
+    private var fillColor: Color {
+        // Unselected resting chip is WHITE (`theme.surface`) so the 1px functional
+        // border defines it; selected states (clay wash / neutral gray) unchanged.
+        guard isSelected else { return theme.surface }
+        return selection == .neutral ? theme.fillSelected : theme.accentSoft
     }
 
     func makeBody(configuration: Configuration) -> some View {
         let pressed = configuration.isPressed
         return configuration.label
             .cueText(.label)
-            .foregroundStyle(isSelected ? theme.accentText : theme.textSecondary)
+            .foregroundStyle(inkColor)
             .padding(.vertical, Spacing.xs + 2)
             .padding(.horizontal, Spacing.sm + 2)
-            .background(shape.fill(isSelected ? theme.accentSoft : theme.surfaceSunken))
+            .background(shape.fill(fillColor))
             // One-step fill darken on press — a subtle scrim over whichever resting
             // fill is showing, mirroring CueButtonStyle's darker-pressed fill.
             .overlay(shape.fill(Color.black.opacity(pressed ? 0.05 : 0)))

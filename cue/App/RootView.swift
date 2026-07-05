@@ -58,11 +58,18 @@ struct RootView: View {
 private struct MainTabs: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(NotificationStore.self) private var notifications
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     let user: UserDTO
     /// The shared calendar store, owned here so the Today and Calendar tabs read
     /// the *same* instance from the environment — a completion on Today bumps the
     /// store revision the UIKit calendar observes, so both surfaces stay in sync.
     @State private var store: CalendarStore
+    /// The periodic foreground sync heartbeat. Owned here (not in the Calendar tab)
+    /// so it runs for the whole authenticated session regardless of which tab is
+    /// selected — the tab-gated placement in `CalendarHostView` never fired until
+    /// the user first opened the Calendar tab.
+    @State private var heartbeat = SyncHeartbeat()
 
     init(user: UserDTO) {
         self.user = user
@@ -80,11 +87,6 @@ private struct MainTabs: View {
             }
             Tab(AppTab.calendar.titleKey, systemImage: AppTab.calendar.systemImage, value: AppTab.calendar) {
                 CalendarHostView(user: user)
-            }
-            Tab(AppTab.dashboard.titleKey, systemImage: AppTab.dashboard.systemImage, value: AppTab.dashboard) {
-                NavigationStack {
-                    DashboardView()
-                }
             }
             Tab(AppTab.settings.titleKey, systemImage: AppTab.settings.systemImage, value: AppTab.settings) {
                 NavigationStack {
@@ -118,11 +120,33 @@ private struct MainTabs: View {
             presenting
         }
         .environment(store)
-        .task { store.bind(notifications: notifications) }
+        .task {
+            store.bind(notifications: notifications)
+            // Cold-launch kick: run the delta once (the default Today tab otherwise
+            // never triggers it), then start the periodic heartbeat.
+            store.refreshIfStale(context: modelContext, wasBackgrounded: true)
+            heartbeat.start(store: store, context: modelContext)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .active:
+                store.refreshIfStale(context: modelContext, wasBackgrounded: true)
+                heartbeat.start(store: store, context: modelContext)
+            case .inactive, .background:
+                heartbeat.stop()
+            @unknown default:
+                break
+            }
+        }
         .sheet(isPresented: $navigation.isPresentingNewEvent) {
             NavigationStack {
                 NewEventScreen()
             }
+            // A `.sheet` presents in a detached environment branch, so the
+            // `CalendarStore` injected on the tab view above is NOT inherited by
+            // the sheet content. Re-inject it explicitly — `NewEventScreen` reads
+            // `@Environment(CalendarStore.self)` and traps without it.
+            .environment(store)
         }
         // Global "Search" sheet — mirrors the New Event sheet. Driven by
         // `AppNavigation.isPresentingSearch`, which the Calendar nav-bar search

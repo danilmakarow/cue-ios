@@ -45,7 +45,7 @@ struct QuickCreateWell: View {
 
     private var inputRow: some View {
         HStack(spacing: Spacing.sm) {
-            Image(systemName: "wand.and.stars")
+            Image(systemName: "square.and.pencil")
                 .font(.system(size: 16, weight: .regular))
                 .foregroundStyle(theme.textSecondary)
             TextField(text: $text) {
@@ -119,10 +119,10 @@ struct QuickCreateWell: View {
     private func draftChips(_ draft: TaskDraftDTO) -> [PreviewChip] {
         var chips: [PreviewChip] = [PreviewChip(symbol: "textformat", text: draft.title)]
         if let start = draft.start, let date = Self.parseISO(start) {
-            chips.append(PreviewChip(symbol: "calendar", text: date.formatted(.dateTime.day().month(.abbreviated).hour().minute())))
+            chips.append(PreviewChip(symbol: "calendar", text: date.formatted(.dateTime.day().month(.abbreviated).hour().minute()), isMono: true))
         }
         if let minutes = draft.durationMinutes {
-            chips.append(PreviewChip(symbol: "timer", text: Self.durationLabel(minutes)))
+            chips.append(PreviewChip(symbol: "timer", text: Self.durationLabel(minutes), isMono: true))
         }
         if draft.recurrence != nil {
             chips.append(PreviewChip(symbol: "repeat", text: String(localized: "quickCreate.chip.repeats")))
@@ -180,12 +180,20 @@ private struct PreviewChip: Identifiable, Hashable {
     let id = UUID()
     let symbol: String
     let text: String
+    /// Renders the chip label in JetBrains Mono (times / durations / receipts);
+    /// sans otherwise.
+    var isMono: Bool = false
 }
 
 /// Wrapping row of small summary chips.
 private struct FlowChips: View {
     @Environment(\.theme) private var theme
     let chips: [PreviewChip]
+
+    /// The parsed-draft preview chips use the design's sharper 4px corner
+    /// (`--radius` small in the spec) — between the 2pt `Radius.tight` and the
+    /// 8pt `Radius.chip` tokens, so it's a local literal.
+    private let previewChipRadius: CGFloat = 4
 
     var body: some View {
         FlowLayout(spacing: Spacing.xs) {
@@ -194,18 +202,18 @@ private struct FlowChips: View {
                     Image(systemName: chip.symbol)
                         .font(.system(size: 11, weight: .regular))
                     Text(chip.text)
-                        .cueText(.caption)
+                        .cueText(chip.isMono ? .codeSmall : .caption)
                         .lineLimit(1)
                 }
                 .foregroundStyle(theme.textPrimary)
                 .padding(.horizontal, Spacing.sm)
                 .padding(.vertical, Spacing.xs)
                 .background(
-                    RoundedRectangle(cornerRadius: Radius.tight, style: .continuous)
+                    RoundedRectangle(cornerRadius: previewChipRadius, style: .continuous)
                         .fill(theme.surfaceSunken)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: Radius.tight, style: .continuous)
+                    RoundedRectangle(cornerRadius: previewChipRadius, style: .continuous)
                         .strokeBorder(theme.border, lineWidth: 1)
                 )
             }

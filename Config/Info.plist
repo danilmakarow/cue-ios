@@ -69,6 +69,8 @@
 	</array>
 	<key>UIAppFonts</key>
 	<array>
+		<string>SourceSerif4-Semibold.ttf</string>
+		<string>SourceSerif4-Bold.ttf</string>
 		<string>IBMPlexSerif-Regular.ttf</string>
 		<string>IBMPlexSerif-Medium.ttf</string>
 		<string>IBMPlexSerif-SemiBold.ttf</string>

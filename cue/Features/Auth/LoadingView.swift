@@ -20,7 +20,8 @@ struct LoadingView: View {
                 BrandMark(size: 96)
 
                 Text(verbatim: "Cue")
-                    .font(.custom(Typography.serifFamily, size: 46, relativeTo: .largeTitle).weight(.semibold))
+                    .font(.custom(Typography.serifFamily, size: 46, relativeTo: .largeTitle))
+                    .tracking(-1)
                     .foregroundStyle(theme.textPrimary)
 
                 ProgressView()

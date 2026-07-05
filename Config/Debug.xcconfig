@@ -10,5 +10,7 @@
 
 #include "Shared.xcconfig"
 
+// TEMP (local UI testing — revert before commit): point at the running local cue-api.
+//API_BASE_URL = http:/$()/localhost:3000
 API_BASE_URL = http:/$()/cue.ngrok.app
 //API_BASE_URL = https:/$()/cue-api.makarov.my

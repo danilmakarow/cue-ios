@@ -74,6 +74,24 @@ final class PersonaStore {
         self.notifications = notifications
     }
 
+    #if DEBUG
+    /// Debug/test-only: builds a store already in `.loaded` with a concrete active
+    /// persona and preset list, skipping the async `load()` entirely. Snapshot
+    /// tests inject this via `PersonaEditorView(store:)` so the editor renders its
+    /// settled content synchronously — no `URLProtocol` stub, no settle timing.
+    /// Compiled out of release builds.
+    static func previewLoaded(
+        active: PersonaSettingsDTO,
+        presets: [PersonaPresetDTO]
+    ) -> PersonaStore {
+        let store = PersonaStore()
+        store.active = active
+        store.presets = presets
+        store.loadState = .loaded
+        return store
+    }
+    #endif
+
     // MARK: Derived
 
     /// Whether the active persona is a read-only preset (vs. an editable custom

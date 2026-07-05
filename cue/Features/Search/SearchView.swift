@@ -88,7 +88,7 @@ struct SearchView: View {
     private var searchField: some View {
         HStack(spacing: Spacing.sm) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(theme.primary)
 
             TextField(
@@ -101,6 +101,7 @@ struct SearchView: View {
             .submitLabel(.search)
             .autocorrectionDisabled()
             .textInputAutocapitalization(.never)
+            .accessibilityIdentifier("search.field")
             .onSubmit { commitRecent(query) }
 
             if !query.isEmpty {
@@ -137,7 +138,6 @@ struct SearchView: View {
                     }
                 }
             }
-            .padding(.horizontal, Spacing.xxs)
         }
         .scrollClipDisabled()
     }
@@ -241,10 +241,8 @@ struct SearchView: View {
             }
             .padding(Spacing.lg)
         }
-        .overlay {
-            InlineLoadingRow(label: String(localized: "search.loading", defaultValue: "Searching…"))
-        }
         .disabled(true)
+        .loadingOverlay(true, label: String(localized: "search.loading", defaultValue: "Filtering…"))
     }
 
     // MARK: Results
@@ -289,6 +287,12 @@ struct SearchView: View {
     @ViewBuilder
     private var noResultsView: some View {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Resolve the CTA label through the catalog (with an inline default) and
+        // pass it verbatim, so the empty state never renders a bare key.
+        let clearFilterTitle = String(
+            localized: "search.noResults.clearFilter",
+            defaultValue: "Clear filter"
+        )
         EmptyStateView(
             title: String(
                 localized: "search.noResults.title",
@@ -303,7 +307,7 @@ struct SearchView: View {
             systemImage: "magnifyingglass",
             actionTitle: selectedGroupId == nil
                 ? nil
-                : LocalizedStringKey("Clear filter"),
+                : LocalizedStringKey("\(clearFilterTitle)"),
             action: selectedGroupId == nil ? nil : { selectedGroupId = nil }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -313,8 +317,11 @@ struct SearchView: View {
 
     @ViewBuilder
     private func sectionEyebrow(_ title: String) -> some View {
-        Text(title.uppercased())
-            .cueText(.label)
+        // The design HTML forces `text-transform:uppercase` on the mono eyebrow;
+        // apply at the call-site per repo convention (string value stays title-case).
+        Text(title)
+            .cueText(.codeSmall)
+            .textCase(.uppercase)
             .foregroundStyle(theme.textSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Spacing.lg)
@@ -432,7 +439,7 @@ private struct SearchResultRow: View {
                             .accessibilityLabel(Text(String(localized: "search.recurring", defaultValue: "Repeats")))
                     }
                     Text(hit.title)
-                        .cueText(.headline)
+                        .cueText(.titleM)
                         .foregroundStyle(theme.textPrimary)
                         .lineLimit(1)
                 }

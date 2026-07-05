@@ -6,7 +6,8 @@
 //  docs/specs/design-tokens.md.
 //
 //  Three voices, each with one job (CUE — Clean):
-//    • Display — IBM Plex Serif (bundled). The editorial, upright slab serif.
+//    • Display — Source Serif 4 Bold (bundled). A strict, austere, upright serif
+//      with few flourishes (replaced IBM Plex Serif for a more serious voice).
 //      LARGE-SCREEN TITLES ONLY (display-L / display-M — app name, big screen
 //      titles / page H1); never section headers, row labels, or body. Section /
 //      card / row titles (title-L, title-M, headline) render in the system sans.
@@ -18,8 +19,10 @@
 //      stamps, eyebrow micro-labels — the "recorded by the system" voice.
 //
 //  Swapping the serif/mono face later is a one-line edit (`serifFamily` /
-//  `monoFamily`). Both are bundled in cue/Resources/Fonts and registered in
-//  Config/Info.plist. Body uses the system font (no bundle needed).
+//  `monoFamily`). Both are bundled in cue/Resources/Fonts (Source Serif 4 +
+//  JetBrains Mono) and registered in Config/Info.plist. `serifFamily` is the exact
+//  PostScript name of the display face, not a family name. Body uses the system
+//  font (no bundle needed).
 //
 
 import SwiftUI
@@ -57,9 +60,15 @@ enum TextRole {
 }
 
 enum Typography {
-    /// The bundled display family. One place to swap the serif face.
-    /// Resolves to the system serif until the font registers (graceful).
-    static let serifFamily = "IBM Plex Serif"
+    /// The bundled display face — Source Serif 4 Bold, by its exact PostScript
+    /// name (the strict, austere serif used for large screen titles). One place to
+    /// swap the serif face. Resolves to the system serif until the font registers.
+    static let serifFamily = "SourceSerif4-Bold"
+
+    /// The bundled Source Serif 4 SemiBold PostScript name — the lighter display
+    /// weight, for secondary display roles that want the serif voice a touch less
+    /// heavy. Falls back to the system serif until the font registers.
+    static let serifSemiboldFamily = "SourceSerif4-Semibold"
 
     /// The bundled monospace family — JetBrains Mono (receipts / IDs / dates /
     /// eyebrow micro-labels). Full Cyrillic coverage.
@@ -71,9 +80,9 @@ enum Typography {
     static func font(for role: TextRole) -> Font {
         switch role {
         case .displayL:
-            return serif(34, relativeTo: .largeTitle).weight(.semibold)
+            return serif(34, relativeTo: .largeTitle)
         case .displayM:
-            return serif(27, relativeTo: .title).weight(.semibold)
+            return serif(27, relativeTo: .title)
         case .titleL:
             return .system(.title2).weight(.medium)          // 22pt sans
         case .titleM:
@@ -97,10 +106,11 @@ enum Typography {
         }
     }
 
-    /// Letter-spacing per role (points). Display reads tighter; receipts read wider.
+    /// Letter-spacing per role (points). Display reads tight and strict; receipts
+    /// read wider.
     static func tracking(for role: TextRole) -> CGFloat {
         switch role {
-        case .displayL, .displayM: return -0.4
+        case .displayL, .displayM: return -0.7
         case .titleL, .titleM: return -0.2
         case .label: return 0.3
         case .code: return 0.2
@@ -109,7 +119,7 @@ enum Typography {
         }
     }
 
-    /// An IBM Plex Serif font at `size`, scaling with Dynamic Type relative to
+    /// A Source Serif 4 Bold font at `size`, scaling with Dynamic Type relative to
     /// `style`. Falls back to the system serif when the custom font is unavailable.
     private static func serif(_ size: CGFloat, relativeTo style: Font.TextStyle) -> Font {
         .custom(serifFamily, size: size, relativeTo: style)

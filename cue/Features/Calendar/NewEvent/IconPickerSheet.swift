@@ -171,7 +171,7 @@ struct IconPickerButton: View {
         Button {
             isPresenting = true
         } label: {
-            Image(systemName: selection ?? "face.smiling")
+            Image(systemName: selection ?? "briefcase")
                 .font(.system(size: 18, weight: .regular))
                 .foregroundStyle(selection == nil ? theme.textSecondary : theme.accentText)
                 .frame(width: 44, height: 44)

@@ -8,6 +8,11 @@ import SwiftUI
 
 /// Modal sheet for creating or editing a task group. Handles
 /// `POST /task-groups` (create) and `PATCH /task-groups/:id` (update).
+///
+/// CUE — Clean layout: a scrolling stack of flush sections — DETAILS (name),
+/// COLOR (swatch rail), ICON (search + grid), a requires-completion toggle, and
+/// the inline-expanding Repeat card (shared `InlineRecurrencePanel`) — over the
+/// sheet canvas, NOT a grouped `Form`. Mirrors the rebuilt Event Edit screen.
 struct GroupEditSheet: View {
     /// Nil → create; non-nil → edit.
     let existingDTO: TaskGroupDTO?
@@ -35,6 +40,8 @@ struct GroupEditSheet: View {
     @State private var initialRecurrence: RecurrenceRuleInput?
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    /// Live filter query for the icon grid.
+    @State private var iconQuery: String = ""
 
     private var isEditing: Bool { existingDTO != nil }
     private let api: APIClient = .shared
@@ -59,69 +66,21 @@ struct GroupEditSheet: View {
     ]
 
     var body: some View {
-        Form {
-            Section {
-                TextField("groups.edit.name", text: $name)
-                    .textInputAutocapitalization(.words)
-            } header: {
-                Text("groups.edit.details")
-                    .cueText(.label)
-                    .textCase(nil)
-                    .foregroundStyle(theme.textSecondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.xl) {
+                detailsSection
+                colorSection
+                iconSection
+                requiresCompletionSection
+                repeatSection
             }
-
-            Section {
-                colorPicker
-            } header: {
-                Text("groups.edit.color")
-                    .cueText(.label)
-                    .textCase(nil)
-                    .foregroundStyle(theme.textSecondary)
-            }
-
-            Section {
-                iconPicker
-            } header: {
-                Text("groups.edit.icon")
-                    .cueText(.label)
-                    .textCase(nil)
-                    .foregroundStyle(theme.textSecondary)
-            }
-
-            Section {
-                HStack(spacing: Spacing.md) {
-                    Text("groups.edit.requiresCompletion")
-                        .cueText(.body)
-                        .foregroundStyle(theme.textPrimary)
-                    Spacer(minLength: 0)
-                    CueToggle(
-                        isOn: $requiresCompletion,
-                        accessibilityLabel: String(localized: "groups.edit.requiresCompletion")
-                    )
-                }
-                .listRowBackground(theme.surface)
-            } footer: {
-                Text("groups.edit.requiresCompletion.footnote")
-                    .cueText(.caption)
-                    .foregroundStyle(theme.textSecondary)
-            }
-
-            RecurrenceSection(recurrence: $recurrenceInput)
-
-            if recurrenceInput != nil {
-                Section {
-                    Label("groups.edit.recurrence.inheritNote", systemImage: "info.circle")
-                        .cueText(.caption)
-                        .foregroundStyle(theme.textSecondary)
-                }
-            }
+            .padding(.horizontal, Spacing.lg)
+            .padding(.top, Spacing.md)
+            .padding(.bottom, Spacing.xl)
         }
-        .scrollContentBackground(.hidden)
-        .background(theme.background.ignoresSafeArea())
-        .navigationTitle(isEditing
-            ? String(localized: "groups.edit.title.edit")
-            : String(localized: "groups.edit.title.create")
-        )
+        .scrollDismissesKeyboard(.interactively)
+        .background(theme.surfaceElevated.ignoresSafeArea())
+        .navigationTitle(navTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -129,6 +88,8 @@ struct GroupEditSheet: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button(String(localized: "common.save")) { performSave() }
+                    .fontWeight(.semibold)
+                    .tint(theme.primary)
                     .disabled(isSubmitting || name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
@@ -153,6 +114,107 @@ struct GroupEditSheet: View {
         .onAppear { populateFromDTO() }
     }
 
+    /// Nav title in SENTENCE case (sans — not flagged for serif), so the global
+    /// appearance leaves it as the system inline title.
+    private var navTitle: String {
+        isEditing
+            ? String(localized: "groups.edit.title.edit")
+            : String(localized: "groups.edit.title.create")
+    }
+
+    // MARK: - Sections
+
+    /// Details — eyebrow label + a single filled gray name well.
+    private var detailsSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            sectionHeader("groups.edit.details")
+            TextField("groups.edit.name", text: $name)
+                .textInputAutocapitalization(.words)
+                .cueText(.body)
+                .foregroundStyle(theme.textPrimary)
+                .tint(theme.primary)
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    theme.surfaceSunken,
+                    in: RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+                )
+        }
+    }
+
+    /// Color — eyebrow label + a horizontally-scrolling swatch rail.
+    private var colorSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            sectionHeader("groups.edit.color")
+            colorPicker
+        }
+    }
+
+    /// Icon — eyebrow label + a filled search field and the preset grid.
+    private var iconSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            sectionHeader("groups.edit.icon")
+            iconPicker
+        }
+    }
+
+    /// Requires-completion — toggle card + footnote caption (preserved from the
+    /// previous `Form`; not shown in the static design shot but kept editable so a
+    /// group's default-completion field still round-trips).
+    private var requiresCompletionSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            CueCard(padding: 0) {
+                HStack {
+                    Text("groups.edit.requiresCompletion")
+                        .cueText(.body)
+                        .foregroundStyle(theme.textPrimary)
+                    Spacer()
+                    CueToggle(
+                        isOn: $requiresCompletion,
+                        accessibilityLabel: String(localized: "groups.edit.requiresCompletion")
+                    )
+                }
+                .padding(.horizontal, Spacing.lg)
+                .padding(.vertical, Spacing.xs)
+                .frame(minHeight: 44)
+            }
+            Text("groups.edit.requiresCompletion.footnote")
+                .cueText(.caption)
+                .foregroundStyle(theme.textSecondary)
+                .padding(.horizontal, Spacing.xs)
+        }
+    }
+
+    /// Repeat — inline-expanding recurrence card (shared `InlineRecurrencePanel`),
+    /// replacing the old push-to-sheet `RecurrenceSection`. When the rule is on, an
+    /// inherit-note caption sits below.
+    private var repeatSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            InlineRecurrencePanel(recurrence: $recurrenceInput)
+            if recurrenceInput != nil {
+                HStack(alignment: .top, spacing: Spacing.sm) {
+                    Image(systemName: "info.circle")
+                        .cueText(.caption)
+                        .foregroundStyle(theme.textSecondary)
+                    Text("groups.edit.recurrence.inheritNote")
+                        .cueText(.caption)
+                        .foregroundStyle(theme.textSecondary)
+                }
+                .padding(.horizontal, Spacing.xs)
+            }
+        }
+    }
+
+    /// UPPERCASE eyebrow section header — system sans, matching Event Edit.
+    private func sectionHeader(_ key: LocalizedStringKey) -> some View {
+        Text(key)
+            .cueText(.label)
+            .textCase(.uppercase)
+            .foregroundStyle(theme.textSecondary)
+            .padding(.horizontal, Spacing.xs)
+    }
+
     // MARK: - Color picker
 
     private var colorPicker: some View {
@@ -165,15 +227,14 @@ struct GroupEditSheet: View {
                 }
             }
             .padding(.vertical, Spacing.xs)
+            .padding(.horizontal, Spacing.xs)
         }
-        .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg, bottom: Spacing.sm, trailing: Spacing.lg))
-        .listRowBackground(theme.surface)
     }
 
     /// One color swatch. `hex == nil` is the "no color" option, drawn as a
-    /// hollow paper chip; otherwise the persisted token resolves to its ink via
+    /// hollow chip; otherwise the persisted token resolves to its ink via
     /// `TaskColorResolver` (handles preset names and `#RRGGBB` hex). Selection is
-    /// marked with an espresso ring (primary).
+    /// marked with a clay ring (primary). Wrapped in a 44pt tap target.
     private func colorSwatch(hex: String?) -> some View {
         let isSelected = colorHex == hex
         let fill = TaskColorResolver.color(from: hex)
@@ -201,6 +262,8 @@ struct GroupEditSheet: View {
                             .padding(-4)
                     }
                 }
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
     }
@@ -208,17 +271,58 @@ struct GroupEditSheet: View {
     // MARK: - Icon picker
 
     private var iconPicker: some View {
-        LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 6), spacing: Spacing.md) {
-            ForEach(iconOptions, id: \.self) { symbolName in
-                iconSwatch(symbolName: symbolName)
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "magnifyingglass")
+                    .cueText(.callout)
+                    .foregroundStyle(theme.textSecondary)
+                TextField(
+                    String(localized: "groups.edit.icon.search", defaultValue: "Search icons"),
+                    text: $iconQuery
+                )
+                .cueText(.body)
+                .foregroundStyle(theme.textPrimary)
+                .tint(theme.primary)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            }
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.sm)
+            .background(
+                theme.surfaceSunken,
+                in: RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+                    .strokeBorder(theme.border, lineWidth: 1)
+            )
+
+            if filteredIcons.isEmpty {
+                Text(String(localized: "groups.edit.icon.noMatch", defaultValue: "No icons match"))
+                    .cueText(.caption)
+                    .foregroundStyle(theme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, Spacing.md)
+            } else {
+                LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 6), spacing: Spacing.md) {
+                    ForEach(filteredIcons, id: \.self) { symbolName in
+                        iconSwatch(symbolName: symbolName)
+                    }
+                }
             }
         }
-        .padding(.vertical, Spacing.xs)
-        .listRowBackground(theme.surface)
     }
 
-    /// One icon tile. Selected → espresso fill with cream glyph; unselected →
-    /// a paper sheet tile with a functional border and ink glyph.
+    /// Icon presets filtered by the live search query (matches against the SF
+    /// Symbol name). An empty query shows the full preset set.
+    private var filteredIcons: [String] {
+        let trimmed = iconQuery.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !trimmed.isEmpty else { return iconOptions }
+        return iconOptions.filter { $0.lowercased().contains(trimmed) }
+    }
+
+    /// One icon tile. Selected → clay fill with white glyph; unselected →
+    /// a white tile with a functional border and ink glyph.
     private func iconSwatch(symbolName: String) -> some View {
         let isSelected = icon == symbolName
         return Button {
@@ -226,13 +330,13 @@ struct GroupEditSheet: View {
         } label: {
             Image(systemName: symbolName)
                 .font(.title3)
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
                 .background(
                     isSelected ? theme.primary : theme.surface,
-                    in: RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
+                    in: RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
+                    RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
                         .strokeBorder(isSelected ? Color.clear : theme.border, lineWidth: 1)
                 )
                 .foregroundStyle(isSelected ? theme.onAccent : theme.textSecondary)
@@ -256,6 +360,8 @@ struct GroupEditSheet: View {
                 byWeekday: rule.byWeekday,
                 byMonthDay: rule.byMonthDay,
                 byMonth: rule.byMonth,
+                bySetPos: rule.bySetPos,
+                monthlyAnchor: rule.monthlyAnchor,
                 endType: rule.endType,
                 endDate: rule.endDate,
                 count: rule.count

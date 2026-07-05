@@ -219,8 +219,36 @@ struct APIClient: Sendable {
         self.encoder = encoder
 
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        // Accept BOTH fractional ("…000Z") and whole-second ("…Z") ISO-8601.
+        // The stock `.iso8601` strategy rejects fractional seconds, but the
+        // backend emits millisecond precision on some timestamps (e.g. a
+        // completion's `completedAt`), which would otherwise fail the whole
+        // response decode. This lenient parser kills that asymmetry class-wide.
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let raw = try container.decode(String.self)
+            guard let date = Self.isoDate(from: raw) else {
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Invalid ISO-8601 date: \(raw)"
+                )
+            }
+            return date
+        }
         self.decoder = decoder
+    }
+
+    /// Parses an ISO-8601 timestamp accepting both fractional-second
+    /// (`2026-06-02T14:00:00.000Z`) and whole-second (`2026-06-02T14:00:00Z`)
+    /// forms — the backend uses both depending on the field.
+    nonisolated private static func isoDate(from raw: String) -> Date? {
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = withFraction.date(from: raw) { return date }
+
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+        return plain.date(from: raw)
     }
 
     /// GETs a decodable resource from the given relative path.

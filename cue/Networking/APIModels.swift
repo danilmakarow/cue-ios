@@ -97,7 +97,13 @@ nonisolated enum MonthlyAnchorMode: String, Codable, CaseIterable, Sendable {
 /// Server representation of a recurrence rule — embedded in `TaskDTO.recurrence`
 /// and `TaskGroupDTO.recurrence`.
 struct RecurrenceRuleDTO: Codable, Sendable, Hashable {
-    let id: String
+    /// The former recurrence-rule row id. Now OPTIONAL: recurrence is stored inline
+    /// as JSONB (backend ADR 0054), so the backend's `RecurrenceConfigDTO` no longer
+    /// emits an `id`. A required `id` here made `JSONDecoder` throw `keyNotFound(.id)`
+    /// on the `recurrence` object of every recurring task's `GET /tasks/:id` — which
+    /// silently failed the whole `TaskDTO` decode and made recurring tasks appear
+    /// un-editable. Nothing reads this field; it is kept only for wire-compat.
+    let id: String?
     let frequency: RecurrenceFrequency
     /// >= 1
     let interval: Int
@@ -215,6 +221,16 @@ struct TaskDTO: Codable, Identifiable, Sendable, Hashable {
     /// Decodes an absent key as an empty array.
     let reminders: [ReminderDTO]
     let notificationStrategyId: String?
+    /// Non-nil when this task is a materialized override child — the recurring
+    /// parent's id. A child carries no recurrence rule of its own.
+    let parentTaskId: String?
+    /// RECURRENCE-ID: the pre-override generated instant this child replaces.
+    let originalStartAt: Date?
+    /// Set when the parent rule no longer generates this child's original slot.
+    let detachedAt: Date?
+    /// Bumped when the task's effective-rule inputs change; the delta client uses
+    /// `recurrenceUpdatedAt > since` as its "re-expansion needed" discriminator.
+    let recurrenceUpdatedAt: Date?
     let createdAt: Date
     let updatedAt: Date
 
@@ -222,6 +238,7 @@ struct TaskDTO: Codable, Identifiable, Sendable, Hashable {
         case id, calendarId, groupId, title, notes, startAt, endAt, isAllDay
         case timezone, requiresCompletion, color, icon, completedAt
         case recurrenceRuleId, recurrence, reminders, notificationStrategyId
+        case parentTaskId, originalStartAt, detachedAt, recurrenceUpdatedAt
         case createdAt, updatedAt
     }
 
@@ -244,6 +261,10 @@ struct TaskDTO: Codable, Identifiable, Sendable, Hashable {
         recurrence = try container.decodeIfPresent(RecurrenceRuleDTO.self, forKey: .recurrence)
         reminders = try container.decodeIfPresent([ReminderDTO].self, forKey: .reminders) ?? []
         notificationStrategyId = try container.decodeIfPresent(String.self, forKey: .notificationStrategyId)
+        parentTaskId = try container.decodeIfPresent(String.self, forKey: .parentTaskId)
+        originalStartAt = try container.decodeIfPresent(Date.self, forKey: .originalStartAt)
+        detachedAt = try container.decodeIfPresent(Date.self, forKey: .detachedAt)
+        recurrenceUpdatedAt = try container.decodeIfPresent(Date.self, forKey: .recurrenceUpdatedAt)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
@@ -288,11 +309,20 @@ struct OccurrenceDTO: Codable, Sendable {
     let completedAt: Date?
     let isRecurring: Bool
     let isException: Bool
+    /// Non-nil when this occurrence is a materialized override of a recurring
+    /// series — the parent task's id. `taskId` is then the CHILD's id, so
+    /// completion / edit / delete address the child directly. Defaulted so the
+    /// `TaskDTO`-derived synthesis in `TaskItem+Mapping` stays source-compatible.
+    var parentTaskId: String? = nil
+    /// True when this override child's parent rule no longer generates its
+    /// original slot. Defaulted for the same source-compat reason.
+    var isDetached: Bool = false
 
     private enum CodingKeys: String, CodingKey {
         case taskId, calendarId, groupId, groupColorHex, originalStart
         case occurrenceStart, occurrenceEnd, title, notes, isAllDay, timezone
         case requiresCompletion, color, icon, completedAt, isRecurring, isException
+        case parentTaskId, isDetached
     }
 
     init(from decoder: Decoder) throws {
@@ -314,6 +344,8 @@ struct OccurrenceDTO: Codable, Sendable {
         completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
         isRecurring = try container.decode(Bool.self, forKey: .isRecurring)
         isException = try container.decode(Bool.self, forKey: .isException)
+        parentTaskId = try container.decodeIfPresent(String.self, forKey: .parentTaskId)
+        isDetached = try container.decodeIfPresent(Bool.self, forKey: .isDetached) ?? false
     }
 
     /// Memberwise initializer retained so callers (e.g. `TaskItem+Mapping`'s
@@ -336,7 +368,9 @@ struct OccurrenceDTO: Codable, Sendable {
         icon: String? = nil,
         completedAt: Date?,
         isRecurring: Bool,
-        isException: Bool
+        isException: Bool,
+        parentTaskId: String? = nil,
+        isDetached: Bool = false
     ) {
         self.taskId = taskId
         self.calendarId = calendarId
@@ -355,6 +389,8 @@ struct OccurrenceDTO: Codable, Sendable {
         self.completedAt = completedAt
         self.isRecurring = isRecurring
         self.isException = isException
+        self.parentTaskId = parentTaskId
+        self.isDetached = isDetached
     }
 }
 
@@ -394,6 +430,12 @@ struct UpdateTaskRequest: Encodable, Sendable {
     var isAllDay: Bool?
     var requiresCompletion: Bool?
     var groupId: String?
+    /// Per-task color: a `TaskColor` preset name (e.g. "BLUE") or a `#RRGGBB` hex.
+    /// A ``FieldUpdate`` so the edit screen can distinguish "leave the color alone"
+    /// (`.unchanged`) from "clear it so the group color is inherited" (`.clear` →
+    /// explicit JSON `null`) versus "set it" (`.set`). Mirrors the backend's
+    /// `UpdateTaskDto.color?: string | null` tri-state.
+    var color: FieldUpdate<String> = .unchanged
     /// Per-task icon. A ``FieldUpdate`` so the edit screen can distinguish "leave
     /// the icon alone" (`.unchanged`) from "remove it" (`.clear` → explicit JSON
     /// `null`) versus "set it" (`.set`).
@@ -407,7 +449,7 @@ struct UpdateTaskRequest: Encodable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case title, notes, startAt, endAt, isAllDay, requiresCompletion, groupId
-        case icon, reminders, recurrence
+        case color, icon, reminders, recurrence
     }
 
     func encode(to encoder: Encoder) throws {
@@ -419,9 +461,53 @@ struct UpdateTaskRequest: Encodable, Sendable {
         try container.encodeIfPresent(isAllDay, forKey: .isAllDay)
         try container.encodeIfPresent(requiresCompletion, forKey: .requiresCompletion)
         try container.encodeIfPresent(groupId, forKey: .groupId)
+        try color.encode(into: &container, forKey: .color)
         try icon.encode(into: &container, forKey: .icon)
         try container.encodeIfPresent(reminders, forKey: .reminders)
         try recurrence.encode(into: &container, forKey: .recurrence)
+    }
+}
+
+/// Request payload for `POST /tasks/:id/occurrences/override` — materializes an
+/// editable override child for one occurrence of a recurring series.
+///
+/// `originalStart` identifies which generated occurrence to override and MUST be a
+/// fractional-seconds ISO string (built via `CalendarStore.isoFractional`) to
+/// match the backend's sub-second occurrence key — same rationale as
+/// `SetCompletionRequest.occurrenceStart`. The remaining fields are the patch
+/// applied on top of the parent snapshot; `color`/`icon` are ``FieldUpdate``
+/// tri-states (omit = inherit the parent, `.clear` = explicit null, `.set` = set).
+struct CreateOccurrenceOverrideRequest: Encodable, Sendable {
+    let originalStart: String
+    var title: String?
+    var notes: String?
+    var startAt: Date?
+    var endAt: Date?
+    var isAllDay: Bool?
+    var requiresCompletion: Bool?
+    var groupId: String?
+    var color: FieldUpdate<String> = .unchanged
+    var icon: FieldUpdate<String> = .unchanged
+    var reminders: [ReminderInput]?
+
+    private enum CodingKeys: String, CodingKey {
+        case originalStart, title, notes, startAt, endAt, isAllDay
+        case requiresCompletion, groupId, color, icon, reminders
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(originalStart, forKey: .originalStart)
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encodeIfPresent(notes, forKey: .notes)
+        try container.encodeIfPresent(startAt, forKey: .startAt)
+        try container.encodeIfPresent(endAt, forKey: .endAt)
+        try container.encodeIfPresent(isAllDay, forKey: .isAllDay)
+        try container.encodeIfPresent(requiresCompletion, forKey: .requiresCompletion)
+        try container.encodeIfPresent(groupId, forKey: .groupId)
+        try color.encode(into: &container, forKey: .color)
+        try icon.encode(into: &container, forKey: .icon)
+        try container.encodeIfPresent(reminders, forKey: .reminders)
     }
 }
 
@@ -512,6 +598,33 @@ struct TaskOccurrenceExceptionDTO: Codable, Sendable {
     let taskId: String
     /// Stable instance key — the original (pre-override) start, ISO-8601 string.
     let originalStartAt: String
+    /// Overridden (moved) start, when this exception rescheduled the occurrence —
+    /// the delta invalidates BOTH the original month and this destination month.
+    /// ISO-8601 string; nil when the occurrence was not moved. Decoded leniently
+    /// (parsed at the call site via `CalendarStore.isoFractional`).
+    let overrideStartAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, taskId, originalStartAt, overrideStartAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        taskId = try container.decode(String.self, forKey: .taskId)
+        originalStartAt = try container.decode(String.self, forKey: .originalStartAt)
+        overrideStartAt = try container.decodeIfPresent(String.self, forKey: .overrideStartAt)
+    }
+}
+
+/// Response from `GET /sync/state` — the cheap per-user "did anything change?"
+/// check. The client compares `revision` to its last-seen value: different ⇒ run
+/// the delta pull; equal ⇒ skip the network round-trip. `revision` is an opaque
+/// equality token (a bigint serialized as a string), `"0"` before any mutation.
+struct SyncStateDTO: Codable, Sendable {
+    let revision: String
+    let changedAt: String?
+    let serverTime: String
 }
 
 /// Response from `GET /tasks/changes?calendarId=&since=<cursor>`.
@@ -781,6 +894,23 @@ struct DailyBriefDTO: Codable, Sendable, Equatable {
     let brief: String?
     /// The local date (`YYYY-MM-DD`, in the user timezone) the brief covers.
     let localDate: String
+}
+
+// MARK: - Brief configuration
+
+/// Response from `GET`/`PATCH`/`DELETE /users/me/brief-settings`. The user's
+/// custom brief prompt that shapes how the daily brief is written; `customPrompt`
+/// is nil when no override is set (the brief falls back to the default voice).
+struct BriefSettingsDTO: Codable, Sendable, Equatable {
+    /// The custom brief instruction text, or nil when the default is in effect.
+    let customPrompt: String?
+}
+
+/// Request payload for `PATCH /users/me/brief-settings` — sets (or clears, via an
+/// explicit `null`) the user's custom brief prompt. Mirrors the shared contract's
+/// `{ customPrompt: string | null }` shape.
+struct UpdateBriefSettingsRequest: Codable, Sendable {
+    let customPrompt: String?
 }
 
 // MARK: - AI persona

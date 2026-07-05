@@ -35,7 +35,9 @@ extension TaskItem {
             icon: dto.icon,
             completedAt: dto.completedAt,
             isRecurring: dto.recurrence != nil || dto.recurrenceRuleId != nil,
-            isException: false
+            isException: false,
+            parentTaskId: dto.parentTaskId,
+            isDetached: dto.detachedAt != nil
         )
         let task = upsert(from: occurrence, in: context)
         // Reminders ride only on the series `TaskDTO` (the `OccurrenceDTO`
@@ -73,6 +75,8 @@ extension TaskItem {
         task.completedAt = dto.completedAt
         task.isRecurring = dto.isRecurring
         task.isException = dto.isException
+        task.parentSeriesId = dto.parentTaskId
+        task.isDetached = dto.isDetached
         task.groupId = dto.groupId
         task.colorToken = dto.color
         task.groupColorToken = dto.groupColorHex
@@ -107,6 +111,7 @@ extension TaskItem {
             endAt: resolvedEnd,
             isAllDay: isAllDay,
             groupId: groupId,
+            colorToken: colorToken,
             groupColorToken: groupColorToken,
             requiresCompletion: requiresCompletion,
             completedAt: completedAt,
@@ -134,7 +139,8 @@ extension TaskItem {
             isAllDay: isAllDay,
             requiresCompletion: requiresCompletion,
             completedAt: completedAt,
-            isRecurring: isRecurring
+            isRecurring: isRecurring,
+            groupId: groupId
         )
     }
 }

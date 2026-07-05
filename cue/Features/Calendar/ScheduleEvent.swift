@@ -36,10 +36,16 @@ struct ScheduleEvent: Identifiable, Hashable, Sendable {
     /// locally-synced `EventTaskGroup` for the detail header's meta row. `nil`
     /// when the occurrence belongs to no group.
     let groupId: String?
+    /// The PER-TASK color token — a `TaskColor` preset name OR a `#RRGGBB` hex
+    /// (straight off `OccurrenceDTO.color`). Takes priority over `groupColorToken`
+    /// when resolving the effective accent via
+    /// ``TaskColorResolver/effectiveColor(taskToken:groupToken:)``. `nil` when the
+    /// task has no per-task color override.
+    let colorToken: String?
     /// The owning group's color token — a `TaskColor` preset name OR a `#RRGGBB`
-    /// hex (straight off `OccurrenceDTO.groupColorHex`). Resolved via
-    /// ``TaskColorResolver`` to paint the detail accent + group dot by GROUP,
-    /// falling back to the clay structural accent when absent.
+    /// hex (straight off `OccurrenceDTO.groupColorHex`). The fallback color source
+    /// below `colorToken`; resolved via ``TaskColorResolver`` to paint the detail
+    /// accent + group dot, falling back to the neutral gray when neither is set.
     let groupColorToken: String?
     /// Whether this entry is a task (can be completed) vs a pure event.
     let requiresCompletion: Bool
@@ -59,6 +65,7 @@ struct ScheduleEvent: Identifiable, Hashable, Sendable {
         endAt: Date,
         isAllDay: Bool = false,
         groupId: String? = nil,
+        colorToken: String? = nil,
         groupColorToken: String? = nil,
         requiresCompletion: Bool = false,
         completedAt: Date? = nil,
@@ -74,6 +81,7 @@ struct ScheduleEvent: Identifiable, Hashable, Sendable {
         self.endAt = endAt
         self.isAllDay = isAllDay
         self.groupId = groupId
+        self.colorToken = colorToken
         self.groupColorToken = groupColorToken
         self.requiresCompletion = requiresCompletion
         self.completedAt = completedAt
@@ -96,6 +104,7 @@ struct ScheduleEvent: Identifiable, Hashable, Sendable {
             endAt: endAt,
             isAllDay: isAllDay,
             groupId: groupId,
+            colorToken: colorToken,
             groupColorToken: groupColorToken,
             requiresCompletion: requiresCompletion,
             completedAt: completedAt,

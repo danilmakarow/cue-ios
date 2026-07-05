@@ -13,6 +13,7 @@ struct GroupsScreen: View {
     @Environment(\.theme) private var theme
     @Environment(\.modelContext) private var modelContext
     @Environment(NotificationStore.self) private var notifications
+    @Environment(CalendarStore.self) private var calendarStore
     @Query(sort: \EventTaskGroup.sortOrder) private var localGroups: [EventTaskGroup]
 
     @State private var remoteDTOs: [TaskGroupDTO] = []
@@ -21,32 +22,38 @@ struct GroupsScreen: View {
     @State private var editingGroup: TaskGroupDTO?
 
     var body: some View {
-        List {
-            if localGroups.isEmpty && !isLoading {
-                ContentUnavailableView(
-                    "groups.empty.title",
+        ScrollView {
+            if localGroups.isEmpty {
+                EmptyStateView(
+                    title: String(localized: "groups.empty.title"),
+                    message: String(localized: "groups.empty.description"),
                     systemImage: "folder",
-                    description: Text("groups.empty.description")
+                    actionTitle: "groups.edit.title.create",
+                    ctaStyle: .primary,
+                    action: { showCreateSheet = true }
                 )
+                .frame(maxWidth: .infinity, minHeight: 420)
             } else {
-                ForEach(localGroups) { group in
-                    GroupRow(group: group) {
-                        editingGroup = remoteDTOs.first(where: { $0.id == group.id })
-                    }
-                    .listRowBackground(theme.surface)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            deleteGroup(group)
-                        } label: {
-                            Label("common.delete", systemImage: "trash")
+                LazyVStack(spacing: Spacing.md) {
+                    ForEach(localGroups) { group in
+                        GroupRow(group: group) {
+                            editingGroup = remoteDTOs.first(where: { $0.id == group.id })
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                deleteGroup(group)
+                            } label: {
+                                Label("common.delete", systemImage: "trash")
+                            }
                         }
                     }
                 }
-                .onMove(perform: moveGroups)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.vertical, Spacing.md)
             }
         }
         .scrollContentBackground(.hidden)
-        .background(theme.background.ignoresSafeArea())
+        .background(theme.surfaceGrouped.ignoresSafeArea())
         .navigationTitle("groups.title")
         .refreshable { await loadGroups() }
         .toolbar {
@@ -54,8 +61,14 @@ struct GroupsScreen: View {
                 Button {
                     showCreateSheet = true
                 } label: {
-                    Image(systemName: "plus")
+                    // The ONE clay moment: the create affordance is a hand-pressed
+                    // clay wax-seal (not a flat circle) with a white plus glyph and
+                    // a soft float shadow lifting it off the chrome.
+                    WaxSeal(isStamped: true, size: 36, systemImage: "plus")
+                        .shadow(color: theme.textPrimary.opacity(0.18), radius: 4, x: 0, y: 2)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "groups.create", defaultValue: "New group"))
             }
         }
         .sheet(isPresented: $showCreateSheet) {
@@ -67,6 +80,13 @@ struct GroupsScreen: View {
                     showCreateSheet = false
                 }
             }
+            // A `.sheet` presents in a detached environment branch and does NOT
+            // inherit the `CalendarStore` this screen received from its presenter;
+            // `GroupEditSheet` reads `@Environment(CalendarStore.self)` and traps
+            // without it. Re-inject explicitly.
+            .environment(calendarStore)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(item: $editingGroup) { dto in
             NavigationStack {
@@ -79,9 +99,16 @@ struct GroupsScreen: View {
                     editingGroup = nil
                 }
             }
+            .environment(calendarStore)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .overlay {
-            if isLoading {
+            // Only show the blocking spinner when we already have cached rows to
+            // sit behind it. On a cold load with no cached groups, suppress it so
+            // the empty state owns the screen instead of flashing a spinner over
+            // nothing (the empty branch is gated on `!isLoading`).
+            if isLoading && !localGroups.isEmpty {
                 ProgressView()
                     .tint(theme.primary)
             }
@@ -167,22 +194,30 @@ private struct GroupRow: View {
 
     var body: some View {
         Button(action: onEdit) {
-            HStack(spacing: Spacing.md) {
-                groupIcon
-                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                    Text(group.name)
-                        .cueText(.titleM)
-                        .foregroundStyle(theme.textPrimary)
-                    if group.defaultRecurrenceRuleId != nil {
-                        Label("groups.row.hasRecurrence", systemImage: "repeat")
-                            .cueText(.caption)
-                            .foregroundStyle(theme.textSecondary)
+            // Design rows: 13/14 inner padding on a floating tile (shadow-float)
+            // with a 62pt min-height — tighter than the 16pt card default. We zero
+            // CueCard's own padding and apply the asymmetric 13/14 ourselves.
+            CueCard(padding: 0, depth: .valueCut) {
+                HStack(spacing: Spacing.md) {
+                    groupIcon
+                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                        Text(group.name)
+                            .cueText(.titleM)
+                            .foregroundStyle(theme.textPrimary)
+                        if group.defaultRecurrenceRuleId != nil {
+                            Label("groups.row.hasRecurrence", systemImage: "repeat")
+                                .cueText(.caption)
+                                .foregroundStyle(theme.textSecondary)
+                        }
                     }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .cueText(.caption)
+                        .foregroundStyle(theme.textSecondary)
                 }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .cueText(.caption)
-                    .foregroundStyle(theme.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 13)
+                .frame(minHeight: 62)
             }
         }
         .buttonStyle(.plain)
@@ -191,7 +226,7 @@ private struct GroupRow: View {
     /// Tokenized icon tile: a sheet-fill paper square with a functional border.
     /// The persisted group color (resolved via `TaskColorResolver`, which handles
     /// both `TaskColor` preset names and `#RRGGBB` hex) tints the glyph; absent a
-    /// color it falls back to espresso ink.
+    /// color it falls back to the clay accent.
     private var groupIcon: some View {
         let color = TaskColorResolver.color(from: group.colorHex) ?? theme.primary
         return ZStack {
@@ -202,9 +237,9 @@ private struct GroupRow: View {
                         .strokeBorder(theme.border, lineWidth: 1)
                 )
                 .frame(width: 36, height: 36)
-            Image(systemName: group.icon ?? "folder.fill")
+            Image(systemName: group.icon ?? "folder")
                 .foregroundStyle(color)
-                .font(.system(size: 16))
+                .font(.system(size: 18))
         }
     }
 }

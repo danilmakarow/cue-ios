@@ -54,7 +54,7 @@ struct CueAvatar: View {
                     // Serif initials, scaled to the diameter — keeps the brand
                     // voice on the placeholder without a fixed text role.
                     Text(initials)
-                        .font(.custom(Typography.serifFamily, size: size * 0.38).weight(.medium))
+                        .font(.custom(Typography.serifSemiboldFamily, size: size * 0.38))
                         .foregroundStyle(theme.textSecondary)
                 }
         } else {

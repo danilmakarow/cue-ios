@@ -101,6 +101,39 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
     /// Guards programmatic scrolls from being treated as user settles.
     private var isProgrammaticallyScrolling = false
 
+    /// The month grid's content density (design-spec §4). Defaults to the bundle
+    /// default (Stacked: color-tinted backgrounds, up to 3 tasks, "+N more") and is
+    /// switched live by the self-contained ``densityControl`` (Compact / Stacked /
+    /// Details) via ``handleDensityChange`` — no shared-file wiring needed.
+    private var density: MonthDensity = .stacked
+
+    /// The three densities in the segmented control's display order. Index parity
+    /// with ``densityControl`` segments — the map from a selected index back to a
+    /// `MonthDensity` and vice-versa.
+    private static let densityOrder: [MonthDensity] = [.compact, .stacked, .details]
+
+    /// Whether the user has scrolled the grid since it appeared (or since the last
+    /// Today recenter). Drives the progressive Today button: a scrolled grid
+    /// recenters on tap; an un-scrolled grid zooms one level into today. Reset to
+    /// `false` after a recenter so a subsequent tap zooms.
+    private var hasScrolled = false
+
+    /// Coalesces `store.revision`-driven reloads: the store can bump `revision`
+    /// several times in quick succession (e.g. as multiple months finish syncing
+    /// during a fling), and each reload re-fetches + reconfigures. Debouncing to a
+    /// single trailing reload per burst keeps the fetch off the hot scroll path,
+    /// fixing the main-thread stall this scope owned.
+    private var reloadWorkItem: DispatchWorkItem?
+
+    /// The debounce interval for revision-driven reloads — long enough to swallow a
+    /// burst of sync completions, short enough to feel immediate.
+    private static let reloadDebounce: TimeInterval = 0.12
+
+    /// A small buffer of months rebuilt on each side of the visible range so a
+    /// nudge-scroll into an adjacent month already has its chips, without paying to
+    /// re-fetch the whole (±6-month) window on every revision.
+    private static let chipFetchBufferMonths = 1
+
     /// A center request that arrived before the collection view had a non-zero
     /// size (e.g. the zoom controller centering a freshly-mounted scope on the
     /// same runloop it's added). `scrollToItem` silently no-ops on a zero-sized
@@ -112,6 +145,35 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
     // MARK: - Views
 
     private let jumpToToday = DayJumpToTodayButton()
+
+    /// The self-contained density switcher (design-spec §4: a right-aligned control
+    /// above the pinned weekday legend). A plain `UISegmentedControl` living in this
+    /// scope's own view — Compact / Stacked / Details — so all three densities are
+    /// reachable without touching any shared file. Its selection drives
+    /// ``handleDensityChange``.
+    private lazy var densityControl: UISegmentedControl = {
+        let control = UISegmentedControl(items: [
+            String(
+                localized: "calendar.month.density.compact",
+                defaultValue: "Compact",
+                comment: "Month grid density: colored dots only"
+            ),
+            String(
+                localized: "calendar.month.density.stacked",
+                defaultValue: "Stacked",
+                comment: "Month grid density: up to 3 tinted task chips"
+            ),
+            String(
+                localized: "calendar.month.density.details",
+                defaultValue: "Details",
+                comment: "Month grid density: up to 2 timed task chips"
+            ),
+        ])
+        control.translatesAutoresizingMaskIntoConstraints = false
+        control.selectedSegmentIndex = Self.densityOrder.firstIndex(of: density) ?? 1
+        control.addTarget(self, action: #selector(handleDensityChange), for: .valueChanged)
+        return control
+    }()
 
     private lazy var collectionView: UICollectionView = {
         let view = UICollectionView(frame: .zero, collectionViewLayout: MonthLayout.make())
@@ -182,7 +244,9 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
         applyTheme()
 
         // One-time reactive registration: rebuild titles + reconfigure on change.
-        adapter.observeRevision { [weak self] in self?.reload() }
+        // Debounced so a burst of sync-completion revision bumps collapses into a
+        // single trailing reload instead of stalling the main thread mid-scroll.
+        adapter.observeRevision { [weak self] in self?.scheduleReload() }
 
         applySnapshot(animated: false)
         reload()
@@ -207,17 +271,38 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
 
         jumpToToday.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(collectionView)
+        view.addSubview(densityControl)
         view.addSubview(jumpToToday)
 
         NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            // Density switcher: a right-aligned row above the pinned weekday legend
+            // (design-spec §4). Lives in this scope's own safe area, so the grid
+            // starts just below it.
+            densityControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Spacing.xs),
+            densityControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -MonthLayout.horizontalInset),
+
+            collectionView.topAnchor.constraint(equalTo: densityControl.bottomAnchor, constant: Spacing.xs),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            jumpToToday.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.xl),
+            jumpToToday.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.xl),
             jumpToToday.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.xxl),
         ])
+    }
+
+    /// Switches the grid's content density from the segmented control, then repaints
+    /// every day cell against the new density. Fully self-contained: no shared-file
+    /// wiring — the selection maps through ``densityOrder`` to a `MonthDensity`, is
+    /// stored, and the visible cells are reconfigured in place (the debounced
+    /// revision path is untouched, so this is an instant, local repaint).
+    @objc private func handleDensityChange() {
+        let index = densityControl.selectedSegmentIndex
+        guard Self.densityOrder.indices.contains(index) else { return }
+        let next = Self.densityOrder[index]
+        guard next != density else { return }
+        density = next
+        reconfigureVisible()
     }
 
     private func wireJumpToToday() {
@@ -255,7 +340,7 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
         case .blank:
             cell.configure(
                 number: "", isToday: false, isSelected: false,
-                chips: [], theme: theme
+                chips: [], density: density, theme: theme
             )
             cell.isUserInteractionEnabled = false
             cell.isAccessibilityElement = false
@@ -267,6 +352,7 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
                 isToday: CalendarMath.isToday(date),
                 isSelected: key == CalendarMath.startOfDay(store.selectedDate),
                 chips: chipsByDay[key] ?? [],
+                density: density,
                 theme: theme
             )
             cell.isUserInteractionEnabled = true
@@ -288,7 +374,7 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
             )
             guard let titleHeader = header as? MonthTitleHeaderView,
                   let month = month(forSection: indexPath.section) else { return header }
-            titleHeader.configure(title: heading(for: month), theme: theme)
+            titleHeader.configure(title: heading(for: month), isCurrent: isCurrentMonth(month), theme: theme)
             return titleHeader
 
         case MonthLayout.weekdayHeaderKind:
@@ -340,34 +426,98 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
 
     // MARK: - Data
 
-    /// Re-runs the windowed fetch across the whole window, rebuilds the per-day
-    /// title map, and reconfigures the visible cells. Bound to `store.revision`
-    /// via the adapter (the `@Query` replacement) and called after a section sync.
+    /// Schedules a debounced reload on the main queue, cancelling any pending one.
+    /// The store bumps `revision` once per month-sync completion; a fling that
+    /// syncs several months would otherwise fire several full re-fetches back to
+    /// back. Coalescing to a single trailing reload keeps that work off the hot
+    /// scroll path — the fix for the month freeze.
+    private func scheduleReload() {
+        reloadWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in self?.reload() }
+        reloadWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.reloadDebounce, execute: workItem)
+    }
+
+    /// Re-runs the windowed fetch across the visible range, rebuilds the per-day
+    /// chip map, and reconfigures the visible cells. Bound (debounced) to
+    /// `store.revision` via the adapter and called after a section sync / growth.
     private func reload() {
         rebuildTitles()
         reconfigureVisible()
     }
 
-    /// Rebuilds `chipsByDay` (title + resolved group color) from a single windowed fetch
-    /// spanning the whole window `[firstMonth, monthAfterLast)`, grouped by day and
-    /// ordered by start. The indicator counts derive from the same grouped result,
-    /// so no extra fetch is needed.
+    /// Rebuilds `chipsByDay` from a fetch spanning only the currently-visible
+    /// months (± a one-month buffer), not the whole ±6-month window. Merges the
+    /// fresh range into the existing map so months scrolled off-screen keep their
+    /// already-built chips until evicted — this narrows the per-revision fetch from
+    /// ~180+ days to ~90, the other half of the freeze fix.
     private func rebuildTitles() {
-        guard let first = window.anchors.first, let last = window.anchors.last else { return }
-        let (from, _) = CalendarMath.monthBounds(first)
-        let (_, to) = CalendarMath.monthBounds(last)
-        let byDay = adapter.occurrencesByDay(from: from, to: to)
-        var chips: [Date: [MonthDayChip]] = [:]
+        guard let range = chipFetchRange() else { return }
+        let byDay = adapter.occurrencesByDay(from: range.from, to: range.to)
+        var chips = chipsByDay
+        // Clear the fetched range first so days that lost all occurrences don't
+        // retain stale chips, then repopulate from the fresh result.
+        chips = chips.filter { $0.key < range.from || $0.key >= range.to }
         for (day, occurrences) in byDay {
             chips[day] = occurrences.map { occurrence in
                 MonthDayChip(
                     title: occurrence.title,
-                    color: CalendarColor.resolved(occurrence.groupColorToken)
+                    time: timeLabel(for: occurrence),
+                    isRecurring: occurrence.isRecurring,
+                    color: CalendarColor.effective(
+                        taskToken: occurrence.colorToken,
+                        groupToken: occurrence.groupColorToken
+                    )
                 )
             }
         }
         chipsByDay = chips
     }
+
+    /// The `[from, to)` fetch range covering the visible months plus a one-month
+    /// buffer on each side. Falls back to the centered month (± buffer) before the
+    /// collection view has realized any cells (e.g. the very first reload).
+    private func chipFetchRange() -> (from: Date, to: Date)? {
+        let buffer = Self.chipFetchBufferMonths
+        let visibleSections = Set(collectionView.indexPathsForVisibleItems.map { $0.section })
+        let months: [Date]
+        if visibleSections.isEmpty {
+            months = [centeredMonth]
+        } else {
+            months = visibleSections.compactMap { month(forSection: $0) }
+        }
+        guard let earliest = months.min(), let latest = months.max() else { return nil }
+        let fromMonth = monthOffset(-buffer, from: earliest)
+        let toMonth = monthOffset(buffer, from: latest)
+        let (from, _) = CalendarMath.monthBounds(fromMonth)
+        let (_, to) = CalendarMath.monthBounds(toMonth)
+        return (from, to)
+    }
+
+    /// The month anchor `offset` months from `month` (negative = earlier). A local
+    /// helper so this scope needn't touch the shared `CalendarMath`; falls back to
+    /// `month` if the calendar can't advance (never expected).
+    private func monthOffset(_ offset: Int, from month: Date) -> Date {
+        Calendar.current.date(byAdding: .month, value: offset, to: month) ?? month
+    }
+
+    /// A month day-chip's mono time label: the localized all-day label for all-day
+    /// occurrences, else a fixed `HH:mm` (24-hour) start — only surfaced by the
+    /// Details density, but computed once here so the chip stays render-only.
+    private func timeLabel(for occurrence: OccurrenceVM) -> String {
+        if occurrence.isAllDay { return String(localized: "newEvent.allDay") }
+        return Self.chipTimeFormatter.string(from: occurrence.startAt)
+    }
+
+    /// Fixed 24-hour `HH:mm` formatter for Details-density chip time lines (design:
+    /// mono `HH:MM`). Uses a POSIX locale so the pattern stays 24-hour regardless of
+    /// the device's 12/24-hour setting, matching the design's mono time.
+    private static let chipTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
 
     /// Reconfigures the currently-visible items in place (no reload flash), so a
     /// data change repaints titles/highlights without rebuilding the snapshot.
@@ -433,12 +583,23 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
         centeredMonth = centered
         jumpToToday.setVisible(true, animated: true)
 
-        guard let index = window.index(of: centered) else { return }
+        guard let index = window.index(of: centered) else {
+            // Not held (shouldn't happen post-settle) — still rebuild for the new
+            // viewport so already-synced months that scrolled in show their chips.
+            reload()
+            return
+        }
 
         if window.isNearLeadingEdge(of: index) {
             growLeading()
         } else if window.isNearTrailingEdge(of: index) {
             growTrailing()
+        } else {
+            // No window growth needed, but the visible range moved — rebuild chips
+            // for the newly-revealed months. `ensureMonthSynced` early-returns for
+            // fresh months (no revision bump), so this settle-time reload is the
+            // only thing that populates chips when scrolling within synced data.
+            reload()
         }
     }
 
@@ -534,17 +695,27 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
         return model.year == currentYear ? model.nameWide : model.nameWideWithYear
     }
 
+    /// Whether `month`'s section is the calendar's *current* month — drives the
+    /// olive present-moment header treatment (impl-plan B2). Compared on the month
+    /// start-anchor so any day within the month resolves the same section.
+    private func isCurrentMonth(_ month: Date) -> Bool {
+        CalendarMath.startOfMonth(month) == CalendarMath.startOfMonth(.now)
+    }
+
     // MARK: - Selection / Jump-to-Today
 
-    /// Progressive "Today": if the centered month isn't the current month, scroll
-    /// it back into view; if it already is, ask the container to zoom one level
-    /// into today via `scopeDidRequestToday` — mirroring the SwiftUI behavior.
+    /// Progressive "Today", gated on whether the user has scrolled since the grid
+    /// appeared (or since the last recenter):
+    /// - **Scrolled** (now or earlier this session): scroll today's month back into
+    ///   view and reset `hasScrolled`, so the very next tap zooms.
+    /// - **Not scrolled**: ask the container to zoom one level into today's per-day
+    ///   view via `scopeDidRequestToday`.
     private func handleJumpToToday() {
-        let currentMonth = CalendarMath.startOfMonth(.now)
-        if centeredMonth == currentMonth {
-            scopeDelegate?.scopeDidRequestToday(self)
-        } else {
+        if hasScrolled {
             scrollToCurrentMonth()
+            hasScrolled = false
+        } else {
+            scopeDelegate?.scopeDidRequestToday(self)
         }
     }
 
@@ -598,6 +769,7 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
     private func applyTheme() {
         view.backgroundColor = theme.background
         jumpToToday.apply(theme: theme)
+        applyDensityControlTheme()
         for case let cell as MonthDayGridCell in collectionView.visibleCells {
             cell.apply(theme: theme)
         }
@@ -606,12 +778,27 @@ final class MonthScopeViewController: UIViewController, CalendarScopeViewControl
             for indexPath in collectionView.indexPathsForVisibleSupplementaryElements(ofKind: kind) {
                 let view = collectionView.supplementaryView(forElementKind: kind, at: indexPath)
                 if let title = view as? MonthTitleHeaderView, let month = month(forSection: indexPath.section) {
-                    title.configure(title: heading(for: month), theme: theme)
+                    title.configure(title: heading(for: month), isCurrent: isCurrentMonth(month), theme: theme)
                 } else if let legend = view as? MonthWeekdayHeaderView {
                     legend.configure(theme: theme)
                 }
             }
         }
+    }
+
+    /// Tints the density switcher to the active theme: a sunken track, the surface
+    /// as the selected-segment fill, and the label ink split primary/secondary so
+    /// it reads as a quiet chrome control rather than an accent (design-spec §4:
+    /// `--fill` track, `body sans 13/500`).
+    private func applyDensityControlTheme() {
+        densityControl.backgroundColor = theme.surfaceSunken
+        densityControl.selectedSegmentTintColor = theme.surface
+        densityControl.setTitleTextAttributes(
+            [.foregroundColor: theme.textSecondary, .font: theme.label], for: .normal
+        )
+        densityControl.setTitleTextAttributes(
+            [.foregroundColor: theme.textPrimary, .font: theme.label], for: .selected
+        )
     }
 
     /// Enables/disables the scope's scrolling for the duration of a zoom transition
@@ -701,9 +888,14 @@ extension MonthScopeViewController: UICollectionViewDelegate {
         }
     }
 
-    /// A fresh drag starts: drop stale velocity/direction history.
+    /// A fresh user drag starts: drop stale velocity/direction history and record
+    /// that the user has scrolled — flipping the Today button from zoom-in to
+    /// recenter (see ``handleJumpToToday``). This fires only for genuine finger
+    /// drags, so a programmatic centering (which never begins dragging) can't trip
+    /// the flag.
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         guard scrollView === collectionView else { return }
+        hasScrolled = true
         prefetchCoordinator.resetVelocity()
     }
 

@@ -108,72 +108,90 @@ struct ConnectTelegramView: View {
 
     @ViewBuilder
     private var loadingState: some View {
+        // Fill the full visible content height (not a fixed 320 min) so the
+        // spinner+label group lands at true vertical center, per the design's
+        // justify-content:center loading region — the ScrollView's top padding
+        // would otherwise pin it into the upper third.
         LoadingStateView(label: String(localized: "telegram.status.loading"))
-            .frame(maxWidth: .infinity, minHeight: 320)
+            .frame(maxWidth: .infinity)
+            .containerRelativeFrame(.vertical)
     }
 
     @ViewBuilder
     private func notConnectedState(viewModel: ConnectTelegramViewModel) -> some View {
-        Text(Self.notConnectedTitle)
-            .cueText(.titleM)
-            .foregroundStyle(theme.textPrimary)
+        // Owns its own vertical rhythm (spacing 0 + explicit per-element bottom
+        // padding) so the title→card and card→row gaps match the design exactly,
+        // without the parent VStack's uniform spacing double-counting.
+        VStack(alignment: .leading, spacing: 0) {
+            // Display title — Source Serif 4 SemiBold 22pt (a ≥17pt page heading, so
+            // the editorial serif voice is correct here, not the sans titleM).
+            Text(Self.notConnectedTitle)
+                .font(.custom(Typography.serifSemiboldFamily, size: 22, relativeTo: .title2))
+                .tracking(-0.2)
+                .foregroundStyle(theme.textPrimary)
+                .padding(.bottom, Spacing.lg)
 
-        // Explanation card — sparkle eyebrow icon + how-it-works copy.
-        CueCard {
-            HStack(alignment: .top, spacing: Spacing.md) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(theme.accentText)
-                    .padding(.top, 1)
-                Text("telegram.explanation")
-                    .cueText(.callout)
-                    .foregroundStyle(theme.textPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            // Explanation card — single star eyebrow icon + how-it-works copy.
+            CueCard(radius: Radius.small, depth: .valueCut) {
+                HStack(alignment: .top, spacing: Spacing.md) {
+                    Image(systemName: "star")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(theme.accentText)
+                        .padding(.top, 1)
+                    Text("telegram.explanation")
+                        .cueText(.callout)
+                        .foregroundStyle(theme.textPrimary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
-        }
+            .padding(.bottom, Spacing.xxl)
 
-        openInTelegramRow
+            openInTelegramRow
+                .padding(.bottom, Spacing.xl)
 
-        // Linking code field + the clipboard affordance.
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            CueField(
-                label: String(localized: "telegram.code.section"),
-                text: $viewModel.code,
-                placeholder: String(localized: "telegram.code.placeholder"),
-                mono: true
-            )
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .onChange(of: viewModel.code) { _, _ in
-                // The brass notice describes a *stale* code; the moment the user
-                // changes the value it no longer applies, so retire it.
-                store.clearCodeRejection()
+            // Linking code field + the clipboard affordance.
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                CueField(
+                    label: String(localized: "telegram.code.section"),
+                    text: $viewModel.code,
+                    placeholder: String(localized: "telegram.code.placeholder"),
+                    mono: true
+                )
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onChange(of: viewModel.code) { _, _ in
+                    // The brass notice describes a *stale* code; the moment the
+                    // user changes the value it no longer applies, so retire it.
+                    store.clearCodeRejection()
+                }
+
+                Button {
+                    viewModel.pasteFromClipboard()
+                } label: {
+                    Label("telegram.paste", systemImage: "doc.on.clipboard")
+                        .cueText(.bodyEmphasis)
+                        .foregroundStyle(theme.primary)
+                }
+            }
+
+            Spacer(minLength: Spacing.xl)
+
+            // Persistent brass "bad code" notice — kept distinct from a transient
+            // banner: it lives in the form and survives until the code is edited.
+            if store.lastCodeRejected {
+                badCodeNotice
+                    .padding(.bottom, Spacing.md)
             }
 
             Button {
-                viewModel.pasteFromClipboard()
+                Task { await connect(viewModel: viewModel) }
             } label: {
-                Label("telegram.paste", systemImage: "doc.on.clipboard")
-                    .cueText(.bodyEmphasis)
-                    .foregroundStyle(theme.primary)
+                Label("telegram.connect", systemImage: "seal")
             }
+            .buttonStyle(.cue(.decisive))
+            .disabled(!viewModel.canSubmit || store.isMutating)
         }
-
-        Spacer(minLength: Spacing.sm)
-
-        // Persistent brass "bad code" notice — kept distinct from a transient
-        // banner: it lives in the form and survives until the code is edited.
-        if store.lastCodeRejected {
-            badCodeNotice
-        }
-
-        Button {
-            Task { await connect(viewModel: viewModel) }
-        } label: {
-            Label("telegram.connect", systemImage: "seal")
-        }
-        .buttonStyle(.cue(.decisive))
-        .disabled(!viewModel.canSubmit || store.isMutating)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -190,7 +208,7 @@ struct ConnectTelegramView: View {
         .frame(maxWidth: .infinity)
 
         // Ticket card — the linked handle, status, and linked-at receipt row.
-        CueCard(header: { Text("telegram.title") }) {
+        CueCard(radius: Radius.small, depth: .valueCut, header: { Text("telegram.title") }) {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 HStack(spacing: Spacing.md) {
                     Image(systemName: "paperplane.fill")
@@ -265,7 +283,7 @@ struct ConnectTelegramView: View {
     private var openInTelegramRow: some View {
         let telegramBlue = Color(red: 0.133, green: 0.620, blue: 0.851)
         Link(destination: Self.botURL ?? URL(fileURLWithPath: "/")) {
-            CueCard {
+            CueCard(radius: Radius.small, depth: .valueCut) {
                 HStack(spacing: Spacing.md) {
                     Image(systemName: "paperplane.fill")
                         .font(.system(size: 18))

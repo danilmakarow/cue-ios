@@ -48,12 +48,24 @@ struct OccurrenceVM: Identifiable, Hashable, Sendable {
     let completedAt: Date?
     /// True when this occurrence is part of a recurring series.
     let isRecurring: Bool
+    /// The owning group id, mirrored straight off `OccurrenceDTO.groupId`. Carried
+    /// so the projection to ``ScheduleEvent`` (via `asScheduleEvent`) can resolve
+    /// the owning group's display name on the detail screen. `nil` when the
+    /// occurrence belongs to no group.
+    let groupId: String?
+    /// The occurrence's PER-TASK color token — a `TaskColor` preset name (e.g.
+    /// `"BLUE"`) OR a `#RRGGBB` hex, straight off `OccurrenceDTO.color`. Takes
+    /// priority over `groupColorToken` when resolving the effective rail color via
+    /// ``TaskColorResolver/effectiveColor(taskToken:groupToken:)``. `nil` when the
+    /// task has no per-task color override.
+    let colorToken: String?
     /// The occurrence's group color token — a `TaskColor` preset name (e.g.
     /// `"BLUE"`) OR a `#RRGGBB` hex, straight off `OccurrenceDTO.groupColorHex`.
-    /// Resolved to a render color via ``CalendarColor/rail(for:theme:)`` so the
-    /// day timeline/agenda rails and month chips/dots paint by GROUP, falling
-    /// back to the clay structural rail when the group has no color. `nil` when
-    /// the occurrence belongs to no group (or the group is uncolored).
+    /// The fallback color source below `colorToken`. Resolved to a render color via
+    /// ``CalendarColor/rail(for:theme:)`` so the day timeline/agenda rails and
+    /// month chips/dots paint by task-then-group, falling back to the neutral gray
+    /// when neither is set. `nil` when the occurrence belongs to no group (or the
+    /// group is uncolored).
     let groupColorToken: String?
 
     /// Designated initializer mirroring ``ScheduleEvent``'s field set.
@@ -70,6 +82,8 @@ struct OccurrenceVM: Identifiable, Hashable, Sendable {
         requiresCompletion: Bool = false,
         completedAt: Date? = nil,
         isRecurring: Bool = false,
+        groupId: String? = nil,
+        colorToken: String? = nil,
         groupColorToken: String? = nil
     ) {
         self.id = id
@@ -84,16 +98,20 @@ struct OccurrenceVM: Identifiable, Hashable, Sendable {
         self.requiresCompletion = requiresCompletion
         self.completedAt = completedAt
         self.isRecurring = isRecurring
+        self.groupId = groupId
+        self.colorToken = colorToken
         self.groupColorToken = groupColorToken
     }
 
     /// Convenience: true when `completedAt` is set.
     var isCompleted: Bool { completedAt != nil }
 
-    /// Returns a copy carrying `token` as the group color. Used by
-    /// ``CalendarDataAdapter`` to fold the group color onto the base value the
-    /// shared `TaskItem.asOccurrenceVM()` mapping produces (which omits it).
-    func withGroupColorToken(_ token: String?) -> OccurrenceVM {
+    /// Returns a copy carrying both the per-task and group color tokens. Used by
+    /// ``CalendarDataAdapter`` (and the Today mapping) to fold the colors onto the
+    /// base value the shared `TaskItem.asOccurrenceVM()` mapping produces (which
+    /// omits them). Both default to the existing value so a caller can update only
+    /// one axis.
+    func withColorTokens(taskToken: String?, groupToken: String?) -> OccurrenceVM {
         OccurrenceVM(
             id: id,
             seriesId: seriesId,
@@ -107,7 +125,15 @@ struct OccurrenceVM: Identifiable, Hashable, Sendable {
             requiresCompletion: requiresCompletion,
             completedAt: completedAt,
             isRecurring: isRecurring,
-            groupColorToken: token
+            groupId: groupId,
+            colorToken: taskToken,
+            groupColorToken: groupToken
         )
+    }
+
+    /// Returns a copy carrying `token` as the group color (leaving the per-task
+    /// color untouched). Retained for call sites that only fold in the group color.
+    func withGroupColorToken(_ token: String?) -> OccurrenceVM {
+        withColorTokens(taskToken: colorToken, groupToken: token)
     }
 }

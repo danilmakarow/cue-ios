@@ -21,6 +21,27 @@ private nonisolated struct WeekStripDayItem: Hashable, Sendable {
     let date: Date
 }
 
+/// One overlapping task bubble on a week-strip day tile: the task's first letter
+/// over its EFFECTIVE color (resolved from the token pair at render time). Value
+/// type so the tile stays dumb and the strip can diff summaries cheaply.
+struct WeekDayBubble: Hashable, Sendable {
+    /// The uppercased first character of the task title (empty when untitled).
+    let letter: String
+    /// The task's per-task color token (nil → falls back to group/gray).
+    let colorToken: String?
+    /// The task's group color token (the second fallback below `colorToken`).
+    let groupColorToken: String?
+}
+
+/// A day's bubble summary for the week strip: up to 3 bubbles plus the total
+/// count, so the tile can render the overlap row and a `+N` overflow pill.
+struct WeekDayBubbles: Hashable, Sendable {
+    /// Up to 3 leading bubbles, in display order.
+    let bubbles: [WeekDayBubble]
+    /// The day's TOTAL task count (drives the `+N` overflow pill when > 3).
+    let totalCount: Int
+}
+
 /// Horizontal week strip pinned above the day pager — a **strictly derived**
 /// presentation slaved to one source of truth: the day pager's `contentOffset.x`.
 ///
@@ -50,18 +71,17 @@ final class WeekStripView: UIView {
 
     // MARK: - Pill treatment toggle
 
-    /// Design-pass toggle: `true` ships the iOS 26 Liquid Glass pill (warm-tinted
-    /// toward `theme.primary`); `false` ships a solid `theme.primary` fill. The
+    /// Design-pass toggle: `true` ships the iOS 26 Liquid Glass pill (tinted toward
+    /// `theme.success`); `false` ships the CUE — Clean olive background FILL. The
     /// pill stays a `UIVisualEffectView` in both modes, so the per-frame geometry
     /// path is identical — flipping this is genuinely one line.
     ///
-    /// DESIGN CALL (Kraft & Ink on WHITE): shipped `false`. On the old kraft-tan
-    /// canvas an espresso-tinted glass pill nestled into the warm paper; on pure
-    /// white the same translucent brown wash reads muddy and *floaty* over the
-    /// crisp white tiles — precisely the glassmorphism this identity rejects
-    /// ("letterpress, not float"). A solid espresso pill with cream day text is
-    /// crisper, higher-contrast, and reads as a deliberate printed mark. The glass
-    /// path is kept intact (not deleted) so flipping this back to `true` is one line.
+    /// DESIGN CALL (CUE — Clean on WHITE): shipped `false`. On pure white a
+    /// translucent glass wash reads muddy and *floaty* over the crisp white tiles —
+    /// precisely the glassmorphism this identity rejects. A borderless soft olive
+    /// (`success`) background fill with `textPrimary` day text is crisper and carries
+    /// the "selected/opened day" signal WITHOUT an outline that would fight today's
+    /// fresh-green border. The glass path is kept so flipping back is one line.
     private static let usesLiquidGlass = false
 
     // MARK: - Model
@@ -93,6 +113,12 @@ final class WeekStripView: UIView {
     /// Per-day task counts keyed by `startOfDay`, drawn as a small badge on each
     /// tile. Empty until ``loadCounts(for:context:)`` populates it.
     private var dailyCounts: [Date: Int] = [:]
+
+    /// Per-day bubble summaries keyed by `startOfDay` — up to 3 colored task
+    /// bubbles + a total for the `+N` pill. Supplied by the owner from its full
+    /// windowed occurrences (the store's count-only cache can't color/label them),
+    /// so when present these SUPERSEDE the neutral count badge on a tile.
+    private var dayBubbles: [Date: WeekDayBubbles] = [:]
 
     /// CPU-only no-op guard for the per-frame pill write. Recomputed from the
     /// input each call — pure cache, never authoritative state that can drift.
@@ -163,7 +189,8 @@ final class WeekStripView: UIView {
             heightAnchor.constraint(equalToConstant: 80),
         ])
 
-        pill.layer.cornerRadius = Radius.small
+        // Design week-strip tile radius is 9px (just inside Radius.small=10).
+        pill.layer.cornerRadius = 9
         pill.layer.cornerCurve = .continuous
         pill.layer.masksToBounds = true
         pill.clipsToBounds = true
@@ -171,7 +198,39 @@ final class WeekStripView: UIView {
         pill.isHidden = true
         addSubview(pill)
 
+        installWeekSwipeGestures()
         applyInitialSnapshot()
+    }
+
+    // MARK: - Prev/next week swipe navigation
+
+    /// Adds horizontal swipe recognizers that jump the selection one week at a
+    /// time. The strip's own collection stays non-scrollable (``isScrollEnabled``
+    /// is `false`) — these gestures drive the SAME programmatic selection path a
+    /// tap uses, so the pill + strip page follow through the normal geometry and
+    /// the pager-as-single-source invariant is untouched.
+    private func installWeekSwipeGestures() {
+        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(handleWeekSwipe(_:)))
+        swipeLeft.direction = .left
+        let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(handleWeekSwipe(_:)))
+        swipeRight.direction = .right
+        addGestureRecognizer(swipeLeft)
+        addGestureRecognizer(swipeRight)
+    }
+
+    /// Swipe LEFT advances one week, swipe RIGHT goes back one week — keeping the
+    /// current weekday and jumping exactly 7 days. Routes through ``onSelectDate``
+    /// (the tap funnel) so the owner runs the single selection path: it pages the
+    /// pager and calls back into ``commitSelection(date:animated:)``, animating the
+    /// pill via the programmatic spring rather than a gesture drag.
+    @objc
+    private func handleWeekSwipe(_ recognizer: UISwipeGestureRecognizer) {
+        let weekDelta = recognizer.direction == .left ? Self.daysPerGroup : -Self.daysPerGroup
+        guard let target = calendar.date(byAdding: .day, value: weekDelta, to: selectedDate) else { return }
+        let normalized = CalendarMath.startOfDay(target)
+        // Stay inside the built ±12-week window; a swipe past the edge is a no-op.
+        guard groupIndex(containing: normalized) != nil else { return }
+        onSelectDate?(normalized)
     }
 
     override func didMoveToWindow() {
@@ -228,6 +287,16 @@ final class WeekStripView: UIView {
     func loadCounts(for weekRange: ClosedRange<Date>, context: ModelContext) async {
         await store.ensureCountsSynced(weekRange: weekRange, context: context)
         dailyCounts = store.dayCountsCache
+        reconfigureVisibleTiles()
+    }
+
+    /// Sets the per-day bubble summaries (owner-supplied from its full windowed
+    /// occurrences) and reconfigures the visible tiles in place. When a day has a
+    /// summary here its colored bubbles replace the neutral count badge. Safe to
+    /// call on every data revision — the reconfigure is a diffable in-place patch,
+    /// never a `reloadData()`.
+    func setDayBubbles(_ bubbles: [Date: WeekDayBubbles]) {
+        dayBubbles = bubbles
         reconfigureVisibleTiles()
     }
 
@@ -326,12 +395,13 @@ final class WeekStripView: UIView {
 
     /// Binds a tile to a date + the current state. Reuses `WeekDayTileCell.configure`.
     private func configure(_ tile: WeekDayTileCell, with date: Date, theme: CalendarTheme) {
+        let day = CalendarMath.startOfDay(date)
         tile.configure(
             date: date,
-            count: dailyCounts[CalendarMath.startOfDay(date)],
+            count: dailyCounts[day],
+            bubbles: dayBubbles[day],
             isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
             isToday: calendar.isDateInToday(date),
-            showMonthLabel: isOutsideCurrentWindow(date),
             theme: theme
         )
     }
@@ -341,16 +411,24 @@ final class WeekStripView: UIView {
     /// Sets the pill's fill from the theme — Liquid Glass warm-tinted toward
     /// `theme.primary`, or a solid `theme.primary` fill when the toggle is off.
     private func applyPillTreatment(theme: CalendarTheme) {
-        pill.layer.cornerRadius = Radius.small
+        // Design week-strip tile radius is 9px (just inside Radius.small=10).
+        pill.layer.cornerRadius = 9
         if Self.usesLiquidGlass {
             let effect = UIGlassEffect(style: .regular)
-            effect.tintColor = theme.primary
+            effect.tintColor = theme.success
             effect.isInteractive = false
             pill.effect = effect
             pill.contentView.backgroundColor = .clear
         } else {
+            // CUE — Clean: the selected (opened) day reads as a SPECIAL BACKGROUND
+            // FILL — a soft olive (`success`) wash with no heavy outline, so it does
+            // not compete with today's fresh-green border. The wash is strengthened
+            // from the old 0.12 so the fill alone carries the "selected" signal; the
+            // day number stays `textPrimary`.
             pill.effect = nil
-            pill.contentView.backgroundColor = theme.primary
+            pill.contentView.backgroundColor = theme.success.withAlphaComponent(0.18)
+            pill.layer.borderWidth = 0
+            pill.layer.borderColor = nil
         }
     }
 
@@ -474,6 +552,15 @@ final class WeekStripView: UIView {
         let pageWidth = collectionView.bounds.width
         guard pageWidth > 0 else { return }
         guard let groupIndex = groupIndex(containing: date) else { return }
+        // Force the compositional layout to realize the full `25 * pageWidth`
+        // content width BEFORE clamping. Without this, an early snap (boot /
+        // first layout) reads a not-yet-computed `contentSize.width ≈ pageWidth`,
+        // so `maxOffset` collapses to 0 and every non-first week clamps to offset
+        // 0 — the strip then shows the FIRST built week (≈12 weeks in the past)
+        // under a pill that's positioned for the selected week, and no re-snap
+        // fires when `contentSize` later grows. Realizing it here keeps `maxOffset`
+        // honest so the target week actually scrolls into view.
+        collectionView.layoutIfNeeded()
         let maxOffset = max(0, collectionView.contentSize.width - pageWidth)
         let targetX = min(CGFloat(groupIndex) * pageWidth, maxOffset)
         lastWeekContentOffsetX = targetX
@@ -654,15 +741,6 @@ final class WeekStripView: UIView {
         groups.firstIndex { group in
             group.dates.contains { calendar.isDate($0, inSameDayAs: date) }
         }
-    }
-
-    /// Days more than 3 days from today get a month label, matching the SwiftUI strip.
-    private func isOutsideCurrentWindow(_ date: Date) -> Bool {
-        let today = calendar.startOfDay(for: Date())
-        let days = calendar.dateComponents(
-            [.day], from: today, to: calendar.startOfDay(for: date)
-        ).day ?? 0
-        return abs(days) > 3
     }
 
     // MARK: - Group building
