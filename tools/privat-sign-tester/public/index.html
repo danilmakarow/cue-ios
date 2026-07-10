@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privat Sign Tester — тест підпису договору КЕП ПриватБанку</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <h1>Privat Sign Tester</h1>
+    <p class="sub">Клієнтський тест підпису договору кваліфікованим підписом ПриватБанку (КЕП / CAdES <code>.p7s</code>). Ключ і пароль <b>не покидають браузер</b>.</p>
+
+    <!-- ── Налаштування ── -->
+    <section class="card">
+      <h2>1. Налаштування</h2>
+      <div class="grid">
+        <label>Віджет ІІТ EU Sign (URI)
+          <input id="widgetUrl" type="url" value="https://eu.iit.com.ua/sign-widget/v20240301" />
+          <small>Актуальну версію дивись на <a href="https://eu.iit.com.ua/sign-widget/" target="_blank" rel="noreferrer">eu.iit.com.ua/sign-widget</a>. Якщо ключ не читається — онови версію в цьому полі.</small>
+        </label>
+        <label>Callback URL (ngrok, для SmartID-режиму)
+          <input id="callbackUrl" type="url" placeholder="https://xxxx.ngrok-free.app/callback" />
+          <small>Публічний URL із ngrok + <code>/callback</code>. Потрібен лише для SmartID-скелета.</small>
+        </label>
+      </div>
+    </section>
+
+    <!-- ── Режим ── -->
+    <section class="card">
+      <h2>2. Режим підпису</h2>
+      <div class="modes">
+        <label class="mode"><input type="radio" name="mode" value="file" checked />
+          <span><b>Файловий ключ</b> — працює зараз (.dat/.jks/.pfx + пароль)</span></label>
+        <label class="mode"><input type="radio" name="mode" value="smartid" />
+          <span><b>SmartID (QR / Приват24)</b> — скелет, потрібне партнерське API</span></label>
+      </div>
+    </section>
+
+    <!-- ── Договір ── -->
+    <section class="card">
+      <h2>3. Договір (файл на підпис)</h2>
+      <input id="contractFile" type="file" />
+      <div id="contractInfo" class="muted"></div>
+      <div class="grid">
+        <label>Тип CAdES
+          <select id="signType">
+            <option value="attached">Вбудований (enveloped) — договір усередині .p7s</option>
+            <option value="detached">Відокремлений (detached) — окремий .p7s + оригінал</option>
+          </select>
+        </label>
+        <label class="check"><input id="withTsp" type="checkbox" /> Додати позначку часу (CAdES-T)</label>
+      </div>
+    </section>
+
+    <!-- ── Файловий режим ── -->
+    <section class="card" id="fileMode">
+      <h2>4. Підпис файловим ключем</h2>
+      <ol class="steps">
+        <li>
+          <button id="readKeyBtn" class="btn">Зчитати ключ ПриватБанку…</button>
+          <span class="hint">відкриється захищена форма ІІТ: обери файл ключа й введи пароль</span>
+          <div id="keyInfo" class="muted"></div>
+        </li>
+        <li>
+          <button id="signBtn" class="btn primary" disabled>Підписати договір</button>
+        </li>
+        <li>
+          <div id="signResult" class="muted"></div>
+          <a id="downloadLink" class="btn ghost" style="display:none">⬇︎ Завантажити підпис (.p7s)</a>
+        </li>
+      </ol>
+      <!-- Контейнер для iframe віджета ІІТ -->
+      <div id="sign-widget-parent" class="widget-host"></div>
+    </section>
+
+    <!-- ── SmartID режим ── -->
+    <section class="card" id="smartidMode" hidden>
+      <h2>4. Підпис SmartID (скелет)</h2>
+      <p class="warn">⚠️ Це <b>скелет</b>. Справжній SmartID-підпис через Приват24 вимагає партнерського API ПриватБанку (креди + зареєстрований callback). Тут ми лише демонструємо потік: сервер → QR → очікування callback. Підпис — <b>мок</b>, не справжній <code>.p7s</code>.</p>
+      <button id="smartidStartBtn" class="btn primary">Створити сесію підпису (мок)</button>
+      <div id="qrBox" class="qr" hidden>
+        <img id="qrImg" alt="QR для Приват24" />
+        <p class="muted">У реальному потоці цей QR скануєш у Приват24 → підтверджуєш підпис → ПриватБанк б'є у твій <code>/callback</code>.</p>
+      </div>
+      <div id="callbackBox" class="callback" hidden>
+        <h3>Останній callback від сервера</h3>
+        <pre id="callbackOut">очікування…</pre>
+      </div>
+    </section>
+
+    <p class="foot">Порт сервера: <code id="origin"></code> · Лог callback дивись у терміналі, де запущено <code>node server.js</code>.</p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
