@@ -5,20 +5,35 @@
 
 import UIKit
 
-/// Pure timeline geometry for a single day, reproducing the SwiftUI
-/// `DayScheduleView`'s math: a 0–24 hour grid at `hourHeight` (36) points per
-/// hour with a `timelineTopPadding` (10) offset, hour rules + labels, and event
-/// blocks positioned by start/end time — now with **time-skips**: any empty gap
-/// of ≥ ``restThresholdMinutes`` (3h) between events (plus the leading/trailing
-/// bookends to midnight) is COLLAPSED into a fixed ``restBandHeight`` (48pt)
-/// "rest band", so the following hours move up ("hours skip"). The now-line and
-/// hour gridlines stay correct across the compression because every y-mapping
-/// runs through the same piecewise-linear ``y(for:)``.
+/// Pure timeline geometry for a single day. The schedule is a top-aligned stack
+/// (`align-content: start` — never stretched to fill evenly), where:
 ///
-/// This is *only* the math + frame computation — no view ownership — so the
-/// owning ``DayTimelineDayView`` (and its tests) can position cells without
-/// re-deriving the rules. Overlap columns are computed exactly as the old
-/// SwiftUI view did.
+/// - **Every empty interval that would waste space is COLLAPSED** into a fixed
+///   ``restBandHeight`` "rest band" — a compact, tappable placeholder labelled with
+///   the real span it stands in for. A gap is only collapsed when collapsing
+///   actually SAVES space (its real height exceeds the band height); a short gap
+///   between back-to-back events keeps its real (small) height, so collapsing never
+///   *adds* empty space.
+/// - **On today, "now" is treated as a 2-hour task**: a synthetic active window of
+///   `[now − 1h, now + 1h]` is merged into the event windows, so the hour before and
+///   after the current moment always render at real scale with the now-line through
+///   the middle.
+/// - **Fill only when there is slack, and only around now.** If the natural stacked
+///   height is SHORTER than the viewport, the ONE collapsed gap adjacent to the
+///   now-window on the side of its nearest task is un-collapsed (rendered at real
+///   duration). Nothing else is stretched — leftover space simply sits below the
+///   stack. This replaces the old "distribute slack across every empty window"
+///   behaviour, which padded the schedule with unwanted gaps.
+/// - **Collapsed gaps can be expanded by tapping them.** The owning view tracks the
+///   set of user-expanded gap keys and rebuilds; an expanded gap renders at real
+///   duration (ruled grid + hour labels), exactly like the auto-expanded now-gap.
+///
+/// The now-line and hour gridlines stay correct across the compression because every
+/// y-mapping runs through the same piecewise-linear ``y(for:)``.
+///
+/// This is *only* the math + frame computation — no view ownership — so the owning
+/// ``DayTimelineDayView`` (and its tests) can position cells without re-deriving the
+/// rules. Overlap columns are computed exactly as the old SwiftUI view did.
 struct DayTimelineLayout {
 
     // MARK: - Fixed structure
@@ -34,33 +49,21 @@ struct DayTimelineLayout {
     /// Minimum rendered height of an event block. Per the design spec a tile maps
     /// its duration to as little as ~14–18pt for the shortest slots (a 15–30 min
     /// event), so the block can be genuinely cramped — the timeline cell then
-    /// fades its clipped title rather than hard-clipping it. Kept at 18 (not the
-    /// spec's 14) to preserve a usable tap target while still letting the smallest
-    /// tiles clip a full title line. The old flat 28 floor was tall enough to fit a
-    /// full title line at every size, which is why the cell's fade mask was dead
-    /// code — see ``DayTimelineEventCell``'s `contentClipped` geometry.
+    /// fades its clipped title rather than hard-clipping it.
     static let minimumEventHeight: CGFloat = 18
     /// Horizontal inset shaved off each overlap column's width (matches the
     /// SwiftUI `columnWidth - 2`).
     static let columnInset: CGFloat = 2
 
-    /// A gap of at least this many minutes with no events is collapsed into a
-    /// single fixed-height rest band ("hours skip"). Per the design brief: any
-    /// gap of MORE THAN 3 HOURS (≥ 180 min).
-    static let restThresholdMinutes: Int = 180
     /// The fixed rendered height of a collapsed rest band, regardless of how many
-    /// real minutes it spans.
+    /// real minutes it spans. An empty gap is collapsed to this height ONLY when its
+    /// real (proportional) height would exceed it — so collapsing always saves space
+    /// and never inflates a short gap.
     static let restBandHeight: CGFloat = 48
 
-    /// The minimum compressed height any empty window is grown to once it receives
-    /// a share of the fill-available slack — so even a hairline empty span becomes a
-    /// tappable, visible breather rather than a zero-height sliver.
-    static let minimumSlackWindowHeight: CGFloat = 24
-    /// The minimum compressed height guaranteed to the empty window that contains
-    /// "now" on today, so the now-line plus its `HH:mm` label always render with a
-    /// little breathing room and are never compressed away. Sized for the label
-    /// (~14pt) plus the line plus padding above and below.
-    static let nowRegionMinimumHeight: CGFloat = 40
+    /// The synthetic "now" window's half-span, in minutes: the current moment is
+    /// treated as a 2-hour task spanning `[now − nowHalfSpan, now + nowHalfSpan]`.
+    static let nowHalfSpanMinutes: Int = 60
 
     private let hourHeight: CGFloat
     private let topPadding: CGFloat
@@ -69,8 +72,7 @@ struct DayTimelineLayout {
     /// `Date` to minutes-since-this-midnight even across DST-ish arithmetic.
     private let dayStart: Date
     /// The piecewise segments (active windows + collapsed rest bands) that define
-    /// the compressed y-mapping, in ascending time order — AFTER the fill-available
-    /// slack has been distributed across the empty windows.
+    /// the compressed y-mapping, in ascending time order.
     private let segments: [Segment]
     /// The total compressed content height of the segment stack (excludes
     /// `topPadding`), cached from the segment build.
@@ -84,19 +86,21 @@ struct DayTimelineLayout {
     ///   - events: the day's TIMED occurrences (all-day are handled by the
     ///     owning view's separate band and must NOT be passed here) — their
     ///     active windows drive where gaps collapse.
-    ///   - availableHeight: the viewport height the schedule should fill AT LEAST.
-    ///     Any leftover beyond the natural content height is distributed across the
-    ///     empty windows only (see ``TimelineSlackDistributor``). Pass `0` (default)
-    ///     to skip filling and use the natural compressed height.
-    ///   - now: the moment whose window is protected from compression on today, so
-    ///     the now-line + label stay visible. Only consulted when `date` is today.
+    ///   - availableHeight: the viewport height the schedule may fill UP TO. When the
+    ///     natural stacked height is shorter, the single collapsed gap next to "now"
+    ///     is un-collapsed to occupy real time toward the nearest task; the schedule
+    ///     is never stretched beyond that. Pass `0` (default) to skip the fill.
+    ///   - now: the current moment — treated as a 2-hour task window on today.
+    ///   - expandedGapKeys: gap keys (`"start-end"` minute ranges) the user has
+    ///     tapped to expand; those gaps render at real duration instead of collapsed.
     init(
         hourHeight: CGFloat,
         topPadding: CGFloat,
         date: Date = Date(),
         events: [OccurrenceVM] = [],
         availableHeight: CGFloat = 0,
-        now: Date = Date()
+        now: Date = Date(),
+        expandedGapKeys: Set<String> = []
     ) {
         self.hourHeight = hourHeight
         self.topPadding = topPadding
@@ -104,33 +108,52 @@ struct DayTimelineLayout {
         self.dayStart = start
         let calendar = Calendar.current
         let isToday = calendar.isDateInToday(date)
-        let built = Self.buildSegments(
+        let nowMinute = isToday ? Self.wallClockMinute(of: now, calendar: calendar) : nil
+
+        // First pass: collapse empty gaps (except any the user already expanded),
+        // with "now" injected as a 2-hour active window on today.
+        var built = Self.buildSegments(
             events: events,
             dayStart: start,
             calendar: calendar,
             hourHeight: hourHeight,
-            isToday: isToday,
-            now: now
+            nowMinute: nowMinute,
+            expandedGapKeys: expandedGapKeys
         )
-        // Fill-available: grow ONLY the empty windows so the schedule occupies at
-        // least the viewport, protecting the now-region on today. The slack target
-        // excludes `topPadding` (the distributor works in the segment stack's own
-        // coordinate space), and the now-minute is only meaningful on today.
-        let nowMinute = isToday ? Self.wallClockMinute(of: now, calendar: calendar) : nil
-        let distributor = TimelineSlackDistributor(
-            targetHeight: max(0, availableHeight - topPadding),
-            nowMinute: nowMinute
-        )
-        let filled = distributor.distribute(segments: built.segments, baseHeight: built.height)
-        self.segments = filled.segments
-        self.compressedHeight = filled.height
+
+        // Fill-when-slack (today only): if the stack is shorter than the viewport,
+        // un-collapse the ONE collapsed gap adjacent to the now-window that leads to
+        // the nearest real task, then rebuild once. No other window is grown —
+        // leftover space sits below the stack (align-content: start).
+        if let nowMinute {
+            let target = max(0, availableHeight - topPadding)
+            let realBoundaries = Self.realEventBoundaries(events: events, dayStart: start, calendar: calendar)
+            if built.height < target,
+               let autoKey = Self.autoExpandGapKey(
+                   segments: built.segments, nowMinute: nowMinute, realBoundaries: realBoundaries
+               ),
+               !expandedGapKeys.contains(autoKey) {
+                built = Self.buildSegments(
+                    events: events,
+                    dayStart: start,
+                    calendar: calendar,
+                    hourHeight: hourHeight,
+                    nowMinute: nowMinute,
+                    expandedGapKeys: expandedGapKeys.union([autoKey])
+                )
+            }
+        }
+
+        self.segments = built.segments
+        self.compressedHeight = built.height
     }
 
     // MARK: - Segment model
 
     /// One contiguous stretch of the compressed timeline.
     enum SegmentKind: Equatable {
-        /// A normal, linearly-mapped active window (hours render at `hourHeight`).
+        /// A normal, linearly-mapped active window (hours render at `hourHeight`) —
+        /// an event window, the now-window, an expanded gap, or a short empty gap.
         case active
         /// A collapsed empty gap, rendered as a fixed-height rest band with a
         /// `HH:MM – HH:MM` label of the real span it stands in for.
@@ -148,33 +171,25 @@ struct DayTimelineLayout {
         let yTop: CGFloat
         /// The segment's rendered height in the compressed content.
         let height: CGFloat
-        /// True when this stretch holds NO events — a collapsed `.rest` band or a
-        /// sub-threshold empty span (leading/trailing bookend or inter-event gap)
-        /// that still renders as ruled grid. Only these windows absorb fill-available
-        /// slack; segments overlapping real events are never grown.
-        let isEmpty: Bool
 
-        /// Returns a copy re-flowed to a new `yTop`/`height`, preserving identity.
-        func reflowed(yTop: CGFloat, height: CGFloat) -> Segment {
-            Segment(
-                kind: kind,
-                startMinute: startMinute,
-                endMinute: endMinute,
-                yTop: yTop,
-                height: height,
-                isEmpty: isEmpty
-            )
-        }
+        /// Real duration of the stretch, in minutes.
+        var durationMinutes: Int { endMinute - startMinute }
     }
 
-    /// The rest bands to render (label + frame), derived once from the segments.
+    /// The rest bands to render (label + frame + tap key), derived once from the
+    /// segments.
     struct RestBand: Identifiable {
+        /// Stable identity of the collapsed gap (its `"start-end"` minute range),
+        /// handed back to the layout when the user taps to expand it.
+        let gapKey: String
+        let startMinute: Int
+        let endMinute: Int
         /// Compressed top y (INCLUDING `topPadding`), ready for a view frame.
         let y: CGFloat
         let height: CGFloat
         /// Localized `HH:MM – HH:MM` label of the collapsed real span.
         let label: String
-        var id: CGFloat { y }
+        var id: String { gapKey }
     }
 
     // MARK: - Derived metrics
@@ -202,7 +217,7 @@ struct DayTimelineLayout {
 
     /// The compressed y (INCLUDING `topPadding`) for `minute` (0...1440). Active
     /// segments interpolate linearly; a moment inside a collapsed gap maps to the
-    /// proportional point of that gap's fixed 48px band.
+    /// proportional point of that gap's fixed band.
     private func compressedY(forMinute minute: Int) -> CGFloat {
         guard let first = segments.first else { return topPadding }
         if minute <= first.startMinute { return topPadding + first.yTop }
@@ -229,7 +244,7 @@ struct DayTimelineLayout {
 
     /// True when the hour at `hour` falls inside (or on the boundary of) an active
     /// segment — so its gridline + gutter label should render. Hours buried inside
-    /// a collapsed rest band are suppressed (they'd all pile onto the 48px band).
+    /// a collapsed rest band are suppressed (they'd all pile onto the band).
     func hourLineIsVisible(_ hour: Int) -> Bool {
         let minute = hour * 60
         return segments.contains { segment in
@@ -237,11 +252,15 @@ struct DayTimelineLayout {
         }
     }
 
-    /// The rest bands to render, as ready-to-frame `(y, height, label)` triples.
+    /// The rest bands to render, as ready-to-frame `(gapKey, span, y, height, label)`
+    /// values.
     func restBands() -> [RestBand] {
         segments.compactMap { segment in
             guard segment.kind == .rest else { return nil }
             return RestBand(
+                gapKey: Self.gapKey(startMinute: segment.startMinute, endMinute: segment.endMinute),
+                startMinute: segment.startMinute,
+                endMinute: segment.endMinute,
                 y: topPadding + segment.yTop,
                 height: segment.height,
                 label: Self.restLabel(startMinute: segment.startMinute, endMinute: segment.endMinute)
@@ -252,21 +271,19 @@ struct DayTimelineLayout {
     // MARK: - Segment building
 
     /// Builds the compressed segment stack for `events` on `dayStart`. Merges the
-    /// events' active minute-windows, then walks 00:00→24:00: gaps ≥
-    /// ``restThresholdMinutes`` (including the leading/trailing bookends to
-    /// midnight) become fixed 48px rest segments; every other stretch is an active
-    /// segment mapped linearly at `hourHeight`/60 px per minute. Every stretch is
-    /// tagged `isEmpty` (no events overlapping it) so the fill-available slack pass
-    /// can grow those windows only. On a today with no timed events the whole day is
-    /// split into two empty windows at the now-line so the mark shows time before
-    /// and after (spec §2).
+    /// events' active minute-windows (plus a 2-hour now-window on today), then walks
+    /// 00:00→24:00: every empty gap (leading/trailing bookends + inter-event gaps) is
+    /// collapsed to a fixed ``restBandHeight`` band WHEN collapsing saves space and
+    /// the gap isn't in `expandedGapKeys`; otherwise it renders at real duration.
+    /// Active windows render linearly at `hourHeight`/60 px per minute. The stack is
+    /// top-aligned — never stretched.
     private static func buildSegments(
         events: [OccurrenceVM],
         dayStart: Date,
         calendar: Calendar,
         hourHeight: CGFloat,
-        isToday: Bool,
-        now: Date
+        nowMinute: Int?,
+        expandedGapKeys: Set<String>
     ) -> (segments: [Segment], height: CGFloat) {
         let pxPerMinute = hourHeight / 60
         let dayEnd = Self.endHour * 60
@@ -281,11 +298,118 @@ struct DayTimelineLayout {
             let endMinute = max(rawEnd, startMinute + 1)
             windows.append((start: startMinute, end: min(endMinute, dayEnd)))
         }
-        windows.sort { $0.start < $1.start }
+
+        // On today, treat "now" as a 2-hour task so the current moment always renders
+        // at real scale with the now-line through its middle. Merged with events.
+        if let nowMinute {
+            let start = min(max(nowMinute - Self.nowHalfSpanMinutes, 0), dayEnd)
+            let end = min(max(nowMinute + Self.nowHalfSpanMinutes, 0), dayEnd)
+            if end > start { windows.append((start: start, end: end)) }
+        }
 
         // Merge overlapping/touching windows into disjoint active spans.
+        let merged = Self.merge(windows)
+
+        var segments: [Segment] = []
+        var cursorY: CGFloat = 0
+
+        /// Appends a linearly-mapped active stretch (event window, now-window,
+        /// expanded gap, or a short empty gap kept at real height).
+        func appendActive(from startMinute: Int, to endMinute: Int) {
+            guard endMinute > startMinute else { return }
+            let height = CGFloat(endMinute - startMinute) * pxPerMinute
+            segments.append(
+                Segment(kind: .active, startMinute: startMinute, endMinute: endMinute, yTop: cursorY, height: height)
+            )
+            cursorY += height
+        }
+
+        /// Emits an empty gap: a collapsed fixed-height rest band when collapsing
+        /// saves space and the gap isn't user-expanded; otherwise a real-height
+        /// active window (short gaps and expanded gaps stay at real scale).
+        func appendGap(from startMinute: Int, to endMinute: Int) {
+            guard endMinute > startMinute else { return }
+            let realHeight = CGFloat(endMinute - startMinute) * pxPerMinute
+            let key = Self.gapKey(startMinute: startMinute, endMinute: endMinute)
+            let shouldCollapse = realHeight > restBandHeight && !expandedGapKeys.contains(key)
+            guard shouldCollapse else {
+                appendActive(from: startMinute, to: endMinute)
+                return
+            }
+            segments.append(
+                Segment(kind: .rest, startMinute: startMinute, endMinute: endMinute, yTop: cursorY, height: restBandHeight)
+            )
+            cursorY += restBandHeight
+        }
+
+        // No events and not today (today always injects the now-window): a single
+        // full-day empty gap, collapsed to one band.
+        guard !merged.isEmpty else {
+            appendGap(from: 0, to: dayEnd)
+            return (segments, cursorY)
+        }
+
+        // Leading bookend, then each active span followed by the gap after it.
+        appendGap(from: 0, to: merged[0].start)
+        for (index, span) in merged.enumerated() {
+            appendActive(from: span.start, to: span.end)
+            let nextStart = index + 1 < merged.count ? merged[index + 1].start : dayEnd
+            appendGap(from: span.end, to: nextStart)
+        }
+
+        return (segments, cursorY)
+    }
+
+    /// The gap key adjacent to the now-window to auto-expand when there is slack: the
+    /// collapsed rest band immediately before or after the active window containing
+    /// "now" whose FAR edge touches a real event boundary (i.e. the gap actually
+    /// leads to a task, never to a day edge), preferring the SHORTER such band (the
+    /// nearer task); ties break toward the later (after) side. Returns `nil` when
+    /// neither neighbour qualifies — a task already adjacent to "now" (its gap open),
+    /// or an empty day — so nothing is stretched and leftover space sits below.
+    private static func autoExpandGapKey(
+        segments: [Segment],
+        nowMinute: Int,
+        realBoundaries: Set<Int>
+    ) -> String? {
+        guard let nowIndex = segments.firstIndex(where: { segment in
+            segment.kind == .active && nowMinute >= segment.startMinute && nowMinute <= segment.endMinute
+        }) else { return nil }
+
+        /// A neighbour qualifies only if it is a collapsed gap whose far edge (the
+        /// side away from "now") lands on a real event boundary — so expanding it
+        /// reveals real time between "now" and an actual task, not empty day-edge.
+        func qualifyingNeighbor(at index: Int, farEdge: (Segment) -> Int) -> Segment? {
+            guard index >= 0, index < segments.count else { return nil }
+            let segment = segments[index]
+            guard segment.kind == .rest, realBoundaries.contains(farEdge(segment)) else { return nil }
+            return segment
+        }
+        let before = qualifyingNeighbor(at: nowIndex - 1, farEdge: { $0.startMinute })
+        let after = qualifyingNeighbor(at: nowIndex + 1, farEdge: { $0.endMinute })
+
+        let chosen: Segment?
+        switch (before, after) {
+        case let (before?, after?):
+            chosen = before.durationMinutes < after.durationMinutes ? before : after
+        case let (before?, nil):
+            chosen = before
+        case let (nil, after?):
+            chosen = after
+        default:
+            chosen = nil
+        }
+        guard let chosen else { return nil }
+        return gapKey(startMinute: chosen.startMinute, endMinute: chosen.endMinute)
+    }
+
+    /// Merges overlapping/touching `[start, end]` minute windows into disjoint spans,
+    /// ascending. Shared by the segment build (events + now-window) and the
+    /// real-event boundary set used to decide which gap leads to a task.
+    private static func merge(_ windows: [(start: Int, end: Int)]) -> [(start: Int, end: Int)] {
+        let sorted = windows.sorted { $0.start < $1.start }
         var merged: [(start: Int, end: Int)] = []
-        for window in windows {
+        for window in sorted {
             if var last = merged.last, window.start <= last.end {
                 last.end = max(last.end, window.end)
                 merged[merged.count - 1] = last
@@ -293,81 +417,27 @@ struct DayTimelineLayout {
                 merged.append(window)
             }
         }
+        return merged
+    }
 
-        var segments: [Segment] = []
-        var cursorY: CGFloat = 0
-
-        /// Appends a linearly-mapped active stretch, tagging whether it holds events.
-        func appendActive(from startMinute: Int, to endMinute: Int, isEmpty: Bool) {
-            guard endMinute > startMinute else { return }
-            let height = CGFloat(endMinute - startMinute) * pxPerMinute
-            segments.append(
-                Segment(
-                    kind: .active, startMinute: startMinute, endMinute: endMinute,
-                    yTop: cursorY, height: height, isEmpty: isEmpty
-                )
-            )
-            cursorY += height
+    /// The set of merged REAL-event boundary minutes (starts + ends, no now-window),
+    /// used to confirm a collapsed gap actually abuts a task before auto-expanding it.
+    private static func realEventBoundaries(events: [OccurrenceVM], dayStart: Date, calendar: Calendar) -> Set<Int> {
+        let dayEnd = Self.endHour * 60
+        var windows: [(start: Int, end: Int)] = []
+        for event in events {
+            let startMinute = Self.minute(of: event.startAt, dayStart: dayStart, calendar: calendar, cap: dayEnd)
+            let rawEnd = Self.minute(of: event.endAt, dayStart: dayStart, calendar: calendar, cap: dayEnd)
+            let endMinute = max(rawEnd, startMinute + 1)
+            windows.append((start: startMinute, end: min(endMinute, dayEnd)))
         }
+        return Set(Self.merge(windows).flatMap { [$0.start, $0.end] })
+    }
 
-        /// Appends a collapsed fixed-height rest band (always an empty window).
-        func appendRest(from startMinute: Int, to endMinute: Int) {
-            guard endMinute > startMinute else { return }
-            segments.append(
-                Segment(
-                    kind: .rest, startMinute: startMinute, endMinute: endMinute,
-                    yTop: cursorY, height: restBandHeight, isEmpty: true
-                )
-            )
-            cursorY += restBandHeight
-        }
-
-        // No events. On today, split the empty day at the now-line into a leading
-        // (00:00 → now) and trailing (now → 24:00) empty window, so the fill pass
-        // can grow both and the now mark sits between "time before" and "time after".
-        // On any other day, a single empty full-day window (grows to fill).
-        guard !merged.isEmpty else {
-            if isToday {
-                let nowMinute = min(max(Self.wallClockMinute(of: now, calendar: calendar), 0), dayEnd)
-                appendActive(from: 0, to: nowMinute, isEmpty: true)
-                appendActive(from: nowMinute, to: dayEnd, isEmpty: true)
-            } else {
-                appendActive(from: 0, to: dayEnd, isEmpty: true)
-            }
-            return (segments, cursorY)
-        }
-
-        // Assemble the ordered stretch list [0 ... 1440]: gaps ≥ threshold become
-        // rest segments; empty sub-threshold gaps stay ruled active windows but are
-        // tagged empty so they can still absorb slack.
-        var cursorMinute = 0
-
-        /// Emits an empty gap: a collapsed rest band when long enough, else a ruled
-        /// active window flagged empty.
-        func appendGap(from startMinute: Int, to endMinute: Int) {
-            guard endMinute > startMinute else { return }
-            if endMinute - startMinute >= restThresholdMinutes {
-                appendRest(from: startMinute, to: endMinute)
-            } else {
-                appendActive(from: startMinute, to: endMinute, isEmpty: true)
-            }
-        }
-
-        // Leading bookend: 00:00 → first active span start.
-        appendGap(from: cursorMinute, to: merged[0].start)
-        cursorMinute = merged[0].start
-
-        for (index, span) in merged.enumerated() {
-            // The active span itself (holds events).
-            appendActive(from: span.start, to: span.end, isEmpty: false)
-            cursorMinute = span.end
-            // The gap to the next span (or to midnight for the last one).
-            let nextStart = index + 1 < merged.count ? merged[index + 1].start : dayEnd
-            appendGap(from: cursorMinute, to: nextStart)
-            cursorMinute = nextStart
-        }
-
-        return (segments, cursorY)
+    /// Stable `"start-end"` identity for an empty gap, shared by the build (to honour
+    /// `expandedGapKeys`), the rendered ``RestBand``, and the tap-to-expand handler.
+    private static func gapKey(startMinute: Int, endMinute: Int) -> String {
+        "\(startMinute)-\(endMinute)"
     }
 
     /// Minutes-since-midnight of `date` relative to `dayStart`, clamped to
@@ -382,7 +452,7 @@ struct DayTimelineLayout {
 
     /// Wall-clock minutes-since-midnight of `date` (0...1440), read from its hour +
     /// minute components — matching the instance ``minutes(for:)`` so the build-time
-    /// now-split lands on the same coordinate the now-line later maps to.
+    /// now-window lands on the same coordinate the now-line later maps to.
     private static func wallClockMinute(of date: Date, calendar: Calendar) -> Int {
         let components = calendar.dateComponents([.hour, .minute], from: date)
         let raw = (components.hour ?? 0) * 60 + (components.minute ?? 0)
@@ -440,11 +510,9 @@ struct DayTimelineLayout {
         calendar.isDateInToday(date)
     }
 
-    /// True when the now-line should render on today. Because the fill pass
-    /// (``TimelineSlackDistributor``) guarantees the window containing "now" keeps at
-    /// least ``nowRegionMinimumHeight``, the now-line is ALWAYS meaningful on today —
-    /// even when "now" lands in a grown empty window or a rest band it protected. It
-    /// is only false in the degenerate case of an empty segment stack.
+    /// True when the now-line should render on today. Because "now" is always laid
+    /// out as a 2-hour active window, the now-line is meaningful whenever the segment
+    /// stack is non-empty on today.
     func nowIsVisible(_ now: Date) -> Bool {
         !segments.isEmpty
     }
@@ -506,120 +574,13 @@ struct DayTimelineLayout {
     }
 }
 
-/// Fill-available-height strategy for the day timeline: grows ONLY the empty
-/// windows of a built segment stack so the schedule occupies at least a target
-/// (viewport) height, while every event-bearing segment keeps its exact
-/// proportional height. Isolating the redistribution here keeps
-/// ``DayTimelineLayout``'s build step a pure piecewise map and makes the "where
-/// does the slack go" policy readable and independently testable.
-///
-/// **Weighting.** The leftover `target − base` is split across the empty windows
-/// (collapsed rest bands + leading/trailing bookends + inter-event gaps) in
-/// proportion to each window's REAL collapsed duration, so longer empty spans
-/// absorb more slack. Each grown window is floored at
-/// ``DayTimelineLayout/minimumSlackWindowHeight`` so even a hairline gap becomes a
-/// visible breather.
-///
-/// **Now-region protection.** The empty window that contains `nowMinute` (today
-/// only) is additionally floored at ``DayTimelineLayout/nowRegionMinimumHeight`` —
-/// applied even when there is no leftover — so the now-line and its `HH:mm` label
-/// always render unclipped and are never compressed away.
-struct TimelineSlackDistributor {
-
-    /// The height the reflowed stack should reach at minimum (segment-stack space,
-    /// i.e. excluding the view's `topPadding`).
-    let targetHeight: CGFloat
-    /// Minutes-since-midnight of "now" whose containing empty window is protected,
-    /// or `nil` when the day being laid out is not today.
-    let nowMinute: Int?
-
-    /// Reflows `segments` so the empty windows absorb the fill slack and the
-    /// now-region keeps its guaranteed minimum. Event-bearing segments are copied
-    /// through unchanged (never shrunk, never grown); only `yTop` is re-cascaded.
-    /// Returns the segments already re-stacked plus the new total height.
-    func distribute(
-        segments: [DayTimelineLayout.Segment],
-        baseHeight: CGFloat
-    ) -> (segments: [DayTimelineLayout.Segment], height: CGFloat) {
-        guard !segments.isEmpty else { return (segments, baseHeight) }
-
-        // Indices of the windows eligible to grow (empty stretches only).
-        let emptyIndices = segments.indices.filter { segments[$0].isEmpty }
-
-        // Per-window extra height, keyed by segment index. Start at zero (= keep
-        // base height) for every segment; only empty windows accrue extra.
-        var extraByIndex: [Int: CGFloat] = [:]
-
-        // 1) Now-region floor — applied first and independent of any leftover, so a
-        //    tiny empty window under "now" is lifted to a visible, unclipped band.
-        if let nowIndex = nowRegionIndex(in: segments) {
-            let deficit = DayTimelineLayout.nowRegionMinimumHeight - segments[nowIndex].height
-            if deficit > 0 { extraByIndex[nowIndex] = deficit }
-        }
-
-        // 2) Fill leftover across empty windows, weighted by real duration. The
-        //    now-region's already-granted floor counts toward the fill, so we don't
-        //    double-spend past the target.
-        let grantedSoFar = extraByIndex.values.reduce(0, +)
-        let leftover = max(0, targetHeight - baseHeight - grantedSoFar)
-        let isFilling = leftover > 0 && !emptyIndices.isEmpty
-        if isFilling {
-            let weights = emptyIndices.map { index -> CGFloat in
-                CGFloat(max(segments[index].endMinute - segments[index].startMinute, 1))
-            }
-            let totalWeight = weights.reduce(0, +)
-            if totalWeight > 0 {
-                for (offset, index) in emptyIndices.enumerated() {
-                    let share = leftover * (weights[offset] / totalWeight)
-                    extraByIndex[index, default: 0] += share
-                }
-            }
-
-            // 3) Minimum-per-window floor — ONLY while actively filling, so no grown
-            //    gap collapses below a usable height. When there is no leftover we
-            //    leave empty windows at their natural (ruled) height and don't inflate
-            //    them just to hit a minimum.
-            for index in emptyIndices {
-                let grown = segments[index].height + extraByIndex[index, default: 0]
-                if grown < DayTimelineLayout.minimumSlackWindowHeight {
-                    extraByIndex[index] = DayTimelineLayout.minimumSlackWindowHeight - segments[index].height
-                }
-            }
-        }
-
-        // Nothing to do — no floors triggered and no leftover.
-        guard !extraByIndex.isEmpty else { return (segments, baseHeight) }
-
-        // Re-cascade yTop with the per-window extras applied.
-        var reflowed: [DayTimelineLayout.Segment] = []
-        reflowed.reserveCapacity(segments.count)
-        var cursorY: CGFloat = 0
-        for (index, segment) in segments.enumerated() {
-            let height = segment.height + extraByIndex[index, default: 0]
-            reflowed.append(segment.reflowed(yTop: cursorY, height: height))
-            cursorY += height
-        }
-        return (reflowed, cursorY)
-    }
-
-    /// The index of the empty window that contains `nowMinute` (today only), or
-    /// `nil` when there is no now-minute or it lands only on non-empty segments.
-    /// Prefers an empty window; an event-bearing segment under "now" needs no floor
-    /// because its own event tiles already keep it tall.
-    private func nowRegionIndex(in segments: [DayTimelineLayout.Segment]) -> Int? {
-        guard let nowMinute else { return nil }
-        return segments.firstIndex { segment in
-            segment.isEmpty && nowMinute >= segment.startMinute && nowMinute <= segment.endMinute
-        }
-    }
-}
-
 /// The day timeline rendered as a single self-sizing UIKit view: hour rules,
-/// half-hour ticks, hourly time labels, collapsed rest bands, absolutely-
-/// positioned event blocks (``DayTimelineEventCell``), and a clay now-indicator
+/// half-hour ticks, hourly time labels, collapsed (tappable) rest bands,
+/// absolutely-positioned event blocks (``DayTimelineEventCell``), and a now-indicator
 /// on today (refreshed each minute). This is the UIKit body of `DayScheduleView`;
 /// it owns no data, taking events + theme through ``configure(events:date:theme:)``
-/// and forwarding the two cell intents through `onToggle` / `onSelect`.
+/// and forwarding the two cell intents through `onToggle` / `onSelect`. Tapping a
+/// collapsed rest band expands it in place.
 final class DayTimelineDayView: UIView {
 
     // MARK: - Intents (forwarded from cells)
@@ -629,10 +590,14 @@ final class DayTimelineDayView: UIView {
 
     // MARK: - Geometry
 
-    /// The layout math. Rebuilt (with the day's events, for time-skips, and the
-    /// current viewport height for fill-available) on every `configure` and whenever
-    /// the available height changes.
+    /// The layout math. Rebuilt (with the day's events, the current viewport height
+    /// for the slack-fill, and the set of user-expanded gaps) on every `configure`,
+    /// on a gap tap, and whenever the available height changes.
     private(set) var layout = DayTimelineLayout(hourHeight: 36, topPadding: 10)
+
+    /// Gap keys the user has tapped to expand. Reset when the day's data changes
+    /// (a new day has different gaps); preserved across pure viewport-height rebuilds.
+    private var expandedGapKeys: Set<String> = []
 
     /// Extra tail below the last segment so the final tile is never cut off — the
     /// spec's 8px tail plus ~30 minutes' worth of breathing room.
@@ -696,14 +661,21 @@ final class DayTimelineDayView: UIView {
 
     // MARK: - Configuration
 
-    /// Rebuilds the timeline for `events` on `date` with `theme`. Rebuilds the
-    /// layout math (with the day's timed events, so gaps collapse, filled to the
-    /// current viewport), refreshes the grid + labels + rest bands, and rebuilds the
-    /// event blocks.
+    /// Rebuilds the timeline for `events` on `date` with `theme`. New data resets any
+    /// user-expanded gaps (a different day has different gaps), then refreshes the
+    /// layout math, grid, labels, rest bands, and event blocks.
     func configure(events: [OccurrenceVM], date: Date, theme: CalendarTheme) {
         self.events = events
         self.date = date
         self.theme = theme
+        expandedGapKeys = []
+        refresh()
+    }
+
+    /// Rebuilds every derived view (layout math + grid + labels + rest bands + event
+    /// blocks + now-indicator) from the current `events` / `date` / `theme` /
+    /// `expandedGapKeys`. Shared by `configure` and the tap-to-expand path.
+    private func refresh() {
         availableHeight = currentAvailableHeight()
         rebuildLayout()
         invalidateIntrinsicContentSize()
@@ -716,10 +688,9 @@ final class DayTimelineDayView: UIView {
         setNeedsLayout()
     }
 
-    /// (Re)builds the layout math from the current `events` / `date` / `theme` and
-    /// the cached ``availableHeight``, so the schedule fills at least the viewport
-    /// and the now-region stays protected. Split out so a pure viewport-height change
-    /// in `layoutSubviews` can re-fill without re-creating cells.
+    /// (Re)builds the layout math from the current inputs and the cached
+    /// ``availableHeight`` + ``expandedGapKeys``. Split out so a pure viewport-height
+    /// change in `layoutSubviews` can re-fill without re-creating cells.
     private func rebuildLayout() {
         guard let theme else { return }
         layout = DayTimelineLayout(
@@ -728,11 +699,19 @@ final class DayTimelineDayView: UIView {
             date: date,
             events: events,
             availableHeight: availableHeight,
-            now: Date()
+            now: Date(),
+            expandedGapKeys: expandedGapKeys
         )
     }
 
-    /// The viewport height the schedule should fill: the enclosing scroll view's
+    /// Marks a collapsed gap as expanded and rebuilds so it renders at real duration.
+    private func expandGap(_ gapKey: String) {
+        guard !expandedGapKeys.contains(gapKey) else { return }
+        expandedGapKeys.insert(gapKey)
+        refresh()
+    }
+
+    /// The viewport height the schedule may fill up to: the enclosing scroll view's
     /// bounds height (this view is pinned to that scroll's content guide, so its own
     /// bounds are the CONTENT height, not the viewport). Falls back to `0` — meaning
     /// "don't fill" — until the view is in a sized scroll view.
@@ -786,13 +765,15 @@ final class DayTimelineDayView: UIView {
 
     // MARK: - Rest bands
 
-    /// Recreates the collapsed rest-band strips for the current layout.
+    /// Recreates the collapsed rest-band strips for the current layout, wiring each
+    /// to expand its gap on tap.
     private func rebuildRestBands() {
         guard let theme else { return }
         for view in restBandViews { view.removeFromSuperview() }
         restBandViews = layout.restBands().map { band in
             let view = DayTimelineRestBandView()
             view.configure(label: band.label, theme: theme)
+            view.onTap = { [weak self] in self?.expandGap(band.gapKey) }
             insertSubview(view, belowSubview: nowLine)
             return view
         }
@@ -845,9 +826,8 @@ final class DayTimelineDayView: UIView {
     }
 
     private func updateNowIndicator() {
-        // The now-line renders on today whenever "now" maps onto the timeline. The
-        // fill pass guarantees the window under "now" keeps enough height, so — per
-        // spec §3 — the indicator is never hidden on today, even in a rest band.
+        // "now" is laid out as a 2-hour active window on today, so the indicator is
+        // always meaningful whenever the day is today and the stack is non-empty.
         let now = Date()
         guard let theme, layout.isToday(date), layout.nowIsVisible(now) else {
             hideNowIndicator()
@@ -871,16 +851,19 @@ final class DayTimelineDayView: UIView {
         let width = bounds.width
         guard width > 0 else { return }
 
-        // Re-fill the schedule when the viewport height changed (rotation, tab-bar
-        // show/hide) so it keeps occupying at least the visible area. Only the
-        // fill/y-mapping changes — segment/band/label COUNTS are unaffected — so a
-        // cheap layout rebuild + intrinsic-size refresh suffices; cells are not
-        // recreated.
+        // Re-fill the schedule when the viewport height changed (first real layout
+        // after hosting, rotation, tab-bar show/hide) so it keeps occupying at least
+        // the visible area. The slack-fill can un-collapse a gap — which CHANGES the
+        // rest-band set — so the band views must be rebuilt in lockstep with the new
+        // layout, otherwise a stale band view is framed at another band's position
+        // and shows the wrong span. Event cells re-frame from `layout` below, so they
+        // need no rebuild here.
         let latestAvailable = currentAvailableHeight()
         if abs(latestAvailable - availableHeight) > 0.5 {
             availableHeight = latestAvailable
             rebuildLayout()
             invalidateIntrinsicContentSize()
+            rebuildRestBands()
         }
 
         let eventsColumnX = DayTimelineLayout.timeColumnWidth + DayTimelineLayout.gutter
@@ -945,7 +928,7 @@ final class DayTimelineDayView: UIView {
         }
 
         // Now indicator inset 8px from both edges on today, with the dot at the
-        // leading edge (matches the design's left:8/right:8 clay rule).
+        // leading edge (matches the design's left:8/right:8 rule).
         if !nowLine.isHidden {
             let nowInset: CGFloat = 8
             let yPosition = layout.nowIndicatorY(Date())
@@ -961,10 +944,6 @@ final class DayTimelineDayView: UIView {
 
     /// Positions the `HH:mm` now-label right-aligned near the right inset, anchored
     /// just above the now-line so it rides WITH the line as the timeline scrolls.
-    /// There is no viewport-top clamp: `timelineScroll` has no scroll delegate, so a
-    /// clamp would only re-evaluate on unrelated layout passes and slide off during a
-    /// drag — and a now-line scrolled off-screen taking its label with it is fine,
-    /// since the line itself is no longer visible either.
     private func layoutNowTimeLabel(lineY: CGFloat, inset: CGFloat, width: CGFloat) {
         nowTimeLabel.sizeToFit()
         let labelHeight = nowTimeLabel.bounds.height
@@ -988,27 +967,42 @@ final class DayTimelineDayView: UIView {
     }
 }
 
-/// A collapsed empty-gap "rest band": a centered mono `HH:MM – HH:MM` label
-/// flanked left and right by 1px dashed separator rules (theme separator @0.7),
-/// standing in for hours the day skips.
+/// A collapsed empty-gap "rest band": a centered mono `HH:MM – HH:MM` label with a
+/// trailing `chevron.down` affordance, flanked by 1px dashed separator rules (theme
+/// separator @0.7), standing in for hours the day skips. Tapping it expands the gap
+/// to real duration.
 final class DayTimelineRestBandView: UIView {
+
+    /// Fired when the band is tapped — the owning view expands its gap.
+    var onTap: (() -> Void)?
 
     private let leftRule = CAShapeLayer()
     private let rightRule = CAShapeLayer()
     private let label = UILabel()
+    /// A small disclosure chevron hinting the band expands on tap.
+    private let chevron = UIImageView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        isUserInteractionEnabled = false
+        // The band is tappable to expand its collapsed gap.
+        isUserInteractionEnabled = true
+        accessibilityTraits = .button
         label.textAlignment = .center
         label.numberOfLines = 1
         addSubview(label)
+        chevron.image = UIImage(
+            systemName: "chevron.down",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 8, weight: .semibold)
+        )
+        chevron.contentMode = .center
+        addSubview(chevron)
         for rule in [leftRule, rightRule] {
             rule.lineWidth = 1
             rule.lineDashPattern = [3, 3]
             rule.fillColor = UIColor.clear.cgColor
             layer.addSublayer(rule)
         }
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
     }
 
     @available(*, unavailable)
@@ -1016,11 +1010,20 @@ final class DayTimelineRestBandView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    @objc private func handleTap() {
+        onTap?()
+    }
+
     /// Sets the collapsed-span label + theme colors.
     func configure(label text: String, theme: CalendarTheme) {
         label.text = text
         label.font = theme.codeSmall
         label.textColor = theme.textSecondary
+        chevron.tintColor = theme.textSecondary
+        accessibilityLabel = String(
+            format: String(localized: "calendar.timeline.expandGap", defaultValue: "Expand %@"),
+            text
+        )
         let ruleColor = theme.separator.withAlphaComponent(0.7).cgColor
         leftRule.strokeColor = ruleColor
         rightRule.strokeColor = ruleColor
@@ -1037,10 +1040,18 @@ final class DayTimelineRestBandView: UIView {
             width: labelWidth,
             height: label.bounds.height
         )
-        // Dashed rules flank the label with an 8px gap on each side.
+        // Chevron just to the right of the label.
+        let chevronSize: CGFloat = 12
+        chevron.frame = CGRect(
+            x: label.frame.maxX + 3,
+            y: centerY - chevronSize / 2,
+            width: chevronSize,
+            height: chevronSize
+        )
+        // Dashed rules flank the [label + chevron] group with an 8px gap on each side.
         let gap: CGFloat = 8
         let leftEnd = label.frame.minX - gap
-        let rightStart = label.frame.maxX + gap
+        let rightStart = chevron.frame.maxX + gap
         let leftPath = UIBezierPath()
         leftPath.move(to: CGPoint(x: 0, y: centerY))
         leftPath.addLine(to: CGPoint(x: max(leftEnd, 0), y: centerY))
